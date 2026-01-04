@@ -1,6 +1,6 @@
 module.exports = {
 
-  title: 'Vue Admin Template',
+  title: '虚拟数据中心原位调度子系统',
 
   /**
    * @type {boolean} true | false

@@ -47,6 +47,7 @@ export const constantRoutes = [
     path: "/",
     component: Layout,
     redirect: "/dashboard",
+    hidden: true,
     children: [
       {
         path: "Dashboard",
@@ -62,6 +63,7 @@ export const constantRoutes = [
     component: Layout,
     redirect: "/DevelopCenter/code",
     name: "DevelopCenter",
+    hidden: true,
     alwaysShow: true,
     meta: {
       title: "开发中心",
@@ -115,6 +117,7 @@ export const constantRoutes = [
     component: Layout,
     redirect: "/SpyCenter/server_spy",
     name: "SpyCenter",
+    hidden: true,
     alwaysShow: true,
     meta: {
       title: "监控中心",
@@ -180,6 +183,7 @@ export const constantRoutes = [
     component: Layout,
     redirect: "/ModelTaskCenter/CreateModels",
     name: "ModelTaskCenter",
+    hidden: true,
     alwaysShow: true,
     meta: {
       title: "模型中心",
@@ -206,6 +210,7 @@ export const constantRoutes = [
     component: Layout,
     redirect: "/AnalyzeCenter/CreatePredictTask",
     name: "AnalyzeCenter",
+    hidden: true,
     alwaysShow: true,
     meta: {
       title: "分析中心",
@@ -233,6 +238,7 @@ export const constantRoutes = [
     component: Layout,
     redirect: "/SchemeCenter/CreateTask",
     name: "SchemeCenter",
+    hidden: true,
     alwaysShow: true,
     meta: {
       title: "规划中心",
@@ -298,6 +304,7 @@ export const constantRoutes = [
     component: Layout,
     redirect: "/ExecuteCenter/OpenFaas",
     name: "ExecuteCenter",
+    hidden: true,
     alwaysShow: true,
     meta: {
       title: "执行中心",
