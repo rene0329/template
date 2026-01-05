@@ -24,27 +24,27 @@
                 <el-table-column
                   prop="task_id"
                   label="任务ID"
-                  :min-width="120"
+                  :min-width="140"
                   sortable
                   align="center"
                 />
                 <el-table-column
                   prop="required_data"
                   label="需要的数据"
-                  :min-width="240"
+                  :min-width="140"
                   align="center"
                 />
                 <el-table-column
                   prop="create_time"
                   label="创建时间"
                   sortable
-                  :min-width="220"
+                  :min-width="140"
                   align="center"
                 />
                 <el-table-column
                   prop="task_status"
                   label="任务状态"
-                  :min-width="180"
+                  :min-width="140"
                   align="center"
                 />
               </el-table>
@@ -283,10 +283,16 @@ export default {
   gap: 8px;
   background: transparent;
 }
+.search-container :deep(.el-form--inline) {
+  display: flex;
+  align-items: center;
+}
 .search-container :deep(.el-form--inline .el-form-item) {
   margin-right: 8px;
   margin-bottom: 0;
-  vertical-align: top;
+}
+.search-container :deep(.el-form-item__content) {
+  line-height: 32px;
 }
 .search-container :deep(.el-input__inner) {
   height: 32px;
@@ -296,7 +302,6 @@ export default {
   height: 32px;
   line-height: 32px;
   padding: 0 16px;
-  vertical-align: top;
 }
 .content-row { display: flex; flex-wrap: wrap; gap: 16px; }
 .table-card {

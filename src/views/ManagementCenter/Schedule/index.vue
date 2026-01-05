@@ -331,10 +331,16 @@ export default {
   gap: 8px;
   background: transparent;
 }
+.search-container :deep(.el-form--inline) {
+  display: flex;
+  align-items: center;
+}
 .search-container :deep(.el-form--inline .el-form-item) {
   margin-right: 8px;
   margin-bottom: 0;
-  vertical-align: top;
+}
+.search-container :deep(.el-form-item__content) {
+  line-height: 32px;
 }
 .search-container :deep(.el-input__inner) {
   height: 32px;
@@ -344,7 +350,6 @@ export default {
   height: 32px;
   line-height: 32px;
   padding: 0 16px;
-  vertical-align: top;
 }
 .content-row { 
   display: flex; 
