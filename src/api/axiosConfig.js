@@ -27,14 +27,26 @@ request.interceptors.request.use((config) => {
 })
 
 // 响应拦截器
-request.interceptors.response.use((res) => {
-  // 响应成功的回调函数，服务器响应数据回来以后，可以做一些事情
-  nprogress.done()
-  return res.data
-}, (error) => {
-  // 响应失败的回调函数
-  return Promise.reject(error) // 返回一个失败的promise,会进入到axios的catch中
-  // 20230803修改-何诗锟--很重要
-})
+request.interceptors.response.use(
+  (res) => {
+    nprogress.done()
+    const payload = res.data // 期望格式 { code, msg, data }
+    if (payload === undefined) {
+      return Promise.reject(new Error('Empty response'))
+    }
+    const { code, msg, data } = payload
+    if (code === 0) {
+      // 成功时返回 data，分页场景直接是 { list, total, pageNum, pageSize }
+      return data
+    }
+    // 非 0 认为失败，抛出带 msg 的错误，方便 UI 提示
+    return Promise.reject(new Error(msg || 'Request failed'))
+  },
+  (error) => {
+    nprogress.done()
+    return Promise.reject(error) // 返回一个失败的promise,会进入到axios的catch中
+    // 20230803修改-何诗锟--很重要
+  }
+)
 
 export default request

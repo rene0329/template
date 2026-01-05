@@ -187,7 +187,7 @@ export default {
       this.loading = true
       try {
         const res = await fetchNodeSettings(this.currentPage, this.pageSize, this.formInline.name)
-        this.TaskData = res.data || res.result || []
+        this.TaskData = res.list || []
         this.total = res.total || this.TaskData.length
       } catch (err) {
         console.error('获取节点配置失败:', err)

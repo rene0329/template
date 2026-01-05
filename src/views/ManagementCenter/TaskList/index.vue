@@ -124,7 +124,7 @@ export default {
       this.loading = true
       try {
         const res = await fetchTaskList(this.currentPage, this.pageSize, this.formInline.name)
-        this.TaskData = res.data || res.result || []
+        this.TaskData = res.list || []
         this.total = res.total || this.TaskData.length
       } catch (err) {
         console.error('获取任务列表失败:', err)

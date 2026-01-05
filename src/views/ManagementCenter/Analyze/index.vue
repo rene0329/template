@@ -103,7 +103,7 @@ export default {
       this.loading = true
       try {
         const res = await fetchAnalysisData(this.currentPage, this.pageSize, this.formInline.name)
-        this.analysisData = res.data || res.result || []
+        this.analysisData = res.list || []
         this.total = res.total || this.analysisData.length
       } catch (err) {
         console.error('获取分析数据失败:', err)

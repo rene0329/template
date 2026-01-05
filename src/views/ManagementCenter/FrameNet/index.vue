@@ -140,8 +140,8 @@ export default {
       this.loading = true
       try {
         const res = await fetchNetworkTopology()
-        this.nodes = res.nodes || res.data?.nodes || []
-        this.edges = res.edges || res.data?.edges || []
+        this.nodes = res.nodes || []
+        this.edges = res.edges || []
         // 如果没有返回数据，使用默认数据
         if (this.nodes.length === 0) {
           this.nodes = [
