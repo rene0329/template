@@ -63,3 +63,58 @@ div:focus {
 .app-container {
   padding: 20px;
 }
+
+// Brand theming for management pages
+$brand-primary: #0c8357;
+$brand-hover: #0bb677;
+
+.analyze-page {
+  .el-pagination {
+    font-size: 14px;
+  }
+
+  // 分页数字选中态
+  .el-pagination .el-pager li.active {
+    color: $brand-primary;
+    border-color: $brand-primary;
+  }
+
+  .el-pagination.is-background .el-pager li:not(.disabled).active {
+    background-color: $brand-primary;
+    border-color: $brand-primary;
+    color: #ffffff;
+  }
+
+  .el-pagination.is-background .el-pager li:not(.disabled):hover {
+    color: $brand-hover;
+    border-color: $brand-hover;
+    background-color: #e6f2ee;
+  }
+
+  .el-pagination button:hover,
+  .el-pagination .el-pager li:hover {
+    color: $brand-hover;
+  }
+
+  // 下拉选择器颜色
+  .el-pagination .el-select .el-input .el-input__inner:focus {
+    border-color: $brand-primary;
+  }
+  
+  .el-select-dropdown__item.selected {
+    color: $brand-primary;
+  }
+  
+  .el-select .el-input.is-focus .el-input__inner {
+    border-color: $brand-primary;
+  }
+}
+
+// 全局下拉选择器主题色
+.el-select-dropdown__item.selected {
+  color: $brand-primary !important;
+}
+
+.el-select-dropdown__item:hover {
+  background-color: #e6f2ee;
+}

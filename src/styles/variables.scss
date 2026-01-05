@@ -1,7 +1,7 @@
 // sidebar (light theme per design)
 $menuText:#333333;
-$menuActiveText:#4ec58c;
-$subMenuActiveText:#4ec58c; // active text for submenu
+$menuActiveText:#0c8357;
+$subMenuActiveText:#0c8357; // active text for submenu
 
 $menuBg:#FFFFFF;
 $menuHover:#f5f7fa;
@@ -9,7 +9,7 @@ $menuHover:#f5f7fa;
 $subMenuBg:#FFFFFF;
 $subMenuHover:#f5f7fa;
 
-$sideBarWidth: 210px;
+$sideBarWidth: 208px;
 
 // the :export directive is the magic sauce for webpack
 // https://www.bluematador.com/blog/how-to-share-variables-between-js-and-sass

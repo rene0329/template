@@ -91,14 +91,14 @@ export default {
 /* ✅ 1) 父级：只变绿字，不要灰底/不要绿条 */
 .sidebar-container :deep(.el-submenu.is-active > .el-submenu__title),
 .sidebar-container :deep(.el-submenu.is-opened > .el-submenu__title) {
-  color: #4ec58c !important;
+  color: #0c8357 !important;
   background-color: transparent !important;
 }
 
 /* ✅ 2) 子级（叶子菜单）：灰底 + 绿字 + 右侧绿条 */
 .sidebar-container :deep(.el-menu-item.is-active) {
   background-color: #f0f2f5 !important;
-  color: #4ec58c !important;
+  color: #0c8357 !important;
   position: relative;
 }
 
@@ -109,19 +109,24 @@ export default {
   width: 100%;
   height: 100%;
   background-color: #f0f2f5 !important;
-  color: #4ec58c !important;
+  color: #0c8357 !important;
 }
 
-/* 右侧绿条：只给子级 */
+/* 右侧绿条：占满整行高度的矩形条 */
 .sidebar-container :deep(.el-menu-item.is-active::after) {
   content: "";
   position: absolute;
   right: 0;
-  top: 6px;
-  bottom: 6px;
+  top: 0;
+  bottom: 0;
   width: 4px;
-  background: #4ec58c;
-  border-radius: 2px;
+  background: linear-gradient(180deg, #497aae 0%, #4ec58c 100%);
+  border-radius: 0;
+}
+
+/* Hover on active item: use hover gradient per spec */
+.sidebar-container :deep(.el-menu-item.is-active:hover::after) {
+  background: linear-gradient(180deg, #335f8d 0%, #3da371 100%);
 }
 
 /* ✅ 3) 明确禁止父级出现右侧绿条（防止残留样式影响） */

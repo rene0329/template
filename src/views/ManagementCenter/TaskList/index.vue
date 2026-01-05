@@ -53,14 +53,21 @@
         </div>
         <div class="page-footer">
           <div class="pagination-container">
+            <span class="pagination-total">共 {{ filteredDataCount }} 条</span>
+            <span class="pagination-sizes-label">每页</span>
+            <el-select v-model="pageSize" size="mini" class="pagination-sizes-select" @change="handleSizeChange">
+              <el-option :value="5" label="5"></el-option>
+              <el-option :value="10" label="10"></el-option>
+              <el-option :value="20" label="20"></el-option>
+              <el-option :value="50" label="50"></el-option>
+            </el-select>
+            <span class="pagination-sizes-label">条</span>
             <el-pagination
               :current-page="currentPage"
               :page-size="pageSize"
-              :page-sizes="[5, 10, 20, 50]"
-              layout="total, sizes, prev, pager, next, jumper"
+              layout="prev, pager, next, jumper"
               :total="filteredDataCount"
               @current-change="handleCurrentChange"
-              @pagination="handleSizeChange"
             />
           </div>
         </div>
@@ -279,6 +286,17 @@ export default {
 .search-container :deep(.el-form--inline .el-form-item) {
   margin-right: 8px;
   margin-bottom: 0;
+  vertical-align: top;
+}
+.search-container :deep(.el-input__inner) {
+  height: 32px;
+  line-height: 32px;
+}
+.search-container :deep(.el-button) {
+  height: 32px;
+  line-height: 32px;
+  padding: 0 16px;
+  vertical-align: top;
 }
 .content-row { display: flex; flex-wrap: wrap; gap: 16px; }
 .table-card {
@@ -332,6 +350,10 @@ export default {
   background: #f5f7fa;
   color: #333333;
   font-weight: 600;
+  padding: 16px 0;
+}
+:deep(.el-table__body td) {
+  padding: 16px 0;
 }
 :deep(.el-button--primary) {
   background: linear-gradient(90deg, #4ec58c, #497aae);
@@ -360,5 +382,32 @@ export default {
 :deep(.el-button--text:hover),
 :deep(.el-button--text:focus) {
   color: #0bb677;
+}
+.pagination-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 20px 0;
+}
+.pagination-total {
+  font-size: 14px;
+  color: #606266;
+  margin-right: 8px;
+}
+.pagination-sizes-label {
+  font-size: 14px;
+  color: #606266;
+}
+.pagination-sizes-select {
+  width: 70px;
+}
+.pagination-sizes-select :deep(.el-input__inner) {
+  height: 28px;
+  line-height: 28px;
+  padding: 0 8px;
+}
+.pagination-sizes-select :deep(.el-input__suffix) {
+  right: 5px;
 }
 </style>

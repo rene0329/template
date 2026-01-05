@@ -6,7 +6,7 @@
         <div class="search-container">
           <el-form :inline="true" :model="formInline" size="medium">
             <el-form-item>
-              <el-input v-model="formInline.name" placeholder="请作数据集名称" />
+              <el-input v-model="formInline.name" placeholder="请输入数据集名称" />
             </el-form-item>
             <el-button @click="onSearch">搜索</el-button>
             <el-button @click="onCancel">重置</el-button>
@@ -64,17 +64,16 @@
                 <el-table-column label="操作" :min-width="180" align="center" header-align="center">
                   <template slot-scope="scope">
                     <el-button 
-                      type="success" 
-                      size="mini" 
+                      type="text" 
                       @click="openTaskDialog(scope.row)"
-                      style="margin-right: 5px;"
+                      class="link-btn"
                     >
                       更新
                     </el-button>
                     <el-button 
-                      type="success" 
-                      size="mini" 
+                      type="text" 
                       @click="deletescopeTask(scope.row)"
+                      class="link-btn"
                     >
                       禁用
                     </el-button>
@@ -141,14 +140,21 @@
 
         <div class="page-footer">
           <div class="pagination-container">
+            <span class="pagination-total">共 {{ filteredDataCount }} 条</span>
+            <span class="pagination-sizes-label">每页</span>
+            <el-select v-model="pageSize" size="mini" class="pagination-sizes-select" @change="handleSizeChange">
+              <el-option :value="5" label="5"></el-option>
+              <el-option :value="10" label="10"></el-option>
+              <el-option :value="20" label="20"></el-option>
+              <el-option :value="50" label="50"></el-option>
+            </el-select>
+            <span class="pagination-sizes-label">条</span>
             <el-pagination
               :current-page="currentPage"
               :page-size="pageSize"
-              :page-sizes="[5, 10, 20, 50]"
-              layout="total, sizes, prev, pager, next, jumper"
+              layout="prev, pager, next, jumper"
               :total="filteredDataCount"
               @current-change="handleCurrentChange"
-              @pagination="handleSizeChange"
             />
           </div>
         </div>
@@ -475,6 +481,22 @@ export default {
 .search-container :deep(.el-form--inline .el-form-item) {
   margin-right: 8px;
   margin-bottom: 0;
+  vertical-align: top;
+}
+.search-container :deep(.el-input__inner) {
+  height: 32px;
+  line-height: 32px;
+}
+.search-container :deep(.el-button) {
+  height: 32px;
+  line-height: 32px;
+  padding: 0 16px;
+  vertical-align: top;
+}
+.action-buttons :deep(.el-button) {
+  height: 32px;
+  line-height: 32px;
+  padding: 0 16px;
 }
 .action-buttons {
   display: flex;
@@ -509,7 +531,27 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 8px;
+}
+.pagination-total {
+  font-size: 14px;
+  color: #606266;
+  margin-right: 8px;
+}
+.pagination-sizes-label {
+  font-size: 14px;
+  color: #606266;
+}
+.pagination-sizes-select {
+  width: 70px;
+}
+.pagination-sizes-select :deep(.el-input__inner) {
+  height: 28px;
+  line-height: 28px;
+  padding: 0 8px;
+}
+.pagination-sizes-select :deep(.el-input__suffix) {
+  right: 5px;
 }
 .copyright-bar {
   height: 30px;
@@ -525,6 +567,10 @@ export default {
   background: #f5f7fa;
   color: #333333;
   font-weight: 600;
+  padding: 16px 0;
+}
+:deep(.el-table__body td) {
+  padding: 16px 0;
 }
 :deep(.el-button--primary) {
   background: linear-gradient(90deg, #4ec58c, #497aae);
@@ -560,10 +606,19 @@ export default {
 }
 :deep(.el-button--text) {
   color: #0c8357;
+  padding: 0 16px;
+  height: 32px;
 }
 :deep(.el-button--text:hover),
 :deep(.el-button--text:focus) {
   color: #0bb677;
+}
+.link-btn {
+  color: #0c8357 !important;
+  padding: 0 8px !important;
+}
+.link-btn:hover {
+  color: #0bb677 !important;
 }
 .charts {
   display: flex;

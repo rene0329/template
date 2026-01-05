@@ -47,3 +47,31 @@
 .el-range-separator {
   box-sizing: content-box;
 }
+
+// Custom theme for el-select
+.el-select .el-input.is-focus .el-input__inner {
+  border-color: #0c8357 !important;
+}
+.el-select .el-input__inner:focus {
+  border-color: #0c8357 !important;
+}
+.el-select-dropdown__item.selected {
+  color: #0c8357 !important;
+}
+.el-select-dropdown__item:hover {
+  background-color: #e6f2ee !important;
+}
+
+// Custom pagination theme
+.el-pagination .el-pager li.active {
+  color: #0c8357 !important;
+}
+.el-pagination .el-pager li:hover {
+  color: #0c8357 !important;
+}
+.el-pagination button:hover {
+  color: #0c8357 !important;
+}
+.el-pagination .el-input__inner:focus {
+  border-color: #0c8357 !important;
+}

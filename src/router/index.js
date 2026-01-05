@@ -45,16 +45,8 @@ export const constantRoutes = [
 
   {
     path: "/",
-    component: Layout,
-    redirect: "/dashboard",
-    children: [
-      {
-        path: "Dashboard",
-        name: "Home",
-        component: () => import("@/views/home/index"),
-        meta: { title: "主页", icon: "dashboard", itemHeight: 48 },
-      },
-    ],
+    redirect: "/ManagementCenter/Settings",
+    hidden: true,
   },
   // 开发中心模块
   {
@@ -501,61 +493,90 @@ export const constantRoutes = [
   //   ]
   // },
 
-  // 管理中心模块
+  // 管理中心各页面扁平化为一级菜单
   {
     path: "/ManagementCenter",
     component: Layout,
     redirect: "/ManagementCenter/Settings",
-    name: "ManagementCenter",
-    alwaysShow: true,
-    meta: {
-      title: "管理中心",
-      icon: "form",
-      itemHeight: 48,
-    },
     children: [
       {
         path: "Settings",
-        component: () => import("@/views/ManagementCenter/Settings/index"),
         name: "Settings",
+        component: () => import("@/views/ManagementCenter/Settings/index"),
         meta: { title: "网络配置", icon: "任务", itemHeight: 40 },
       },
+    ],
+  },
+  {
+    path: "/ManagementCenter",
+    component: Layout,
+    children: [
       {
         path: "FrameNet",
-        component: () => import("@/views/ManagementCenter/FrameNet/index"),
         name: "FrameNet",
+        component: () => import("@/views/ManagementCenter/FrameNet/index"),
         meta: { title: "网络结构", icon: "任务", itemHeight: 40 },
       },
+    ],
+  },
+  {
+    path: "/ManagementCenter",
+    component: Layout,
+    children: [
       {
         path: "DataManagement",
-        component: () => import("@/views/ManagementCenter/DataManagement/index"),
         name: "DataManagement",
+        component: () => import("@/views/ManagementCenter/DataManagement/index"),
         meta: { title: "数据管理", icon: "部署工作2", itemHeight: 40 },
       },
+    ],
+  },
+  {
+    path: "/ManagementCenter",
+    component: Layout,
+    children: [
       {
         path: "SelectData",
-        component: () => import("@/views/ManagementCenter/SelectData/index"),
         name: "SelectData",
+        component: () => import("@/views/ManagementCenter/SelectData/index"),
         meta: { title: "数据选择", icon: "任务调度", itemHeight: 40 },
       },
+    ],
+  },
+  {
+    path: "/ManagementCenter",
+    component: Layout,
+    children: [
       {
         path: "TaskList",
-        component: () => import("@/views/ManagementCenter/TaskList/index"),
         name: "TaskList",
+        component: () => import("@/views/ManagementCenter/TaskList/index"),
         meta: { title: "任务列表", icon: "伸缩", itemHeight: 40 },
       },
+    ],
+  },
+  {
+    path: "/ManagementCenter",
+    component: Layout,
+    children: [
       {
         path: "Schedule",
-        component: () => import("@/views/ManagementCenter/Schedule/index"),
         name: "Schedule",
+        component: () => import("@/views/ManagementCenter/Schedule/index"),
         meta: { title: "调度展示", icon: "任务调度", itemHeight: 40 },
       },
+    ],
+  },
+  {
+    path: "/ManagementCenter",
+    component: Layout,
+    children: [
       {
         path: "Analyze",
-        component: () => import("@/views/ManagementCenter/Analyze/index"),
         name: "Analyze",
+        component: () => import("@/views/ManagementCenter/Analyze/index"),
         meta: { title: "性能分析", icon: "任务调度", itemHeight: 40 },
-      }
+      },
     ],
   },
 
