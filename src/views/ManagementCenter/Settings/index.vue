@@ -19,35 +19,29 @@
               <el-table
                 :data="currentPageData"
                 style="width: 100%; min-width: 960px;"
-                :default-sort="{prop: 'id', order: 'upward'}"
+                :default-sort="{prop: 'nodeId', order: 'upward'}"
               >
                 <el-table-column
-                  prop="id"
+                  prop="nodeId"
                   label="编号"
                   :min-width="120"
                   sortable
                   align="center"
                 />
-                <el-table-column prop="node_name" label="节点名称" :min-width="150" align="center">
+                <el-table-column prop="nodeName" label="节点名称" :min-width="150" align="center">
                   <template slot-scope="{ row }">
-                    <el-link type="primary" @click="openDetail(row)">{{ row.node_name }}</el-link>
+                    <el-link type="primary" @click="openDetail(row)">{{ row.nodeName }}</el-link>
                   </template>
                 </el-table-column>
                 <el-table-column
-                  prop="ip_address"
+                  prop="internalIp"
                   label="IP地址"
                   sortable
                   :min-width="150"
                   align="center"
                 />
                 <el-table-column
-                  prop="subnet_mask"
-                  label="掩码"
-                  :min-width="150"
-                  align="center"
-                />
-                <el-table-column
-                  prop="node_type"
+                  prop="type"
                   label="节点类型"
                   :min-width="140"
                   align="center"

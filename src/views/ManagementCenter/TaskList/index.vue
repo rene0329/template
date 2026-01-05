@@ -19,30 +19,30 @@
               <el-table
                 :data="currentPageData"
                 style="width: 100%;"
-                :default-sort="{prop: 'task_id', order: 'upward'}"
+                :default-sort="{prop: 'taskId', order: 'upward'}"
               >
                 <el-table-column
-                  prop="task_id"
+                  prop="taskId"
                   label="任务ID"
                   :min-width="140"
                   sortable
                   align="center"
                 />
                 <el-table-column
-                  prop="required_data"
+                  prop="selectedData"
                   label="需要的数据"
                   :min-width="140"
                   align="center"
                 />
                 <el-table-column
-                  prop="create_time"
+                  prop="createTime"
                   label="创建时间"
                   sortable
                   :min-width="140"
                   align="center"
                 />
                 <el-table-column
-                  prop="task_status"
+                  prop="status"
                   label="任务状态"
                   :min-width="140"
                   align="center"

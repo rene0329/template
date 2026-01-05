@@ -26,37 +26,37 @@
                 style="width: 100%;"
               >
                 <el-table-column
-                  prop="id"
+                  prop="dataName"
                   label="数据名称"
                   :min-width="150"
                   align="center"
                 />
                 <el-table-column
-                  prop="node_name"
+                  prop="dataSize"
                   label="大小"
                   :min-width="140"
                   align="center"
                 />
                 <el-table-column
-                  prop="ip_address"
+                  prop="dataHeat"
                   label="热度"
                   :min-width="140"
                   align="center"
                 />
                 <el-table-column
-                  prop="subnet_mask"
+                  prop="dataStatus"
                   label="状态"
                   :min-width="140"
                   align="center"
                 />
                 <el-table-column
-                  prop="node_type"
+                  prop="dataServer"
                   label="存储节点"
                   :min-width="140"
                   align="center"
                 />
                 <el-table-column
-                  prop="cluster"
+                  prop="backupServer"
                   label="备份节点"
                   :min-width="140"
                   align="center"
