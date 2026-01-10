@@ -572,15 +572,32 @@ export default {
   background: #f5f7fa;
   color: #333333;
   font-weight: 600;
-  padding: 16px 0;
+  line-height: 54px;
 }
 :deep(.el-table__body td) {
-  padding: 16px 0;
+  line-height: 54px;
 }
+:deep(.el-table__empty-block) {
+  min-height: 54px;            /* 空状态区域高度 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;          /* 想要淡灰底 */
+}
+
+:deep(.el-table__empty-text) {
+  color: #909399;
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+
 :deep(.el-button--primary) {
   background: linear-gradient(90deg, #4ec58c, #497aae);
   border-color: #4ec58c;
   color: #ffffff;
+  height: 32px;
+  line-height: 32px;
+  padding: 0 16px;
 }
 :deep(.el-button--primary:hover),
 :deep(.el-button--primary:focus) {

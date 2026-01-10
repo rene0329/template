@@ -65,6 +65,15 @@ export default {
   border-right: none;
 }
 
+/* 覆盖 Element UI 默认的 56px（更高优先级，适用于所有菜单项） */
+.sidebar-container :deep(.el-menu-item),
+.sidebar-container :deep(.el-submenu__title),
+.sidebar-container :deep(.el-menu .el-menu-item),
+.sidebar-container :deep(.el-menu .el-submenu__title) {
+  height: 48px !important;
+  line-height: 48px !important;
+}
+
 /* Root item (submenu title) height 48px */
 .sidebar-container :deep(.el-submenu__title) {
   height: 48px;
@@ -73,8 +82,30 @@ export default {
   color: #333333;
 }
 
+/* Top-level leaf item height 48px */
+// .sidebar-container :deep(.el-menu > .el-menu-item) {
+//   height: 48px;
+//   line-height: 48px;
+//   font-size: 14px;
+//   color: #333333;
+// }
+/* 一级：有些是 el-menu 直接包 li，有些是 el-menu -> a -> li（router-link） */
+.sidebar-container :deep(.el-menu > .el-menu-item),
+.sidebar-container :deep(.el-menu > a > .el-menu-item) {
+  height: 48px !important;
+  line-height: 48px !important;
+  font-size: 14px;
+}
+
+/* 一级：submenu 标题（一般不被 a 包，但也保持 48） */
+.sidebar-container :deep(.el-menu > .el-submenu > .el-submenu__title) {
+  height: 48px !important;
+  line-height: 48px !important;
+  font-size: 14px;
+}
+
 /* Child item height 40px */
-.sidebar-container :deep(.el-menu-item) {
+.sidebar-container :deep(.el-submenu .el-menu-item) {
   height: 40px;
   line-height: 40px;
   font-size: 14px;
