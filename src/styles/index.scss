@@ -10,15 +10,77 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   font-family: Helvetica Neue, Helvetica, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Arial, sans-serif;
-}
-
-label {
-  font-weight: 700;
+    
 }
 
 html {
   height: 100%;
   box-sizing: border-box;
+   
+}
+////////////////////////////* 全局隐藏滚动条，但允许滚动 *////////////////////////////
+/* 允许滚动，但隐藏竖向滚动条（Chrome/Edge/Safari） */
+html, body {
+  overflow-y: auto;     /* 还能滚 */
+  overflow-x: hidden;
+}
+
+/* Chrome/Edge/Safari */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* Firefox */
+html, body {
+  scrollbar-width: none;
+}
+
+/* IE/旧Edge（如果你们还兼容的话） */
+html, body {
+  -ms-overflow-style: none;
+}
+
+/******** 1) Element el-scrollbar：只隐藏竖向 bar ********/
+.el-scrollbar__bar.is-vertical {
+  display: none !important;
+  opacity: 0 !important;
+  width: 0 !important;
+}
+.el-scrollbar__wrap {
+  overflow: auto !important; /* 仍能滚 */
+}
+
+/******** 2) 原生滚动条：只隐藏竖向 scrollbar ********/
+/* Firefox */
+html, body,
+#app,
+.el-main,
+.page-main,
+.app-main,
+.main-container {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+/* Chrome/Edge/Safari：只把竖向宽度设为 0，不动横向高度 */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+#app::-webkit-scrollbar,
+.el-main::-webkit-scrollbar,
+.page-main::-webkit-scrollbar,
+.app-main::-webkit-scrollbar,
+.main-container::-webkit-scrollbar {
+  width: 0 !important;    /* 隐藏竖条 */
+}
+
+
+
+////////////////////////////* 全局隐藏滚动条，但允许滚动 *////////////////////////////
+
+label {
+  font-weight: 700;
 }
 
 #app {

@@ -17,6 +17,7 @@
           <div class="table-card">
             <div class="table-wrapper">
               <el-table
+                class="my-table"
                 :data="currentPageData"
                 style="width: 100%;"
                 :default-sort="{prop: 'taskId', order: 'upward'}"
@@ -351,15 +352,28 @@ export default {
 .node-detail-dialog .el-dialog__body { padding-bottom: 24px; }
 
 /* 颜色规范：按钮与表头 */
-:deep(.el-table__header th) {
+:deep(.my-table .el-table__header-wrapper th.el-table__cell) {
+  height: 54px;
+  padding: 0 !important;      /* 关键：干掉默认 padding 才能保证总高=54 */
   background: #f5f7fa;
   color: #333333;
   font-weight: 600;
+}
+
+/* 表头文字容器也锁定为 54，确保垂直居中 */
+:deep(.my-table .el-table__header-wrapper th.el-table__cell .cell) {
+  line-height: 54px;
+  padding: 0 !important;
+}
+:deep(.my-table .el-table__body-wrapper td.el-table__cell) {
+  height: 54px;
+  padding: 0 !important;
+}
+
+:deep(.my-table .el-table__body-wrapper td.el-table__cell .cell) {
   line-height: 54px;
 }
-:deep(.el-table__body td) {
-  line-height: 54px;
-}
+
 :deep(.el-table__empty-block) {
   min-height: 54px;            /* 空状态区域高度 */
   display: flex;
