@@ -1,7 +1,7 @@
 <template>
   <div class="navbar">
     <div class="bottom-bar">
-      <hamburger :is-active="sidebar.opened" class="hamburger-container" @toggleClick="toggleSideBar" />
+      <hamburger :is-active="sidebar.opened" class="hamburger-container" style="padding: 0px 10px;" @toggleClick="toggleSideBar" />
 
       <breadcrumb class="breadcrumb-container" />
 
@@ -58,7 +58,7 @@ export default {
     align-items: center;
     justify-content: center;
     width: 40px;
-    height: 100%;
+    height: 40px;
     cursor: pointer;
     transition: background .3s;
     -webkit-tap-highlight-color: transparent;
@@ -67,10 +67,16 @@ export default {
       background: rgba(0, 0, 0, .025);
     }
   }
+  .hamburger-container :deep(svg.hamburger) {
+  width: 30px;
+  height: 30px;
+  display: block;
+  }
+
 
   .breadcrumb-container {
     flex: 1;
-    margin-left: 12px;
+    margin-left: 0px;
   }
 
   .right-menu {

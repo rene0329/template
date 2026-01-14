@@ -11,6 +11,9 @@
             <el-button @click="onSearch">搜索</el-button>
             <el-button @click="onCancel">重置</el-button>
           </el-form>
+          <div class="action-buttons">
+            <el-button type="primary" @click="handleSubmit" :disabled="selectedRows.length === 0">新建任务</el-button>
+          </div>
         </div>
         <div class="content-row">
           <div class="table-card">
@@ -50,17 +53,6 @@
               </el-table>
             </div>
           </div>
-        </div>
-        <div class="submit-bar">
-          <el-button
-            type="primary"
-            size="medium"
-            :disabled="selectedRows.length === 0"
-            @click="handleSubmit"
-            style="width: 100%;"
-          >
-            提交
-          </el-button>
         </div>
         <div class="page-footer">
           <div class="pagination-container">
