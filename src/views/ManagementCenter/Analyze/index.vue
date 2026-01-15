@@ -17,6 +17,7 @@
           <div class="table-card">
             <div class="table-wrapper">
               <el-table
+                class="my-table"
                 :data="currentPageData"
                 style="width: 100%;"
               >
