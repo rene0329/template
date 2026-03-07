@@ -22,28 +22,28 @@
                 style="width: 100%;"
               >
                 <el-table-column
-                  prop="task_id"
+                  prop="taskId"
                   label="任务ID"
                   :min-width="120"
                   sortable
                   align="center"
                 />
                 <el-table-column
-                  prop="centralized_time"
+                  prop="t2"
                   label="集中式计算数据移动时间/毫秒"
                   :min-width="200"
                   sortable
                   align="center"
                 />
                 <el-table-column
-                  prop="distributed_time"
+                  prop="t1"
                   label="分布式计算数据移动时间/毫秒"
                   :min-width="200"
                   sortable
                   align="center"
                 />
                 <el-table-column
-                  prop="acceleration_ratio"
+                  prop="rating"
                   label="数据移动加速比"
                   :min-width="150"
                   sortable

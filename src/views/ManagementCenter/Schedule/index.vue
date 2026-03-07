@@ -25,17 +25,17 @@
                 class="my-table"
                 :data="currentPageData"
                 style="width: 100%;"
-                :default-sort="{prop: 'task_id', order: 'upward'}"
+                :default-sort="{prop: 'taskId', order: 'upward'}"
               >
                 <el-table-column
-                  prop="task_id"
+                  prop="taskId"
                   label="任务ID"
                   :min-width="180"
                   sortable
                   align="center"
                 />
                 <el-table-column
-                  prop="scheduling_plan"
+                  prop="schedule"
                   label="调度方案"
                   :min-width="420"
                   align="center"
@@ -48,12 +48,11 @@
                   width="120"
                 />-->
                 <el-table-column
-                  prop="task_create_time"
+                  prop="createTime"
                   label="创建时间"
                   width="200"
                   sortable
-                  :formatter="formatter"
-                />-->
+                />
              
               </el-table>
             </div>
