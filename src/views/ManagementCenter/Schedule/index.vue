@@ -25,7 +25,6 @@
                 class="my-table"
                 :data="currentPageData"
                 style="width: 100%;"
-                :default-sort="{prop: 'taskId', order: 'upward'}"
               >
                 <el-table-column
                   prop="taskId"
