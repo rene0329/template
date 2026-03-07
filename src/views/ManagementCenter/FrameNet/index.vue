@@ -140,8 +140,37 @@ export default {
       this.loading = true
       try {
         const res = await fetchNetworkTopology()
-        this.nodes = res.nodes || []
-        this.edges = res.edges || []
+        const rawNodes = res.nodes || []
+        const rawEdges = res.edges || res.links || []
+
+        // 后端节点标准化
+        this.nodes = rawNodes.map((n, idx) => {
+          const angle = (idx / Math.max(rawNodes.length, 1)) * Math.PI * 2
+          const radius = 180
+          const centerX = 540
+          const centerY = 340
+          const cpu = n.maxCpu ? Number((((n.currentCpu || 0) / n.maxCpu) * 100).toFixed(2)) : 0
+          return {
+            id: n.nodeId,
+            label: n.nodeName || `node-${n.nodeId}`,
+            x: n.x || Math.round(centerX + radius * Math.cos(angle)),
+            y: n.y || Math.round(centerY + radius * Math.sin(angle)),
+            width: n.width || 110,
+            height: n.height || 44,
+            cpu,
+            disk: n.disk || 0
+          }
+        })
+
+        // 后端链路标准化
+        this.edges = rawEdges.map((e, idx) => ({
+          id: e.edgeId || `edge-${idx}`,
+          source: e.source != null ? e.source : e.sourceId,
+          target: e.target != null ? e.target : e.targetId,
+          latency: Number(e.latency || 0),
+          bandwidth: Number(e.bandwidth || 0)
+        }))
+
         // 如果没有返回数据，使用默认数据
         if (this.nodes.length === 0) {
           this.nodes = [
@@ -286,6 +315,7 @@ export default {
     getEdgePath(e) {
       const s = this.nodes.find(n => n.id === e.source)
       const t = this.nodes.find(n => n.id === e.target)
+      if (!s || !t) return ''
       return `M${s.x},${s.y} L${t.x},${t.y}`
     },
     getEdgeColor(latency) {

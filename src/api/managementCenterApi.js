@@ -124,6 +124,17 @@ export const submitSelectedDatasets = (datasetIds) => {
   })
 }
 
+/**
+ * 提交数据并创建真实执行任务（统一到后端 submitData 异步执行链路）
+ */
+export const submitTaskWithDatas = (currentTaskId, selectedDatas) => {
+  return request({
+    url: `/common/submitData/${currentTaskId}`,
+    method: 'post',
+    data: selectedDatas
+  })
+}
+
 // ==================== 调度展示 (Schedule) ====================
 /**
  * 获取调度计划列表

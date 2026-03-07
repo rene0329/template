@@ -46,7 +46,11 @@
                   label="节点类型"
                   :min-width="140"
                   align="center"
-                />
+                >
+                  <template slot-scope="{ row }">
+                    {{ nodeTypeLabel(row.type) }}
+                  </template>
+                </el-table-column>
                 <el-table-column
                   prop="cluster"
                   label="所属集群"
@@ -65,7 +69,7 @@
 
         <!-- 资源使用情况弹窗 -->
         <el-dialog
-          :title="`${selected?.node_name || ''} 资源使用情况`"
+          :title="`${selected?.nodeName || selected?.node_name || ''} 资源使用情况`"
           :visible.sync="dialogVisibleCharts"
           width="900px"
           @opened="initCharts"
@@ -106,7 +110,7 @@
               <el-input v-model="selectedTask.subnet_mask" :disabled="!editing"></el-input>
             </el-form-item>
             <el-form-item label="节点类型" prop="node_type">
-              <el-input v-model="selectedTask.node_type" :disabled="true"></el-input>
+              <el-input :value="nodeTypeLabel(selectedTask.type || selectedTask.node_type)" :disabled="true"></el-input>
             </el-form-item>
             <el-form-item label="所属集群" prop="cluster">
               <el-input v-model="selectedTask.cluster" :disabled="!editing"></el-input>
@@ -227,6 +231,16 @@ export default {
       this.dialogVisibleDetail = false
       this.editing = false
     },
+    nodeTypeLabel(type) {
+      const map = {
+        'storage': '存储节点',
+        'compute-storage': '计算存储节点',
+        'compute': '计算节点',
+        'master': '主节点',
+        'worker': '工作节点'
+      }
+      return map[type] || type || '-'
+    },
     async saveChanges() {
       try {
         await updateNodeSettings(this.selectedTask)
@@ -242,9 +256,17 @@ export default {
       this.selected = row
       // 尝试从服务器获取最新的节点指标
       try {
-        const res = await fetchNodeMetrics(row.id)
-        if (res && res.metrics) {
-          this.selected = { ...row, metrics: res.metrics }
+        const res = await fetchNodeMetrics(row.nodeId)
+        if (res) {
+          const cpu = res.maxCpu ? Number(((res.currentCpu || 0) / res.maxCpu * 100).toFixed(2)) : 0
+          const mem = res.maxMemory ? Number(((res.currentMemory || 0) / res.maxMemory * 100).toFixed(2)) : 0
+          // 当前表结构暂无存储使用率字段，先以 0 占位
+          const disk = 0
+          this.selected = {
+            ...row,
+            ...res,
+            metrics: { cpu, mem, disk }
+          }
         }
       } catch (err) {
         console.warn('获取节点指标失败，使用缓存数据:', err)
@@ -253,7 +275,8 @@ export default {
     },
     initCharts() {
       if (!this.selected) return
-      const { cpu, mem, disk } = this.selected.metrics
+      const metrics = this.selected.metrics || { cpu: 0, mem: 0, disk: 0 }
+      const { cpu, mem, disk } = metrics
 
       const radar = echarts.init(document.getElementById('radar'))
       radar.setOption({

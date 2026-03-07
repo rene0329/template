@@ -116,22 +116,25 @@
         </el-dialog>
 
         <!-- 节点详情对话框 -->
-        <el-dialog title="节点详情" :visible="dialogVisibleDetail" @close="closeTaskDialog" custom-class="node-detail-dialog">
+        <el-dialog title="数据详情" :visible="dialogVisibleDetail" @close="closeTaskDialog" custom-class="node-detail-dialog">
           <el-form :model="selectedTask" :rules="rules" ref="taskForm">
-            <el-form-item label="数据名称" prop="id">
-              <el-input v-model="selectedTask.id" :disabled="!editing"></el-input>
+            <el-form-item label="数据名称" prop="dataName">
+              <el-input v-model="selectedTask.dataName" :disabled="!editing"></el-input>
             </el-form-item>
-            <el-form-item label="大小" prop="node_name">
-              <el-input v-model="selectedTask.node_name" :disabled="!editing"></el-input>
+            <el-form-item label="大小(字节)" prop="dataSize">
+              <el-input v-model="selectedTask.dataSize" :disabled="!editing"></el-input>
             </el-form-item>
-            <el-form-item label="热度" prop="ip_address">
-              <el-input v-model="selectedTask.ip_address" :disabled="!editing"></el-input>
+            <el-form-item label="热度" prop="dataHeat">
+              <el-input v-model="selectedTask.dataHeat" :disabled="!editing"></el-input>
             </el-form-item>
-            <el-form-item label="状态" prop="subnet_mask">
-              <el-input v-model="selectedTask.subnet_mask" :disabled="true"></el-input>
+            <el-form-item label="状态" prop="dataStatus">
+              <el-input v-model="selectedTask.dataStatus" :disabled="true"></el-input>
             </el-form-item>
-            <el-form-item label="存储节点" prop="node_type">
-              <el-input v-model="selectedTask.node_type" :disabled="!editing"></el-input>
+            <el-form-item label="存储节点" prop="dataServer">
+              <el-input v-model="selectedTask.dataServer" :disabled="!editing"></el-input>
+            </el-form-item>
+            <el-form-item label="备份节点" prop="backupServer">
+              <el-input v-model="selectedTask.backupServer" :disabled="!editing"></el-input>
             </el-form-item>
           </el-form>
 
@@ -282,7 +285,7 @@ export default {
     },
     async deletescopeTask(task) {
       try {
-        await toggleDataStatus(task.id)
+        await toggleDataStatus(task.dataName)
         this.$message({ message: '禁用成功', type: 'success' })
         this.fetchData()
       } catch (err) {
@@ -305,7 +308,7 @@ export default {
         this.heatLoading = false
       }
     },
-    // 热敏存储
+    // 热敏存储 — 按热度重新分配存储节点
     async onHeatSensitiveStorage() {
       this.storageLoading = true
       try {
@@ -319,7 +322,7 @@ export default {
         this.storageLoading = false
       }
     },
-    // 原位汇聚
+    // 原位汇聚 — 与热敏制导存储共用同一接口，重新按热度分配存储
     async onInSituAggregation() {
       this.aggregationLoading = true
       try {

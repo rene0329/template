@@ -23,7 +23,7 @@
                 :data="currentPageData"
                 style="width: 100%;"
                 :default-sort="{prop: 'id', order: 'upward'}"
-                row-key="dataset_id"
+                row-key="dataId"
                 @selection-change="handleSelectionChange"
               >
                 <el-table-column
@@ -32,20 +32,20 @@
                   align="center"
                 />
                 <el-table-column
-                  prop="dataset_id"
+                  prop="dataId"
                   label="编号"
                   :min-width="80"
                   sortable
                   align="center"
                 />
                 <el-table-column
-                  prop="dataset_name"
+                  prop="dataName"
                   label="数据集名称"
                   :min-width="150"
                   align="center"
                 />
                 <el-table-column
-                  prop="dataset_description"
+                  prop="dataDescription"
                   label="数据集描述"
                   sortable
                   :min-width="520"
@@ -82,7 +82,7 @@
 </template>
 
 <script>
-import { fetchDatasetList, submitSelectedDatasets } from '@/api/managementCenterApi'
+import { fetchDatasetList, submitTaskWithDatas } from '@/api/managementCenterApi'
 import * as echarts from 'echarts'
 
 export default {
@@ -201,11 +201,13 @@ export default {
         return
       }
 
-      const datasetIds = this.selectedRows.map(r => r.dataset_id)
+      const selectedDatas = this.selectedRows.map(r => r.dataName)
+      // 后端路径参数是 Integer，使用秒级时间戳可避免超出 int 范围
+      const currentTaskId = Math.floor(Date.now() / 1000)
 
       try {
-        await submitSelectedDatasets(datasetIds)
-        this.$message.success('提交成功')
+        await submitTaskWithDatas(currentTaskId, selectedDatas)
+        this.$message.success('任务已提交，正在后台执行')
         this.selectedRows = []
       } catch (e) {
         console.error('提交失败:', e)
