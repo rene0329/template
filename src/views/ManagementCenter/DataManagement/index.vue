@@ -13,8 +13,8 @@
           </el-form>
           <div class="action-buttons">
             <el-button type="primary" @click="onUpdateHeatAll" :loading="heatLoading">热度全部更新</el-button>
-            <el-button type="primary" @click="onHeatSensitiveStorage" :loading="storageLoading">热敏存储</el-button>
-            <el-button type="primary" @click="onInSituAggregation" :loading="aggregationLoading">原位汇聚</el-button>
+            <el-button type="primary" @click="onHeatSensitiveStorage" :loading="storageLoading" :disabled="hasTaskData">热敏存储</el-button>
+            <el-button type="primary" @click="onInSituAggregation" :loading="aggregationLoading" :disabled="!hasTaskData">原位汇聚</el-button>
           </div>
         </div>
 
@@ -187,7 +187,8 @@ import {
   updateDataItem, 
   toggleDataStatus,
   updateDataHeatAll,
-  saveDataStorageAll 
+  saveDataStorageAll,
+  fetchTaskList
 } from '@/api/managementCenterApi'
 
 export default {
@@ -210,6 +211,7 @@ export default {
       heatLoading: false,
       storageLoading: false,
       aggregationLoading: false,
+      hasTaskData: false,
       // 用于表单搜索
       formInline: {
         name: ''
@@ -244,9 +246,13 @@ export default {
     async fetchData() {
       this.loading = true
       try {
-        const res = await fetchDataManagementList(this.currentPage, this.pageSize, this.formInline.name)
-        this.TaskData = res.list || []
-        this.total = res.total || this.TaskData.length
+        const [dataRes, taskRes] = await Promise.all([
+          fetchDataManagementList(this.currentPage, this.pageSize, this.formInline.name),
+          fetchTaskList(1, 1, '')
+        ])
+        this.TaskData = dataRes.list || []
+        this.total = dataRes.total || this.TaskData.length
+        this.hasTaskData = (taskRes.total || 0) > 0
       } catch (err) {
         console.error('获取数据失败:', err)
         this.$message.error('获取数据失败')
@@ -320,11 +326,11 @@ export default {
         this.heatLoading = false
       }
     },
-    // 热敏存储 — 按热度重新分配存储节点
+    // 热敏存储 — 按热度重新分配存储节点（仅限 task_management 为空时）
     async onHeatSensitiveStorage() {
       this.storageLoading = true
       try {
-        await saveDataStorageAll()
+        await saveDataStorageAll('heat')
         this.$message({ message: '热敏存储执行成功', type: 'success' })
         this.fetchData()
       } catch (err) {
@@ -334,11 +340,11 @@ export default {
         this.storageLoading = false
       }
     },
-    // 原位汇聚 — 与热敏制导存储共用同一接口，重新按热度分配存储
+    // 原位汇聚 — 仅限 task_management 有数据时可用
     async onInSituAggregation() {
       this.aggregationLoading = true
       try {
-        await saveDataStorageAll()
+        await saveDataStorageAll('aggregation')
         this.$message({ message: '原位汇聚执行成功', type: 'success' })
         this.fetchData()
       } catch (err) {
