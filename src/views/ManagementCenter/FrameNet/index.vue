@@ -140,65 +140,36 @@ export default {
       this.loading = true
       try {
         const res = await fetchNetworkTopology()
-        const rawNodes = res.nodes || []
-        const rawEdges = res.edges || res.links || []
-
-        // 后端节点标准化
-        this.nodes = rawNodes.map((n, idx) => {
-          const angle = (idx / Math.max(rawNodes.length, 1)) * Math.PI * 2
-          const radius = 180
-          const centerX = 540
-          const centerY = 340
-          const cpu = n.maxCpu ? Number((((n.currentCpu || 0) / n.maxCpu) * 100).toFixed(2)) : 0
-          return {
-            id: n.nodeId,
-            label: n.nodeName || `node-${n.nodeId}`,
-            x: n.x || Math.round(centerX + radius * Math.cos(angle)),
-            y: n.y || Math.round(centerY + radius * Math.sin(angle)),
-            width: n.width || 110,
-            height: n.height || 44,
-            cpu,
-            disk: n.disk || 0
-          }
-        })
-
-        // 后端链路标准化
-        this.edges = rawEdges.map((e, idx) => ({
-          id: e.edgeId || `edge-${idx}`,
-          source: e.source != null ? e.source : e.sourceId,
-          target: e.target != null ? e.target : e.targetId,
-          latency: Number(e.latency || 0),
-          bandwidth: Number(e.bandwidth || 0)
-        }))
-
+        this.nodes = this.normalizeNodes(res.nodes || [])
+        this.edges = this.normalizeEdges(res.edges || [])
         // 如果没有返回数据，使用默认数据
         if (this.nodes.length === 0) {
-          this.nodes = [
+          this.nodes = this.normalizeNodes([
             { id: 'master-40', label: 'master-40', x: 480, y: 280, width: 110, height: 44, cpu: 40, disk: 30 },
             { id: 'master-141', label: 'master-141', x: 660, y: 360, width: 110, height: 44, cpu: 55, disk: 45 },
             { id: 'master-215', label: 'master-215', x: 540, y: 460, width: 110, height: 44, cpu: 35, disk: 20 }
-          ]
+          ])
         }
         if (this.edges.length === 0) {
-          this.edges = [
+          this.edges = this.normalizeEdges([
             { source: 'master-40', target: 'master-141', latency: 30, bandwidth: 500 },
             { source: 'master-40', target: 'master-215', latency: 45, bandwidth: 420 },
             { source: 'master-215', target: 'master-141', latency: 29, bandwidth: 540 }
-          ]
+          ])
         }
       } catch (err) {
         console.error('获取网络拓扑失败:', err)
         // 失败时使用默认数据
-        this.nodes = [
+        this.nodes = this.normalizeNodes([
           { id: 'master-40', label: 'master-40', x: 480, y: 280, width: 110, height: 44, cpu: 40, disk: 30 },
           { id: 'master-141', label: 'master-141', x: 660, y: 360, width: 110, height: 44, cpu: 55, disk: 45 },
           { id: 'master-215', label: 'master-215', x: 540, y: 460, width: 110, height: 44, cpu: 35, disk: 20 }
-        ]
-        this.edges = [
+        ])
+        this.edges = this.normalizeEdges([
           { source: 'master-40', target: 'master-141', latency: 30, bandwidth: 500 },
           { source: 'master-40', target: 'master-215', latency: 45, bandwidth: 420 },
           { source: 'master-215', target: 'master-141', latency: 29, bandwidth: 540 }
-        ]
+        ])
       } finally {
         this.loading = false
         this.computeClusters()
@@ -207,22 +178,54 @@ export default {
         this.$nextTick(() => this.fit())
       }
     },
-    computeClusters() {
-      const groups = {
-        'a': { label: '集群 1', nodes: ['master-40', 'master-141', 'master-215'] }
-      }
-
-      this.clusters = Object.entries(groups).map(([id, g]) => {
-        const ns = this.nodes.filter(n => g.nodes.includes(n.id))
-        const xs = ns.flatMap(n => [n.x - n.width/2, n.x + n.width/2])
-        const ys = ns.flatMap(n => [n.y - n.height/2, n.y + n.height/2])
-        const minX = Math.min(...xs), maxX = Math.max(...xs)
-        const minY = Math.min(...ys), maxY = Math.max(...ys)
-        const padding = 60
+    normalizeNodes(nodes) {
+      return (nodes || []).map((n, index) => {
+        const id = String(n.id ?? n.label ?? n.name ?? `node-${index}`).trim()
+        const label = String(n.label ?? n.name ?? id).trim()
+        const x = Number(n.x)
+        const y = Number(n.y)
 
         return {
+          ...n,
           id,
-          label: g.label,
+          label,
+          x,
+          y,
+          width: Number(n.width) || 110,
+          height: Number(n.height) || 44,
+          cpu: Number(n.cpu ?? n.cpuUsage ?? 0),
+          disk: Number(n.disk ?? n.diskUsage ?? 0)
+        }
+      }).filter(n => Number.isFinite(n.x) && Number.isFinite(n.y))
+    },
+    normalizeEdges(edges) {
+      return (edges || []).map((e, index) => ({
+        ...e,
+        id: e.id || `edge-${index}`,
+        source: String(e.source ?? e.from ?? '').trim(),
+        target: String(e.target ?? e.to ?? '').trim(),
+        latency: Number(e.latency ?? e.delay ?? 0),
+        bandwidth: Number(e.bandwidth ?? e.bw ?? 0)
+      })).filter(e => e.source && e.target)
+    },
+    computeClusters() {
+      if (!this.nodes.length) {
+        this.clusters = []
+        return
+      }
+
+      const xs = this.nodes.flatMap(n => [n.x - n.width / 2, n.x + n.width / 2])
+      const ys = this.nodes.flatMap(n => [n.y - n.height / 2, n.y + n.height / 2])
+      const minX = Math.min(...xs)
+      const maxX = Math.max(...xs)
+      const minY = Math.min(...ys)
+      const maxY = Math.max(...ys)
+      const padding = 60
+
+      this.clusters = [
+        {
+          id: 'all-nodes',
+          label: '集群 1',
           bounds: {
             x: minX - padding,
             y: minY - padding,
@@ -231,7 +234,7 @@ export default {
           },
           center: { x: (minX + maxX) / 2, y: minY - padding - 20 }
         }
-      })
+      ]
     },
 
     initSvgSize() {
@@ -249,13 +252,34 @@ export default {
     },
 
     fit() {
-      const pad = 100
-      const allX = this.nodes.flatMap(n => [n.x - n.width/2, n.x + n.width/2])
-      const allY = this.nodes.flatMap(n => [n.y - n.height/2, n.y + n.height/2])
-      const minX = Math.min(...allX) - pad
-      const maxX = Math.max(...allX) + pad
-      const minY = Math.min(...allY) - pad
-      const maxY = Math.max(...allY) + pad
+      if (!this.nodes.length || !this.svgWidth || !this.svgHeight) return
+
+      const pad = 40
+      const nodeXs = this.nodes.flatMap(n => [n.x - n.width / 2, n.x + n.width / 2])
+      const nodeYs = this.nodes.flatMap(n => [n.y - n.height / 2, n.y + n.height / 2])
+
+      let minX = Math.min(...nodeXs)
+      let maxX = Math.max(...nodeXs)
+      let minY = Math.min(...nodeYs)
+      let maxY = Math.max(...nodeYs)
+
+      if (this.clusters.length) {
+        const clusterXs = this.clusters.flatMap(c => [c.bounds.x, c.bounds.x + c.bounds.width])
+        const clusterYs = this.clusters.flatMap(c => {
+          const labelTop = c.bounds.y - 40
+          return [labelTop, c.bounds.y + c.bounds.height]
+        })
+
+        minX = Math.min(minX, ...clusterXs)
+        maxX = Math.max(maxX, ...clusterXs)
+        minY = Math.min(minY, ...clusterYs)
+        maxY = Math.max(maxY, ...clusterYs)
+      }
+
+      minX -= pad
+      maxX += pad
+      minY -= pad
+      maxY += pad
 
       const contentW = maxX - minX
       const contentH = maxY - minY
