@@ -100,14 +100,14 @@
         <!-- 节点详情对话框 -->
         <el-dialog title="节点详情" :visible="dialogVisibleDetail" @close="closeTaskDialog" custom-class="node-detail-dialog">
           <el-form :model="selectedTask" :rules="rules" ref="taskForm">
-            <el-form-item label="节点名称" prop="id">
-              <el-input v-model="selectedTask.id" :disabled="!editing"></el-input>
+            <el-form-item label="节点名称" prop="nodeName">
+              <el-input v-model="selectedTask.nodeName" :disabled="!editing"></el-input>
             </el-form-item>
-            <el-form-item label="IP地址" prop="ip_address">
-              <el-input v-model="selectedTask.ip_address" :disabled="!editing"></el-input>
+            <el-form-item label="内网IP" prop="internalIp">
+              <el-input v-model="selectedTask.internalIp" :disabled="true"></el-input>
             </el-form-item>
-            <el-form-item label="掩码" prop="subnet_mask">
-              <el-input v-model="selectedTask.subnet_mask" :disabled="!editing"></el-input>
+            <el-form-item label="外网IP" prop="externalIp">
+              <el-input v-model="selectedTask.externalIp" :disabled="true"></el-input>
             </el-form-item>
             <el-form-item label="节点类型" prop="node_type">
               <el-input :value="nodeTypeLabel(selectedTask.type || selectedTask.node_type)" :disabled="true"></el-input>
