@@ -88,7 +88,7 @@
                       @click="deletescopeTask(scope.row)"
                       class="link-btn"
                     >
-                      禁用
+                      {{ scope.row.dataStatus === 1 ? '禁用' : '启用' }}
                     </el-button>
                   </template>
                 </el-table-column>
