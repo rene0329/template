@@ -34,14 +34,22 @@
                   :min-width="200"
                   sortable
                   align="center"
-                />
+                >
+                  <template v-slot:default="scope">
+                    {{ scope.row.t2 != null ? scope.row.t2 : '-' }}
+                  </template>
+                </el-table-column>
                 <el-table-column
                   prop="t1"
                   label="分布式计算数据移动时间/毫秒"
                   :min-width="200"
                   sortable
                   align="center"
-                />
+                >
+                  <template v-slot:default="scope">
+                    {{ scope.row.t1 != null ? scope.row.t1 : '-' }}
+                  </template>
+                </el-table-column>
                 <el-table-column
                   prop="rating"
                   label="数据移动加速比"
