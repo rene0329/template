@@ -99,6 +99,7 @@ export default {
       headerRightText: '欢迎使用',
       loading: false,
       total: 0,
+      pollingTimer: null,
       // 用于表单搜索
       formInline: {
         name: ''
@@ -126,6 +127,10 @@ export default {
     this.fetchData()
   },
   mounted() {
+    this.startPolling()
+  },
+  beforeDestroy() {
+    this.stopPolling()
   },
   methods: {
     async fetchData() {
@@ -152,6 +157,18 @@ export default {
     },
     onRefresh() {
       this.fetchData()
+    },
+    startPolling() {
+      this.pollingTimer = setInterval(() => {
+        const hasPending = this.TaskData.some(t => t.status === '执行中')
+        if (hasPending) this.fetchData()
+      }, 5000)
+    },
+    stopPolling() {
+      if (this.pollingTimer) {
+        clearInterval(this.pollingTimer)
+        this.pollingTimer = null
+      }
     },
     handleSizeChange(val) {
       this.pageSize = val

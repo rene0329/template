@@ -38,7 +38,11 @@
                   label="调度方案"
                   :min-width="420"
                   align="center"
-                />
+                >
+                  <template slot-scope="scope">
+                    <span style="white-space: pre-wrap; text-align: left; display: inline-block;">{{ scope.row.schedule }}</span>
+                  </template>
+                </el-table-column>
               
                 
                 <!--el-table-column

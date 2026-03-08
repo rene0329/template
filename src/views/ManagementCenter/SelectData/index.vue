@@ -43,7 +43,11 @@
                   label="数据集名称"
                   :min-width="150"
                   align="center"
-                />
+                >
+                  <template slot-scope="scope">
+                    <span>{{ scope.row.dataName ? scope.row.dataName.charAt(0).toUpperCase() + scope.row.dataName.slice(1) : '' }}</span>
+                  </template>
+                </el-table-column>
                 <el-table-column
                   prop="dataDescription"
                   label="数据集描述"

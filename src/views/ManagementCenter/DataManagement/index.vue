@@ -31,13 +31,21 @@
                   label="数据名称"
                   :min-width="150"
                   align="center"
-                />
+                >
+                  <template slot-scope="scope">
+                    <span>{{ scope.row.dataName ? scope.row.dataName.charAt(0).toUpperCase() + scope.row.dataName.slice(1) : '' }}</span>
+                  </template>
+                </el-table-column>
                 <el-table-column
                   prop="dataSize"
-                  label="大小"
+                  label="大小(MB)"
                   :min-width="140"
                   align="center"
-                />
+                >
+                  <template slot-scope="scope">
+                    <span>{{ scope.row.dataSize ? (scope.row.dataSize / 1024 / 1024).toFixed(2) + ' MB' : '0 MB' }}</span>
+                  </template>
+                </el-table-column>
                 <el-table-column
                   prop="dataHeat"
                   label="热度"
@@ -49,7 +57,11 @@
                   label="状态"
                   :min-width="140"
                   align="center"
-                />
+                >
+                  <template slot-scope="scope">
+                    <span>{{ scope.row.dataStatus === 1 ? '可用' : '禁用' }}</span>
+                  </template>
+                </el-table-column>
                 <el-table-column
                   prop="dataServer"
                   label="存储节点"
@@ -121,7 +133,7 @@
             <el-form-item label="数据名称" prop="dataName">
               <el-input v-model="selectedTask.dataName" :disabled="!editing"></el-input>
             </el-form-item>
-            <el-form-item label="大小(字节)" prop="dataSize">
+            <el-form-item label="大小(MB)" prop="dataSize">
               <el-input v-model="selectedTask.dataSize" :disabled="!editing"></el-input>
             </el-form-item>
             <el-form-item label="热度" prop="dataHeat">
