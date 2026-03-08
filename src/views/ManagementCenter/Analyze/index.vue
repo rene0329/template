@@ -36,7 +36,7 @@
                   align="center"
                 >
                   <template v-slot:default="scope">
-                    {{ scope.row.t2 != null ? scope.row.t2 : '-' }}
+                    {{ scope.row.t2 != null ? (scope.row.t2 * 1000).toFixed(2) : '-' }}
                   </template>
                 </el-table-column>
                 <el-table-column
@@ -47,7 +47,7 @@
                   align="center"
                 >
                   <template v-slot:default="scope">
-                    {{ scope.row.t1 != null ? scope.row.t1 : '-' }}
+                    {{ scope.row.t1 != null ? (scope.row.t1 * 1000).toFixed(2) : '-' }}
                   </template>
                 </el-table-column>
                 <el-table-column
