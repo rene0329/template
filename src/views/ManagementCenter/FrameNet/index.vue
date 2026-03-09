@@ -358,7 +358,7 @@ export default {
           <div style="min-width:220px;line-height:1.6;">
             <div><b>节点名称：</b>${data.label}</div>
             <div><b>CPU：</b>${data.cpu}%</div>
-            <div><b>存储：</b>${data.disk}%</div>
+            <div><b>内存：</b>${data.disk}%</div>
           </div>
         `
       } else if (type === 'edge') {
