@@ -9,8 +9,8 @@ import 'nprogress/nprogress.css'
 // request就是axios,只不过稍微配置一下
 const request = axios.create({
   // 基础路径：发请求的时候，路径中会带有api 这里改成我们的地址
-  // baseURL: 'http://10.60.150.74:5010',
-  baseURL: 'http://10.15.16.40:34679', // practice-server
+  // Vue 在 Docker 构建阶段注入；未设置时使用新集群的后端 NodePort。
+  baseURL: process.env.VUE_APP_PRACTICE_API || 'http://10.212.14.88:31081',
   // 代表请求超时的时间为50s --20230803修改-何诗锟--很重要
   // 延长了请求超时的时间，因为工作流创建比较缓慢 --20230815修改-康力
   timeout: 120000

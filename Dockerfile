@@ -6,6 +6,10 @@ WORKDIR /app
 # 1. 【填坑】解决 Node 22 + 旧版 Vue 的 OpenSSL 兼容性问题
 ENV NODE_OPTIONS=--openssl-legacy-provider
 
+# 前端地址会编译进静态资源；可在 docker build 时通过 --build-arg 覆盖。
+ARG VUE_APP_PRACTICE_API=http://10.212.14.88:31081
+ENV VUE_APP_PRACTICE_API=${VUE_APP_PRACTICE_API}
+
 # 2. 安装依赖
 COPY package*.json ./
 # 加上 --legacy-peer-deps 以防万一依赖冲突
