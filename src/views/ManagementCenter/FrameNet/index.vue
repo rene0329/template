@@ -59,7 +59,6 @@
                       :stroke-width="getEdgeWidth(e.bandwidth)"
                       fill="none"
                       stroke-linecap="round"
-                      marker-end="url(#arrow)"
                       @mouseover="showTip('edge', e, $event)"
                       @mouseout="hideTip"
                       style="cursor: pointer; pointer-events: stroke;"

@@ -38,8 +38,9 @@ export const updateDataHeatAll = () => {
 export const saveDataStorageAll = (mode = 'heat') => { // 对应“热敏存储”和“原位汇聚”
   return request({
     url: '/common/saveAll', // 路径前缀 '/common' 会被代理处理
-    method: 'get',
+    method: 'post',
     params: { mode },
+    timeout: 600000,
   });
 };
 

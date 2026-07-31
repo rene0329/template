@@ -42,8 +42,9 @@ export const updateDataHeatAll = () => {
 export const saveDataStorageAll = (mode = 'heat') => {
   return request({
     url: '/common/saveAll',
-    method: 'get',
-    params: { mode }
+    method: 'post',
+    params: { mode },
+    timeout: 600000
   })
 }
 
