@@ -3,17 +3,23 @@ name: Build Desktop Release
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing GitHub Release tag to rebuild
+        required: true
+        type: string
 
 permissions:
   contents: write
 
 concurrency:
-  group: desktop-release-${{ github.event.release.tag_name }}
+  group: desktop-release-${{ github.event.release.tag_name || inputs.tag }}
   cancel-in-progress: false
 
 env:
   DEFAULT_BACKEND_URL: ${{ vars.DEFAULT_BACKEND_URL }}
-  RELEASE_VERSION: ${{ github.event.release.tag_name }}
+  RELEASE_VERSION: ${{ github.event.release.tag_name || inputs.tag }}
 
 jobs:
   build:
@@ -56,11 +62,18 @@ jobs:
           pnpm run configure:default
           node scripts/write-release-version.js
 
+      - name: Validate target release
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release view "$env:RELEASE_VERSION" --repo "$env:GITHUB_REPOSITORY"
+        shell: pwsh
+
       - name: Build desktop installer
         run: pnpm run electron:make -- --arch=${{ matrix.arch }}
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: desktop-${{ matrix.platform }}
           path: out/make/**/*
@@ -73,7 +86,7 @@ jobs:
 
     steps:
       - name: Download installers
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           pattern: desktop-*
           path: release-assets
@@ -94,4 +107,4 @@ jobs:
           done < <(find release-assets -type f -print0)
           cd release-upload
           sha256sum * > SHA256SUMS.txt
-          gh release upload "${{ github.event.release.tag_name }}" ./* --clobber
+          gh release upload "$RELEASE_VERSION" ./* --clobber

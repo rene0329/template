@@ -4,6 +4,7 @@
   "version": "4.4.0",
   "main": "electron/main.js",
   "description": "虚拟数据中心原位调度子系统桌面客户端",
+  "author": "miiyakii",
   "scripts": {
     "dev": "cross-env NODE_OPTIONS=--openssl-legacy-provider vue-cli-service serve",
     "dev:web": "cross-env NODE_OPTIONS=--openssl-legacy-provider vue-cli-service serve",
