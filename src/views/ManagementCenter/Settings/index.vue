@@ -69,7 +69,7 @@
 
         <!-- 资源使用情况弹窗 -->
         <el-dialog
-          :title="`${selected?.nodeName || selected?.node_name || ''} 资源使用情况`"
+          :title="`${selectedNodeTitle} 资源使用情况`"
           :visible.sync="dialogVisibleCharts"
           width="900px"
           @opened="initCharts"
@@ -180,6 +180,9 @@ export default {
     }
   },
   computed: {
+    selectedNodeTitle() {
+      return this.selected ? (this.selected.nodeName || this.selected.node_name || '') : ''
+    },
     currentPageData() {
       return this.TaskData
     }

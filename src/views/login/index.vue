@@ -48,15 +48,24 @@
         <span> password: any</span>
       </div>
 
+      <div class="server-settings">
+        <el-button type="text" @click="openBackendSettings">
+          <i class="el-icon-setting" /> 服务器设置
+        </el-button>
+      </div>
+
     </el-form>
+    <backend-settings ref="backendSettings" />
   </div>
 </template>
 
 <script>
 import { validUsername } from '@/utils/validate'
+import BackendSettings from '@/components/BackendSettings'
 
 export default {
   name: 'Login',
+  components: { BackendSettings },
   data() {
     const validateUsername = (rule, value, callback) => {
       if (!validUsername(value)) {
@@ -95,6 +104,9 @@ export default {
     }
   },
   methods: {
+    openBackendSettings() {
+      this.$refs.backendSettings.open()
+    },
     showPwd() {
       if (this.passwordType === 'password') {
         this.passwordType = ''
@@ -202,6 +214,14 @@ $light_gray:#eee;
         margin-right: 16px;
       }
     }
+  }
+
+  .server-settings {
+    text-align: center;
+  }
+
+  .server-settings .el-button {
+    color: #d9e1ec;
   }
 
   .svg-container {

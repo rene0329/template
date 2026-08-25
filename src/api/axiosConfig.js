@@ -19,6 +19,16 @@ const request = axios.create({
 // 提取baseURL
 export const baseURL = request.defaults.baseURL
 
+// Electron 桌面端会在运行时读取用户配置，并通过此方法切换后端地址。
+export function setBaseURL(url) {
+  const normalized = String(url || '').trim().replace(/\/+$/, '')
+  if (!/^https?:\/\//i.test(normalized)) {
+    throw new Error('后端地址必须以 http:// 或 https:// 开头')
+  }
+  request.defaults.baseURL = normalized
+  return normalized
+}
+
 // 配置请求拦截器,在请求发出去之前，拦截器可以监测到，可以在请求发出之前做一些事情
 request.interceptors.request.use((config) => {
   // config 是一个配置对象，对象里有一个属性很重要，就是header请求头
