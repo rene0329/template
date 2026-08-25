@@ -1,33 +1,33 @@
-# 使用 Node 22 作为基础镜像
-FROM node:22-alpine
+# 构建阶段：Node 22 + pnpm 编译旧版 Vue 项目。
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# 1. 【填坑】解决 Node 22 + 旧版 Vue 的 OpenSSL 兼容性问题
+# 解决 Node 22 + 旧版 Vue/Webpack 的 OpenSSL 兼容性问题。
 ENV NODE_OPTIONS=--openssl-legacy-provider
 
 # 前端地址会编译进静态资源；可在 docker build 时通过 --build-arg 覆盖。
 ARG VUE_APP_PRACTICE_API=http://10.212.14.88:31081
 ENV VUE_APP_PRACTICE_API=${VUE_APP_PRACTICE_API}
 
-# 2. 安装依赖
-COPY package*.json ./
-# 加上 --legacy-peer-deps 以防万一依赖冲突
-RUN npm install --legacy-peer-deps
+# Docker Web 构建不需要下载 Electron 桌面运行时。
+RUN corepack enable && corepack prepare pnpm@11.19.0 --activate
+ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+RUN pnpm install --frozen-lockfile
 
-# 3. 复制代码并构建
 COPY . .
-RUN npm run build
+RUN pnpm run build
 
-# 4. 【关键】全局安装 serve 工具
+# 运行阶段：仅保留静态资源和 Web 服务器，不携带源码及桌面构建依赖。
+FROM node:22-alpine AS runtime
+
+WORKDIR /app
+
+ENV NODE_ENV=production
 RUN npm install -g serve
+COPY --from=builder /app/dist ./dist
 
-# 5. 暴露端口 3000
 EXPOSE 3000
 
-# 6. 启动命令
-# serve: 启动服务
-# -s: 【核心】开启 Single-Page 模式，自动解决刷新 404 问题 (所有 404 都指回 index.html)
-# dist: 指定服务的文件夹是编译后的 dist 目录
-# -l 3000: 指定监听 3000 端口
 CMD ["serve", "-s", "dist", "-l", "3000"]

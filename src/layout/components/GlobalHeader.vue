@@ -2,18 +2,29 @@
   <header class="global-header">
     <div class="title">虚拟数据中心原位调度子系统</div>
     <div class="meta">
-      <img v-if="avatar" :src="avatar" alt="avatar" class="avatar" />
+      <el-button class="server-button" type="text" @click="openBackendSettings">
+        <i class="el-icon-setting" /> 服务器
+      </el-button>
+      <img v-if="avatar" :src="avatar" alt="avatar" class="avatar">
       <span class="name">{{ name }}</span>
     </div>
+    <backend-settings ref="backendSettings" />
   </header>
 </template>
 
 <script>
 import { mapGetters } from 'vuex'
+import BackendSettings from '@/components/BackendSettings'
 export default {
   name: 'GlobalHeader',
+  components: { BackendSettings },
   computed: {
     ...mapGetters(['avatar', 'name'])
+  },
+  methods: {
+    openBackendSettings() {
+      this.$refs.backendSettings.open()
+    }
   }
 }
 </script>
@@ -34,6 +45,8 @@ export default {
   z-index: 10;
   .title { font-weight: 600; font-size: 16px; }
   .meta { display: flex; align-items: center; gap: 8px; }
+  .server-button { color: #fff; margin-right: 10px; }
+  .server-button:hover { color: #4ec58c; }
   .avatar { width: 32px; height: 32px; border-radius: 50%; }
   .name { font-size: 14px; }
 }

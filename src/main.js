@@ -4,13 +4,14 @@ import 'normalize.css/normalize.css' // A modern alternative to CSS resets
 
 import ElementUI from 'element-ui'
 import 'element-ui/lib/theme-chalk/index.css'
-import locale from 'element-ui/lib/locale/lang/en' // lang i18n
 
 import '@/styles/index.scss' // global css
 
 import App from './App'
 import store from './store'
 import router from './router'
+import { setBaseURL } from '@/api/axiosConfig'
+import { getRuntimeConfig } from '@/utils/runtime-config'
 
 import '@/icons' // icon
 import '@/permission' // permission control
@@ -19,7 +20,7 @@ import 'bpmn-js/dist/assets/diagram-js.css'
 import 'bpmn-js/dist/assets/bpmn-font/css/bpmn.css'
 import 'bpmn-js/dist/assets/bpmn-font/css/bpmn-codes.css'
 import 'bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css'
-import './components/bpmn/assets/css/vue-bmpn.css'//bpmn相关
+import './components/bpmn/assets/css/vue-bmpn.css' // bpmn相关
 /**
  * If you don't want to use mock-server
  * you want to use MockJs for mock api
@@ -47,9 +48,20 @@ Vue.prototype.$echarts = echarts
 Vue.use(echarts)
 Vue.use(VueHighlightJS)
 
-new Vue({
-  el: '#app',
-  router,
-  store,
-  render: h => h(App)
-})
+async function startApplication() {
+  try {
+    const config = await getRuntimeConfig()
+    setBaseURL(config.backendUrl)
+  } catch (error) {
+    console.error('加载运行时配置失败，将使用内置后端地址:', error)
+  }
+
+  new Vue({
+    el: '#app',
+    router,
+    store,
+    render: h => h(App)
+  })
+}
+
+startApplication()

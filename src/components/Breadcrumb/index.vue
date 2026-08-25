@@ -30,9 +30,13 @@ export default {
     getBreadcrumb() {
       // only show routes with meta.title
       let matched = this.$route.matched.filter(item => item.meta && item.meta.title)
-      // remove Dashboard from head if present
-      if (this.isDashboard(matched[0])) {
-        matched = matched.slice(1)
+      // Keep Dashboard as the first entry for every non-dashboard route.
+      if (!this.isDashboard(matched[0])) {
+        matched = [{
+          path: '/dashboard',
+          name: 'Dashboard',
+          meta: { title: 'Dashboard' }
+        }].concat(matched)
       }
       this.levelList = matched.filter(item => item.meta && item.meta.title && item.meta.breadcrumb !== false)
     },

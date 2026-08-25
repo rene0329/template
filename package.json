@@ -1,13 +1,20 @@
 {
-  "name": "vue-admin-template",
+  "name": "virtual-data-center-scheduler",
+  "productName": "虚拟数据中心原位调度子系统",
   "version": "4.4.0",
-  "description": "A vue admin template with Element UI & axios & iconfont & permission control & lint",
-  "author": "Pan <panfree23@gmail.com>",
+  "main": "electron/main.js",
+  "description": "虚拟数据中心原位调度子系统桌面客户端",
   "scripts": {
-    "dev": "SET NODE_OPTIONS=--openssl-legacy-provider && vue-cli-service serve",
-    "build:prod": "SET NODE_OPTIONS=--openssl-legacy-provider && vue-cli-service build",
-    "build:stage": "SET NODE_OPTIONS=--openssl-legacy-provider && vue-cli-service build --mode staging",
-    "build": "vue-cli-service build",
+    "dev": "cross-env NODE_OPTIONS=--openssl-legacy-provider vue-cli-service serve",
+    "dev:web": "cross-env NODE_OPTIONS=--openssl-legacy-provider vue-cli-service serve",
+    "dev:electron": "wait-on http://127.0.0.1:9528 && cross-env ELECTRON_RENDERER_URL=http://127.0.0.1:9528 electron .",
+    "electron:dev": "concurrently -k \"pnpm:dev:web\" \"pnpm:dev:electron\"",
+    "build:prod": "cross-env NODE_OPTIONS=--openssl-legacy-provider vue-cli-service build",
+    "build:stage": "cross-env NODE_OPTIONS=--openssl-legacy-provider vue-cli-service build --mode staging",
+    "build": "cross-env NODE_OPTIONS=--openssl-legacy-provider vue-cli-service build",
+    "configure:default": "node scripts/write-default-config.js",
+    "electron:package": "pnpm run build && electron-forge package",
+    "electron:make": "pnpm run build && electron-forge make",
     "preview": "node build/index.js --preview",
     "svgo": "svgo -f src/icons/svg --config=src/icons/svgo.yml",
     "lint": "eslint --ext .js,.vue src",
@@ -22,13 +29,15 @@
     "d3": "^7.8.3",
     "echarts": "^4.9.0",
     "element-ui": "^2.15.13",
+    "highlight.js": "^11.12.0",
     "jeeplus-bpmn": "^6.0.10",
     "js-cookie": "2.2.0",
     "jsonlint-mod": "^1.7.6",
     "normalize.css": "7.0.0",
     "nprogress": "0.2.0",
     "path-to-regexp": "2.4.0",
-    "vue": "^2.6.10",
+    "svg-baker-runtime": "^1.4.7",
+    "vue": "2.6.10",
     "vue-codemirror": "^4.0.6",
     "vue-count-to": "^1.0.13",
     "vue-highlightjs": "^1.3.3",
@@ -36,6 +45,9 @@
     "vuex": "3.1.0"
   },
   "devDependencies": {
+    "@electron-forge/cli": "^7.11.2",
+    "@electron-forge/maker-squirrel": "^7.11.2",
+    "@electron-forge/maker-zip": "^7.11.2",
     "@vue/cli-plugin-babel": "4.4.4",
     "@vue/cli-plugin-eslint": "4.4.4",
     "@vue/cli-plugin-unit-jest": "4.4.4",
@@ -46,7 +58,10 @@
     "babel-jest": "23.6.0",
     "babel-plugin-dynamic-import-node": "2.3.3",
     "chalk": "2.4.2",
+    "concurrently": "^10.0.5",
     "connect": "3.6.6",
+    "cross-env": "^10.1.0",
+    "electron": "^43.4.1",
     "eslint": "6.7.2",
     "eslint-plugin-vue": "6.2.2",
     "html-webpack-plugin": "3.2.0",
@@ -62,15 +77,16 @@
     "serve-static": "1.13.2",
     "svg-sprite-loader": "4.1.3",
     "svgo": "1.2.2",
-    "vue-template-compiler": "2.6.10"
+    "vue-template-compiler": "2.6.10",
+    "wait-on": "^9.1.0"
   },
   "browserslist": [
     "> 1%",
     "last 2 versions"
   ],
   "engines": {
-    "node": ">=8.9",
-    "npm": ">= 3.0.0"
+    "node": ">=20"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "packageManager": "pnpm@11.19.0"
 }

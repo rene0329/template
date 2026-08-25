@@ -1,0 +1,11 @@
+blockExoticSubdeps: false
+strictPeerDependencies: false
+nodeLinker: hoisted
+allowBuilds:
+  core-js: true
+  deasync: true
+  electron: true
+  electron-winstaller: true
+  ejs: false
+  fsevents: false
+  yorkie: false
