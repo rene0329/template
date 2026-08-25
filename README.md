@@ -68,6 +68,8 @@ DEFAULT_BACKEND_URL=http://10.212.14.88:31081
 - Linux x64 ZIP 应用包
 - 全部发布文件的 `SHA256SUMS.txt`
 
+Release 附件使用 `virtual-data-center-<platform>-<arch>-<version>` 英文文件名，应用安装后的产品名仍保持中文。
+
 并自动把产物附加到对应 Release：
 
 ```bash
