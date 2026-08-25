@@ -107,4 +107,4 @@ jobs:
           done < <(find release-assets -type f -print0)
           cd release-upload
           sha256sum * > SHA256SUMS.txt
-          gh release upload "$RELEASE_VERSION" ./* --clobber
+          gh release upload "$RELEASE_VERSION" ./* --repo "$GITHUB_REPOSITORY" --clobber
