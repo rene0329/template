@@ -495,6 +495,19 @@ export const constantRoutes = [
 
   // 管理中心各页面扁平化为一级菜单
   {
+    path: '/RegistrationCenter',
+    component: Layout,
+    redirect: '/RegistrationCenter/NodeRegistry',
+    name: 'RegistrationCenter',
+    alwaysShow: true,
+    meta: { title: '资源注册中心', icon: 'clipboard', itemHeight: 48 },
+    children: [
+      { path: 'NodeRegistry', name: 'NodeRegistry', component: () => import('@/views/RegistrationCenter/NodeRegistry/index'), meta: { title: '节点注册', icon: 'server', itemHeight: 40 }},
+      { path: 'DatasetRegistry', name: 'DatasetRegistry', component: () => import('@/views/RegistrationCenter/DatasetRegistry/index'), meta: { title: '数据集注册', icon: 'documentation', itemHeight: 40 }},
+      { path: 'RuntimeImageRegistry', name: 'RuntimeImageRegistry', component: () => import('@/views/RegistrationCenter/RuntimeImageRegistry/index'), meta: { title: '运行镜像注册', icon: 'form', itemHeight: 40 }}
+    ]
+  },
+  {
     path: "/ManagementCenter",
     component: Layout,
     redirect: "/ManagementCenter/Settings",
