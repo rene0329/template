@@ -2,101 +2,104 @@
   <el-container class="analyze-page">
     <el-main class="page-main">
       <div class="content-card">
-          <div class="kiali-topo">
-            <div class="toolbar">
-              <el-button size="small" @click="fit">自适应</el-button>
-              <span class="legend">
-                <i class="dot green"></i>低延迟
-                <i class="dot red"></i>高延迟
-              </span>
-            </div>
-
-            <div
-              class="svg-container"
-              @wheel.prevent="handleWheel"
-              @mousedown="startDrag"
-              @mousemove="handleMouseMove"
-              @mouseup="stopDrag"
-              @mouseleave="stopDrag"
-            >
-              <svg ref="svg" :width="svgWidth" :height="svgHeight">
-                <g :transform="`translate(${pan.x}, ${pan.y}) scale(${scale})`">
-                  <!-- 集群 -->
-                  <g v-for="c in clusters" :key="c.id">
-                    <rect
-                      :x="c.bounds.x"
-                      :y="c.bounds.y"
-                      :width="c.bounds.width"
-                      :height="c.bounds.height"
-                      fill="transparent"
-                      stroke="#aaa"
-                      stroke-width="2"
-                      stroke-dasharray="5,3"
-                      rx="6"
-                    />
-                    <text
-                      :x="c.center.x"
-                      :y="c.bounds.y - 15"
-                      font-size="15"
-                      font-weight="bold"
-                      fill="#555"
-                      text-anchor="middle"
-                    >{{ c.label }}</text>
-                  </g>
-
-                  <!-- 箭头 -->
-                  <defs>
-                    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-                      <path d="M0,0 L0,6 L9,3 z" fill="#666" />
-                    </marker>
-                  </defs>
-
-                  <!-- 链路 -->
-                  <g v-for="e in edges" :key="e.id">
-                    <path
-                      :d="getEdgePath(e)"
-                      :stroke="getEdgeColor(e.latency)"
-                      :stroke-width="getEdgeWidth(e.bandwidth)"
-                      fill="none"
-                      stroke-linecap="round"
-                      @mouseover="showTip('edge', e, $event)"
-                      @mouseout="hideTip"
-                      style="cursor: pointer; pointer-events: stroke;"
-                    />
-                  </g>
-
-                  <!-- 节点 -->
-                  <g v-for="n in nodes" :key="n.id">
-                    <rect
-                      :x="n.x - n.width/2"
-                      :y="n.y - n.height/2"
-                      :width="n.width"
-                      :height="n.height"
-                      rx="8"
-                      fill="#fff"
-                      stroke="#3066ee"
-                      stroke-width="2"
-                      @mouseover="showTip('node', n, $event)"
-                      @mouseout="hideTip"
-                      style="cursor: pointer;"
-                    />
-                    <text
-                      :x="n.x"
-                      :y="n.y + 1"
-                      font-size="12"
-                      fill="#333"
-                      text-anchor="middle"
-                      dominant-baseline="middle"
-                      style="pointer-events:none"
-                    >{{ n.label }}</text>
-                  </g>
-                </g>
-              </svg>
-            </div>
-
-            <!-- 悬浮提示 -->
-            <div v-if="tip.visible" class="tooltip" :style="tip.style" v-html="tip.html"></div>
+        <div class="kiali-topo">
+          <div class="toolbar">
+            <el-button size="small" @click="fit">自适应</el-button>
+            <el-switch v-model="activeOnly" active-text="只看可用节点" @change="refreshTopology" />
+            <span class="legend">
+              <i class="dot available" />可用
+              <i class="dot inactive" />未启用
+              <i class="dot offline" />异常/离线
+            </span>
           </div>
+
+          <div
+            class="svg-container"
+            @wheel.prevent="handleWheel"
+            @mousedown="startDrag"
+            @mousemove="handleMouseMove"
+            @mouseup="stopDrag"
+            @mouseleave="stopDrag"
+          >
+            <svg ref="svg" :width="svgWidth" :height="svgHeight">
+              <g :transform="`translate(${pan.x}, ${pan.y}) scale(${scale})`">
+                <!-- 集群 -->
+                <g v-for="c in clusters" :key="c.id">
+                  <rect
+                    :x="c.bounds.x"
+                    :y="c.bounds.y"
+                    :width="c.bounds.width"
+                    :height="c.bounds.height"
+                    fill="transparent"
+                    stroke="#aaa"
+                    stroke-width="2"
+                    stroke-dasharray="5,3"
+                    rx="6"
+                  />
+                  <text
+                    :x="c.center.x"
+                    :y="c.bounds.y - 15"
+                    font-size="15"
+                    font-weight="bold"
+                    fill="#555"
+                    text-anchor="middle"
+                  >{{ c.label }}</text>
+                </g>
+
+                <!-- 箭头 -->
+                <defs>
+                  <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                    <path d="M0,0 L0,6 L9,3 z" fill="#666" />
+                  </marker>
+                </defs>
+
+                <!-- 链路 -->
+                <g v-for="e in edges" :key="e.id">
+                  <path
+                    :d="getEdgePath(e)"
+                    :stroke="getEdgeColor(e.latency)"
+                    :stroke-width="getEdgeWidth(e.bandwidth)"
+                    :stroke-dasharray="e.active === false ? '7,5' : ''"
+                    fill="none"
+                    stroke-linecap="round"
+                    style="cursor: pointer; pointer-events: stroke;"
+                    @mouseover="showTip('edge', e, $event)"
+                    @mouseout="hideTip"
+                  />
+                </g>
+
+                <!-- 节点 -->
+                <g v-for="n in nodes" :key="n.id">
+                  <rect
+                    :x="n.x - n.width/2"
+                    :y="n.y - n.height/2"
+                    :width="n.width"
+                    :height="n.height"
+                    rx="8"
+                    :fill="getNodeFill(n)"
+                    :stroke="getNodeColor(n)"
+                    stroke-width="2"
+                    style="cursor: pointer;"
+                    @mouseover="showTip('node', n, $event)"
+                    @mouseout="hideTip"
+                  />
+                  <text
+                    :x="n.x"
+                    :y="n.y + 1"
+                    font-size="12"
+                    fill="#333"
+                    text-anchor="middle"
+                    dominant-baseline="middle"
+                    style="pointer-events:none"
+                  >{{ n.label }}</text>
+                </g>
+              </g>
+            </svg>
+          </div>
+
+          <!-- 悬浮提示 -->
+          <div v-if="tip.visible" class="tooltip" :style="tip.style" v-html="tip.html" />
+        </div>
       </div>
     </el-main>
     <div class="copyright-bar">Copyright©2025 之江实验室 版权所有</div>
@@ -118,64 +121,45 @@ export default {
       dragStart: { x: 0, y: 0 },
       panStart: { x: 0, y: 0 },
       loading: false,
+      activeOnly: false,
       clusters: [],
       // 从服务器获取的数据
       nodes: [],
       edges: [],
-      tip: { visible: false, html: '', style: {} },
+      tip: { visible: false, html: '', style: {}},
       mousePos: { x: 0, y: 0 },
       systemName: '网络拓扑',
       headerRightText: '欢迎使用'
     }
   },
   mounted() {
+    window.addEventListener('resize', this.onResize)
     this.fetchData()
+    this.refreshTimer = window.setInterval(() => this.fetchData(false), 15000)
   },
   beforeDestroy() {
     window.removeEventListener('resize', this.onResize)
+    window.clearInterval(this.refreshTimer)
   },
   methods: {
-    async fetchData() {
+    async fetchData(refit = true) {
       this.loading = true
       try {
-        const res = await fetchNetworkTopology()
+        const res = await fetchNetworkTopology(this.activeOnly)
         this.nodes = this.normalizeNodes(res.nodes || [])
         this.edges = this.normalizeEdges(res.edges || [])
-        // 如果没有返回数据，使用默认数据
-        if (this.nodes.length === 0) {
-          this.nodes = this.normalizeNodes([
-            { id: 'master-40', label: 'master-40', x: 480, y: 280, width: 110, height: 44, cpu: 40, disk: 30 },
-            { id: 'master-141', label: 'master-141', x: 660, y: 360, width: 110, height: 44, cpu: 55, disk: 45 },
-            { id: 'master-215', label: 'master-215', x: 540, y: 460, width: 110, height: 44, cpu: 35, disk: 20 }
-          ])
-        }
-        if (this.edges.length === 0) {
-          this.edges = this.normalizeEdges([
-            { source: 'master-40', target: 'master-141', latency: 30, bandwidth: 500 },
-            { source: 'master-40', target: 'master-215', latency: 45, bandwidth: 420 },
-            { source: 'master-215', target: 'master-141', latency: 29, bandwidth: 540 }
-          ])
-        }
       } catch (err) {
         console.error('获取网络拓扑失败:', err)
-        // 失败时使用默认数据
-        this.nodes = this.normalizeNodes([
-          { id: 'master-40', label: 'master-40', x: 480, y: 280, width: 110, height: 44, cpu: 40, disk: 30 },
-          { id: 'master-141', label: 'master-141', x: 660, y: 360, width: 110, height: 44, cpu: 55, disk: 45 },
-          { id: 'master-215', label: 'master-215', x: 540, y: 460, width: 110, height: 44, cpu: 35, disk: 20 }
-        ])
-        this.edges = this.normalizeEdges([
-          { source: 'master-40', target: 'master-141', latency: 30, bandwidth: 500 },
-          { source: 'master-40', target: 'master-215', latency: 45, bandwidth: 420 },
-          { source: 'master-215', target: 'master-141', latency: 29, bandwidth: 540 }
-        ])
+        this.$message.error(err.message || '获取网络拓扑失败')
       } finally {
         this.loading = false
         this.computeClusters()
         this.initSvgSize()
-        window.addEventListener('resize', this.onResize)
-        this.$nextTick(() => this.fit())
+        if (refit) this.$nextTick(() => this.fit())
       }
+    },
+    refreshTopology() {
+      this.fetchData(true)
     },
     normalizeNodes(nodes) {
       return (nodes || []).map((n, index) => {
@@ -348,16 +332,32 @@ export default {
     getEdgeWidth(bw) {
       return Math.max(1, Math.min(6, (bw - 50) / 950 * 5 + 1))
     },
+    getNodeColor(node) {
+      const colors = { AVAILABLE: '#52c41a', DISABLED: '#909399', INACTIVE: '#e6a23c' }
+      return colors[node.effectiveStatus] || '#f56c6c'
+    },
+    getNodeFill(node) {
+      const colors = { AVAILABLE: '#f0f9eb', DISABLED: '#f4f4f5', INACTIVE: '#fdf6ec' }
+      return colors[node.effectiveStatus] || '#fef0f0'
+    },
 
     // 悬浮提示（去掉内存）
     showTip(type, data, event) {
       let html = ''
+      const esc = value => String(value == null ? '' : value)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
       if (type === 'node') {
         html = `
           <div style="min-width:220px;line-height:1.6;">
-            <div><b>节点名称：</b>${data.label}</div>
+            <div><b>节点名称：</b>${esc(data.label)}</div>
             <div><b>CPU：</b>${data.cpu}%</div>
             <div><b>内存：</b>${data.disk}%</div>
+            <div><b>有效状态：</b>${esc(data.effectiveStatus || 'UNKNOWN')}</div>
+            <div><b>注册状态：</b>${esc(data.registrationStatus || 'UNKNOWN')}</div>
+            <div><b>观测状态：</b>${esc(data.observedStatus || 'UNKNOWN')}</div>
+            <div><b>可调度：</b>${data.schedulable ? '是' : '否'}</div>
+            ${data.statusReason ? `<div><b>原因：</b>${esc(data.statusReason)}</div>` : ''}
           </div>
         `
       } else if (type === 'edge') {
@@ -365,7 +365,7 @@ export default {
         const t = this.nodes.find(n => n.id === data.target)?.label || data.target
         html = `
           <div style="min-width:220px;line-height:1.6;">
-            <div><b>源 → 目的：</b>${s} → ${t}</div>
+            <div><b>源 → 目的：</b>${esc(s)} → ${esc(t)}</div>
             <div><b>延迟：</b>${data.latency} ms</div>
             <div><b>带宽：</b>${data.bandwidth} Mbps</div>
           </div>
@@ -402,21 +402,21 @@ export default {
   padding: 0 24px;
   box-sizing: border-box;
 }
-.brand { 
-  font-size: 16px; 
-  font-weight: 600; 
+.brand {
+  font-size: 16px;
+  font-weight: 600;
 }
-.header-meta { 
-  display: flex; 
-  align-items: center; 
-  gap: 8px; 
-  font-size: 14px; 
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
 }
-.header-avatar { 
-  margin-right: 4px; 
+.header-avatar {
+  margin-right: 4px;
 }
-.header-user { 
-  font-size: 14px; 
+.header-user {
+  font-size: 14px;
 }
 .breadcrumb-bar {
   height: 40px;
@@ -467,7 +467,9 @@ export default {
 }
 .legend { display: flex; align-items: center; gap: 8px; color: #666; }
 .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-.green { background: #52c41a; } .red { background: #ff4d4f; }
+.available { background: #52c41a; }
+.inactive { background: #909399; }
+.offline { background: #f56c6c; }
 .svg-container { width: 100%; height: 100%; overflow: hidden; cursor: grab; }
 .svg-container:active { cursor: grabbing; }
 .page-footer { padding: 0 3vw 3vw; box-sizing: border-box; }

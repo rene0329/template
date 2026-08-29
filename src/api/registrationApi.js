@@ -32,3 +32,4 @@ export const activateRuntimeImage = (id) => mutation(`/api/v1/runtime-images/${i
 export const disableRuntimeImage = (id) => mutation(`/api/v1/runtime-images/${id}/disable`)
 
 export const createRegisteredTask = (data) => mutation('/api/v1/tasks', 'post', data)
+export const preflightRegisteredTask = (data) => request({ url: '/api/v1/tasks/preflight', method: 'post', data })

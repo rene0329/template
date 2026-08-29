@@ -154,10 +154,11 @@ export const fetchScheduleList = (page, pageSize, query = '') => {
 /**
  * 获取完整网络拓扑数据（节点+边）
  */
-export const fetchNetworkTopology = () => {
+export const fetchNetworkTopology = (activeOnly = false) => {
   return request({
     url: '/common/networkTopology',
-    method: 'get'
+    method: 'get',
+    params: { activeOnly }
   })
 }
 

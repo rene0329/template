@@ -28,8 +28,11 @@
             <el-table-column prop="displayName" label="显示名称" min-width="140" />
             <el-table-column prop="k8sNodeName" label="K8s 节点" min-width="140" />
             <el-table-column prop="role" label="角色" width="120" />
-            <el-table-column prop="registrationStatus" label="注册状态" width="130" />
-            <el-table-column prop="enabled" label="启用" width="80"><template slot-scope="s">{{ s.row.enabled ? '是' : '否' }}</template></el-table-column>
+            <el-table-column prop="registrationStatus" label="注册状态" width="120" />
+            <el-table-column prop="observedStatus" label="运行状态" width="130" />
+            <el-table-column label="有效状态" width="130"><template slot-scope="s"><el-tag size="mini" :type="s.row.schedulable ? 'success' : 'warning'">{{ s.row.effectiveStatus }}</el-tag></template></el-table-column>
+            <el-table-column prop="enabled" label="启用" width="70"><template slot-scope="s">{{ s.row.enabled ? '是' : '否' }}</template></el-table-column>
+            <el-table-column prop="statusReason" label="状态原因" min-width="180" show-overflow-tooltip />
             <el-table-column label="操作" width="190">
               <template slot-scope="s">
                 <el-button type="text" @click="act(verifyNode, s.row.nodeId, '校验完成')">校验</el-button>
