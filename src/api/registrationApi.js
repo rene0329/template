@@ -15,6 +15,7 @@ export const registerNode = (data) => mutation('/api/v1/nodes', 'post', data)
 export const verifyNode = (id) => mutation(`/api/v1/nodes/${id}/verify`)
 export const enableNode = (id) => mutation(`/api/v1/nodes/${id}/enable`)
 export const disableNode = (id) => mutation(`/api/v1/nodes/${id}/disable`)
+export const unregisterNode = (id) => mutation(`/api/v1/nodes/${id}`, 'delete')
 
 export const discoverDatasets = (nodeIds = []) => mutation('/api/v1/dataset-discovery-runs', 'post', { nodeIds })
 export const fetchDatasetCandidates = (params) => request({ url: '/api/v1/dataset-candidates', method: 'get', params })

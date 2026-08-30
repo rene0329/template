@@ -33,11 +33,12 @@
             <el-table-column label="有效状态" width="130"><template slot-scope="s"><el-tag size="mini" :type="s.row.schedulable ? 'success' : 'warning'">{{ s.row.effectiveStatus }}</el-tag></template></el-table-column>
             <el-table-column prop="enabled" label="启用" width="70"><template slot-scope="s">{{ s.row.enabled ? '是' : '否' }}</template></el-table-column>
             <el-table-column prop="statusReason" label="状态原因" min-width="180" show-overflow-tooltip />
-            <el-table-column label="操作" width="190">
+            <el-table-column label="操作" width="250">
               <template slot-scope="s">
                 <el-button type="text" @click="act(verifyNode, s.row.nodeId, '校验完成')">校验</el-button>
                 <el-button v-if="!s.row.enabled" type="text" @click="act(enableNode, s.row.nodeId, '已启用')">启用</el-button>
                 <el-button v-else type="text" @click="act(disableNode, s.row.nodeId, '已停用')">停用</el-button>
+                <el-button v-if="!s.row.enabled && s.row.registrationStatus === 'DISABLED'" type="text" class="danger-action" @click="unregister(s.row)">取消注册</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -56,7 +57,7 @@
   </div>
 </template>
 <script>
-import { discoverNodes, fetchNodeCandidates, fetchRegisteredNodes, registerNode, verifyNode, enableNode, disableNode } from '@/api/registrationApi'
+import { discoverNodes, fetchNodeCandidates, fetchRegisteredNodes, registerNode, verifyNode, enableNode, disableNode, unregisterNode } from '@/api/registrationApi'
 export default {
   name: 'NodeRegistry',
   data: () => ({ tab: 'candidates', query: '', page: 1, total: 0, rows: [], loading: false, discovering: false, saving: false, dialog: false, form: { candidateId: null, displayName: '', role: 'COMPUTE_DATA', enabled: false }}),
@@ -68,8 +69,18 @@ export default {
     openRegister(row) { this.form = { candidateId: row.candidateId, displayName: row.k8sNodeName, role: row.observedRole || 'COMPUTE_DATA', enabled: false }; this.dialog = true },
     async submit() { this.saving = true; try { await registerNode(this.form); this.dialog = false; this.$message.success('节点已注册'); await this.load() } catch (e) { this.$message.error(e.message || '注册失败') } finally { this.saving = false } },
     async act(api, id, message) { try { await api(id); this.$message.success(message); await this.load() } catch (e) { this.$message.error(e.message || '操作失败') } },
+    async unregister(row) {
+      try {
+        await this.$confirm(`确认取消注册节点“${row.displayName || row.k8sNodeName}”？该操作不会删除 Kubernetes 节点。`, '取消注册', { type: 'warning', confirmButtonText: '确认取消注册' })
+        await unregisterNode(row.nodeId)
+        this.$message.success('节点已取消注册')
+        await this.load()
+      } catch (e) {
+        if (e !== 'cancel' && e !== 'close') this.$message.error(e.message || '取消注册失败')
+      }
+    },
     changePage(page) { this.page = page; this.load() }
   }
 }
 </script>
-<style scoped>.registry-page{padding:20px}.toolbar{display:flex;align-items:center;justify-content:space-between;font-weight:600}.search{width:220px;margin-right:8px}.el-pagination{margin-top:18px;text-align:right}</style>
+<style scoped>.registry-page{padding:20px}.toolbar{display:flex;align-items:center;justify-content:space-between;font-weight:600}.search{width:220px;margin-right:8px}.el-pagination{margin-top:18px;text-align:right}.danger-action{color:#f56c6c}</style>
