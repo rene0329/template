@@ -21,6 +21,14 @@ export const discoverDatasets = (nodeIds = []) => mutation('/api/v1/dataset-disc
 export const fetchDatasetCandidates = (params) => request({ url: '/api/v1/dataset-candidates', method: 'get', params })
 export const fetchRegisteredDatasets = (params) => request({ url: '/api/v1/datasets', method: 'get', params })
 export const registerDataset = (data) => mutation('/api/v1/datasets', 'post', data)
+export const uploadAndRegisterDataset = (data, onUploadProgress) => request({
+  url: '/api/v1/datasets/upload',
+  method: 'post',
+  data,
+  timeout: 60 * 60 * 1000,
+  headers: { 'Idempotency-Key': requestId() },
+  onUploadProgress
+})
 export const verifyDataset = (id) => mutation(`/api/v1/datasets/${id}/verify`)
 export const activateDataset = (id) => mutation(`/api/v1/datasets/${id}/activate`)
 export const disableDataset = (id) => mutation(`/api/v1/datasets/${id}/disable`)
