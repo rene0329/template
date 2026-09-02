@@ -1,4 +1,4 @@
-<!--数据管理模块-->
+<!--数据集信息模块-->
 <template>
   <el-container class="analyze-page">
     <el-main class="page-main">
@@ -208,7 +208,7 @@ export default {
       dialogVisibleCharts: false,
       logsKey: 0,
       selected: null,
-      systemName: '数据管理',
+      systemName: '数据集信息',
       headerRightText: '欢迎使用',
       loading: false,
       refreshing: false,

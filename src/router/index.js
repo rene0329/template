@@ -493,7 +493,7 @@ export const constantRoutes = [
   //   ]
   // },
 
-  // 管理中心各页面扁平化为一级菜单
+  // 四个一级模块；保留既有页面地址与资源注册配置。
   {
     path: '/RegistrationCenter',
     component: Layout,
@@ -503,29 +503,31 @@ export const constantRoutes = [
     meta: { title: '资源注册中心', icon: 'clipboard', itemHeight: 48 },
     children: [
       { path: 'NodeRegistry', name: 'NodeRegistry', component: () => import('@/views/RegistrationCenter/NodeRegistry/index'), meta: { title: '节点注册', icon: 'server', itemHeight: 40 }},
-      { path: 'DatasetRegistry', name: 'DatasetRegistry', component: () => import('@/views/RegistrationCenter/DatasetRegistry/index'), meta: { title: '数据集注册', icon: 'documentation', itemHeight: 40 }},
+      { path: 'DatasetRegistry', name: 'DatasetRegistry', component: process.env.VUE_APP_DEMO_MODE === 'true' ? () => import('@/views/RegistrationCenter/DatasetRegistry/MockPreview') : () => import('@/views/RegistrationCenter/DatasetRegistry/index'), meta: { title: '数据集注册', icon: 'documentation', itemHeight: 40 }},
       { path: 'RuntimeImageRegistry', name: 'RuntimeImageRegistry', component: () => import('@/views/RegistrationCenter/RuntimeImageRegistry/index'), meta: { title: '运行镜像注册', icon: 'form', itemHeight: 40 }}
     ]
   },
   {
     path: "/ManagementCenter",
+    redirect: "/ManagementCenter/Settings",
+    hidden: true,
+  },
+  {
+    path: "/NetworkCenter",
     component: Layout,
     redirect: "/ManagementCenter/Settings",
+    name: "NetworkCenter",
+    alwaysShow: true,
+    meta: { title: "网络中心", icon: "cluster", itemHeight: 48 },
     children: [
       {
-        path: "Settings",
+        path: "/ManagementCenter/Settings",
         name: "Settings",
         component: () => import("@/views/ManagementCenter/Settings/index"),
         meta: { title: "网络配置", icon: "edit", itemHeight: 40 },
       },
-    ],
-  },
-  {
-    path: "/ManagementCenter",
-    component: Layout,
-    children: [
       {
-        path: "FrameNet",
+        path: "/ManagementCenter/FrameNet",
         name: "FrameNet",
         component: () => import("@/views/ManagementCenter/FrameNet/index"),
         meta: { title: "网络结构", icon: 'cluster', itemHeight: 40 },
@@ -533,59 +535,55 @@ export const constantRoutes = [
     ],
   },
   {
-    path: "/ManagementCenter",
+    path: "/DataCenter",
     component: Layout,
+    redirect: "/ManagementCenter/DataManagement",
+    name: "DataCenter",
+    alwaysShow: true,
+    meta: { title: "数据管理", icon: "clipboard", itemHeight: 48 },
     children: [
       {
-        path: "DataManagement",
+        path: "/ManagementCenter/DataManagement",
         name: "DataManagement",
         component: () => import("@/views/ManagementCenter/DataManagement/index"),
-        meta: { title: "数据管理", icon: 'clipboard', itemHeight: 40 },
+        meta: { title: "数据集信息", icon: 'clipboard', itemHeight: 40 },
+      },
+      {
+        path: "SchedulingLogs",
+        name: "SchedulingLogs",
+        component: () => import("@/views/ManagementCenter/SchedulingLogs/index"),
+        meta: { title: "调度日志", icon: 'documentation', itemHeight: 40 },
       },
     ],
   },
   {
-    path: "/ManagementCenter",
+    path: "/TaskCenter",
     component: Layout,
+    redirect: "/ManagementCenter/SelectData",
+    name: "TaskCenter",
+    alwaysShow: true,
+    meta: { title: "任务管理", icon: "nested", itemHeight: 48 },
     children: [
       {
-        path: "SelectData",
+        path: "/ManagementCenter/SelectData",
         name: "SelectData",
         component: () => import("@/views/ManagementCenter/SelectData/index"),
         meta: { title: "数据选择", icon: 'nested', itemHeight: 40 },
       },
-    ],
-  },
-  {
-    path: "/ManagementCenter",
-    component: Layout,
-    children: [
       {
-        path: "TaskList",
+        path: "/ManagementCenter/TaskList",
         name: "TaskList",
         component: () => import("@/views/ManagementCenter/TaskList/index"),
         meta: { title: "任务列表", icon: 'documentation', itemHeight: 40 },
       },
-    ],
-  },
-  {
-    path: "/ManagementCenter",
-    component: Layout,
-    children: [
       {
-        path: "Schedule",
+        path: "/ManagementCenter/Schedule",
         name: "Schedule",
         component: () => import("@/views/ManagementCenter/Schedule/index"),
         meta: { title: "调度展示", icon: 'documentation', itemHeight: 40 },
       },
-    ],
-  },
-  {
-    path: "/ManagementCenter",
-    component: Layout,
-    children: [
       {
-        path: "Analyze",
+        path: "/ManagementCenter/Analyze",
         name: "Analyze",
         component: () => import("@/views/ManagementCenter/Analyze/index"),
         meta: { title: "性能分析", icon: 'form', itemHeight: 40 },

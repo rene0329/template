@@ -139,31 +139,26 @@
           <el-table
             :data="selectedNodeDatasets"
             size="mini"
-            max-height="188"
+            max-height="190"
             empty-text="该节点暂无数据集"
           >
-            <el-table-column prop="dataName" label="数据集名称" min-width="150" show-overflow-tooltip />
-            <el-table-column prop="fileType" label="类型" width="90" align="center">
+            <el-table-column prop="dataName" label="数据集名称" min-width="180" show-overflow-tooltip />
+            <el-table-column prop="fileType" label="类型" width="100" align="center">
               <template slot-scope="scope">{{ scope.row.fileType || '-' }}</template>
             </el-table-column>
-            <el-table-column label="大小" width="110" align="right">
+            <el-table-column label="大小" width="120" align="right">
               <template slot-scope="scope">{{ formatBytes(scope.row.dataSize) }}</template>
             </el-table-column>
-            <el-table-column label="状态" width="90" align="center">
+            <el-table-column label="状态" width="100" align="center">
               <template slot-scope="scope">
                 <el-tag size="mini" :type="scope.row.status === 'ACTIVE' ? 'success' : 'info'">
                   {{ scope.row.status }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="version" label="版本" width="90" />
-            <el-table-column prop="replicaStatus" label="本节点副本状态" min-width="160" show-overflow-tooltip />
-            <el-table-column prop="filePath" label="文件路径" min-width="260" show-overflow-tooltip>
-              <template slot-scope="scope">{{ scope.row.filePath || '-' }}</template>
-            </el-table-column>
-            <el-table-column prop="dataDescription" label="描述" min-width="220" show-overflow-tooltip>
-              <template slot-scope="scope">{{ scope.row.dataDescription || '-' }}</template>
-            </el-table-column>
+            <el-table-column prop="version" label="版本" width="90" align="center" />
+            <el-table-column prop="replicaStatus" label="本节点副本状态" min-width="170" show-overflow-tooltip />
+            <el-table-column prop="filePath" label="文件路径" min-width="260" show-overflow-tooltip />
           </el-table>
         </section>
       </div>
@@ -655,7 +650,34 @@ export default {
 }
 .server-icon circle { fill: #52c41a; stroke: none; }
 .server-icon line { stroke: #7a8494; stroke-width: 1; }
-.dataset-panel { flex: 0 0 auto; min-height: 0; }
+.dataset-panel {
+  flex: 0 0 auto;
+  min-height: 190px;
+  margin: 16px 24px 8px;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #ffffff;
+}
+.dataset-panel__header {
+  min-height: 42px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #ebeef5;
+  background: #f8fafb;
+  color: #303133;
+}
+.dataset-panel__header strong {
+  margin-right: 10px;
+}
+.dataset-count,
+.dataset-hint {
+  margin-left: 10px;
+  color: #909399;
+  font-size: 12px;
+}
 .page-footer { padding: 0 3vw 3vw; box-sizing: border-box; }
 :deep(.el-button--primary),
 :deep(.el-button--default) {
