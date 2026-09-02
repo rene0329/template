@@ -1,25 +1,13 @@
-// Confirmed tunnel endpoint locations from docs/cluster-memory.md (2026-09-02).
-// Scope private addresses to this deployment; they are not public IP geolocation.
-const deploymentLocations = {
-  'in-cluster-default': {
-    '10.213.0.1': '中国 · 浙江 · 杭州',
-    '10.213.0.3': '中国 · 北京',
-    '10.213.0.5': '中国 · 上海'
-  }
-}
-
 export function nodeLocation(node) {
-  const labels = node.labels || {}
-  const explicit = [labels.location, labels.country, labels.province, labels.city]
-    .map(value => typeof value === 'string' ? value.trim() : '')
-  if (explicit[0]) return explicit[0]
-  const geography = explicit.slice(1).filter(Boolean)
-  if (geography.length) return [...new Set(geography)].join(' · ')
-  const region = labels['topology.kubernetes.io/region'] || labels['failure-domain.beta.kubernetes.io/region']
-  const zone = labels['topology.kubernetes.io/zone'] || labels['failure-domain.beta.kubernetes.io/zone']
-  if (region || zone) return [region, zone].filter(Boolean).join(' · ')
-  const configured = deploymentLocations[node.clusterId || node.cluster]
-  return (configured && configured[node.internalIp]) || '位置未配置'
+  const ip = typeof node.externalIp === 'string' ? node.externalIp.trim() : ''
+  if (!ip) return '未获取公网 IP'
+  const location = node.publicIpLocation
+  // Do not reuse a result belonging to a previous egress IP or registry poll.
+  if (!location || location.ip !== ip) return '未查到归属地'
+  if (location.status === 'UNAVAILABLE') return '归属地查询暂不可用'
+  if (location.status === 'INVALID_IP') return '无有效公网 IP'
+  return location.status === 'RESOLVED' && location.displayName
+    ? location.displayName : '未查到归属地'
 }
 
 export function summarizeNodeDatasets(datasets = []) {

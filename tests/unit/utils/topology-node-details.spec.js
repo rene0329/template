@@ -1,29 +1,32 @@
 import { nodeLocation, summarizeNodeDatasets } from '@/utils/topology-node-details'
 
-it('maps the documented tunnel IPs to their deployed cities', () => {
-  expect(nodeLocation({ cluster: 'in-cluster-default', internalIp: '10.213.0.1' })).toBe('中国 · 浙江 · 杭州')
-  expect(nodeLocation({ clusterId: 'in-cluster-default', internalIp: '10.213.0.3' })).toBe('中国 · 北京')
-  expect(nodeLocation({ clusterId: 'in-cluster-default', internalIp: '10.213.0.5' })).toBe('中国 · 上海')
+it('uses the lookup result associated with the displayed public IP', () => {
+  expect(nodeLocation({
+    externalIp: '47.116.9.113',
+    publicIpLocation: { ip: '47.116.9.113', status: 'RESOLVED', displayName: '中国 · 上海市' }
+  })).toBe('中国 · 上海市')
 })
 
-it('does not infer geography from node names, private subnets or unrelated clusters', () => {
-  expect(nodeLocation({ label: 'alihz', internalIp: '10.213.0.99' })).toBe('位置未配置')
-  expect(nodeLocation({ cluster: 'another-cluster', internalIp: '10.213.0.1' })).toBe('位置未配置')
-  expect(nodeLocation({ cluster: 'in-cluster-default', internalIp: '10.212.14.88' })).toBe('位置未配置')
-  expect(nodeLocation({})).toBe('位置未配置')
+it('never infers IP geography from names, private IPs or deployment labels', () => {
+  expect(nodeLocation({ label: 'alish', cluster: 'in-cluster-default', internalIp: '10.213.0.5',
+    labels: { location: '上海机房', country: '中国', city: '上海', 'topology.kubernetes.io/region': 'cn-shanghai' }
+  })).toBe('未获取公网 IP')
+  expect(nodeLocation({})).toBe('未获取公网 IP')
+  expect(nodeLocation({ externalIp: '47.116.9.113', labels: { location: '上海机房' }})).toBe('未查到归属地')
 })
 
-it('prefers registered location metadata to deployment defaults', () => {
-  expect(nodeLocation({ cluster: 'in-cluster-default', internalIp: '10.213.0.1', labels: { location: '测试机房' }}))
-    .toBe('测试机房')
-  expect(nodeLocation({ labels: { country: '中国', province: '浙江', city: '杭州' }}))
-    .toBe('中国 · 浙江 · 杭州')
-  expect(nodeLocation({ labels: { province: '北京', city: '北京' }})).toBe('北京')
+it('does not reuse a location after the public IP changes', () => {
+  expect(nodeLocation({ externalIp: '121.43.57.204',
+    publicIpLocation: { ip: '47.116.9.113', status: 'RESOLVED', displayName: '中国 · 上海市' }
+  })).toBe('未查到归属地')
 })
 
-it('supports registered Kubernetes region and zone labels', () => {
-  expect(nodeLocation({ labels: { 'topology.kubernetes.io/region': 'cn-hangzhou', 'topology.kubernetes.io/zone': 'cn-hangzhou-a' }}))
-    .toBe('cn-hangzhou · cn-hangzhou-a')
+it('distinguishes unavailable lookup, invalid IP and absent records', () => {
+  const node = status => ({ externalIp: '47.116.9.113', publicIpLocation: { ip: '47.116.9.113', status }})
+  expect(nodeLocation(node('UNAVAILABLE'))).toBe('归属地查询暂不可用')
+  expect(nodeLocation(node('INVALID_IP'))).toBe('无有效公网 IP')
+  expect(nodeLocation(node('NOT_FOUND'))).toBe('未查到归属地')
+  expect(nodeLocation(node('RESOLVED'))).toBe('未查到归属地')
 })
 
 it('previews dataset names followed by the total count', () => {

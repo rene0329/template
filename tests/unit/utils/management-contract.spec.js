@@ -111,16 +111,18 @@ it('zooms around the pointer and pans the topology when dragging the canvas', ()
   expect(vm.isDragging).toBe(false)
 })
 
-it('joins registered IP and location by node ID without replacing live topology state', async() => {
+it('joins registered internal IP without replacing the live public IP location or topology state', async() => {
   const vm = context(FrameNet)
-  vm.topologyNodes = [{ id: 'display-name', nodeId: 4, effectiveStatus: 'AVAILABLE' }]
+  vm.topologyNodes = [{ id: 'display-name', nodeId: 4, effectiveStatus: 'AVAILABLE', externalIp: '121.43.57.204',
+    publicIpLocation: { ip: '121.43.57.204', status: 'RESOLVED', displayName: '中国 · 浙江省 · 杭州市' }
+  }]
   fetchRegisteredNodes.mockResolvedValue({ list: [
     { nodeId: 3, internalIp: '10.212.14.88' },
     { nodeId: 4, internalIp: '10.213.0.1', clusterId: 'in-cluster-default', effectiveStatus: 'OFFLINE' }
   ], total: 2 })
   await vm.refreshNodeDetails()
   expect(vm.nodes[0].internalIp).toBe('10.213.0.1')
-  expect(vm.nodes[0].location).toBe('中国 · 浙江 · 杭州')
+  expect(vm.nodes[0].location).toBe('中国 · 浙江省 · 杭州市')
   expect(vm.nodes[0].effectiveStatus).toBe('AVAILABLE')
 })
 
@@ -139,12 +141,12 @@ it('shows IP and corresponding location in escaped tooltip text', () => {
   vm.showTip('node', { label: 'alihz', internalIp: '10.213.0.1', location: '杭州 <机房>', datasets: [] }, { clientX: 100, clientY: 100 })
   expect(vm.tip.html).toContain('<b>内网 IP：</b>10.213.0.1')
   expect(vm.tip.html).toContain('<b>公网 IP：</b>未获取')
-  expect(vm.tip.html).toContain('<b>对应位置：</b>杭州 &lt;机房&gt;')
+  expect(vm.tip.html).toContain('<b>IP 归属地：</b>杭州 &lt;机房&gt;')
   expect(vm.tip.html).not.toContain('<机房>')
   vm.showTip('node', { label: 'unknown', datasets: [] }, { clientX: 100, clientY: 100 })
   expect(vm.tip.html).toContain('<b>内网 IP：</b>未登记')
   expect(vm.tip.html).toContain('<b>公网 IP：</b>未获取')
-  expect(vm.tip.html).toContain('位置未配置')
+  expect(vm.tip.html).toContain('未查到归属地')
 })
 
 it('always shows separate internal and public IP rows without substituting one for the other', () => {

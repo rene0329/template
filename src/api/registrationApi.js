@@ -33,6 +33,7 @@ export const uploadAndRegisterDataset = (data, onUploadProgress) => request({
 export const verifyDataset = (id) => mutation(`/api/v1/datasets/${id}/verify`)
 export const activateDataset = (id) => mutation(`/api/v1/datasets/${id}/activate`)
 export const disableDataset = (id) => mutation(`/api/v1/datasets/${id}/disable`)
+export const unregisterDataset = (id) => mutation(`/api/v1/datasets/${id}`, 'delete')
 export const bindDatasetImage = (datasetId, runtimeImageId) => mutation(`/api/v1/datasets/${datasetId}/runtime-image`, 'put', { runtimeImageId })
 
 export const fetchRuntimeImages = (params) => request({ url: '/api/v1/runtime-images', method: 'get', params })

@@ -175,11 +175,12 @@ export default {
       return this.topologyNodes.map(node => {
         const details = this.registeredNodes.find(registered => String(registered.nodeId) === String(node.nodeId)) || {}
         const datasets = datasetsForNode(this.datasets, node.nodeId)
+        const externalIp = node.externalIp || details.externalIp
         return {
           ...node,
           internalIp: details.internalIp || node.internalIp,
-          externalIp: node.externalIp || details.externalIp,
-          location: nodeLocation({ ...node, ...details }),
+          externalIp,
+          location: nodeLocation({ ...node, externalIp }),
           datasets,
           datasetSummary: summarizeNodeDatasets(datasets)
         }
@@ -440,7 +441,7 @@ export default {
             <div><b>节点名称：</b>${esc(data.label)}</div>
             <div><b>内网 IP：</b>${esc(data.internalIp || (this.nodeDetailsLoading ? '加载中…' : '未登记'))}</div>
             <div title="节点探测到的公网出口 IP；共用 NAT 的节点可能相同"><b>公网 IP：</b>${esc(data.externalIp || (this.nodeDetailsLoading ? '加载中…' : '未获取'))}</div>
-            <div><b>对应位置：</b>${esc(data.location || '位置未配置')}</div>
+            <div title="按当前公网 IP 查询离线地址库；表示出口 IP 归属地，不一定是节点实际机房位置"><b>IP 归属地：</b>${esc(data.location || '未查到归属地')}</div>
             ${this.nodeDetailsError ? `<div class="tip-warning">${esc(this.nodeDetailsError)}</div>` : ''}
             <div><b>CPU：</b>${data.cpu == null ? '暂无数据' : data.cpu + '%'}</div>
             <div><b>内存：</b>${data.disk == null ? '暂无数据' : data.disk + '%'}</div>

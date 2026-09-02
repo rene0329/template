@@ -12,7 +12,7 @@
         <el-tab-pane label="已注册数据集" name="registered">
           <el-table v-loading="loading" :data="rows" @selection-change="selected=$event">
             <el-table-column type="selection" width="45" :selectable="row => row.status === 'ACTIVE' && row.availableReplicaCount > 0" /><el-table-column prop="datasetCode" label="编码" min-width="130" /><el-table-column prop="name" label="名称" min-width="150" /><el-table-column prop="version" label="版本" width="90" /><el-table-column prop="dataType" label="类型" width="100" /><el-table-column prop="status" label="注册状态" width="110" /><el-table-column label="副本健康" width="120"><template slot-scope="s"><el-tag size="mini" :type="healthTag(s.row.healthStatus)">{{ s.row.healthStatus }}</el-tag></template></el-table-column><el-table-column label="可用副本" width="100"><template slot-scope="s">{{ s.row.availableReplicaCount }}/{{ s.row.totalReplicaCount }}</template></el-table-column><el-table-column prop="statusReason" label="状态原因" min-width="180" show-overflow-tooltip /><el-table-column prop="defaultRuntimeImageId" label="镜像 ID" width="100" />
-            <el-table-column label="操作" width="190"><template slot-scope="s"><el-button type="text" @click="act(verifyDataset,s.row.datasetId)">校验</el-button><el-button type="text" @click="act(activateDataset,s.row.datasetId)">激活</el-button><el-button type="text" @click="act(disableDataset,s.row.datasetId)">停用</el-button></template></el-table-column>
+            <el-table-column label="操作" width="250" fixed="right"><template slot-scope="s"><el-button type="text" @click="act(verifyDataset,s.row.datasetId)">校验</el-button><el-button type="text" @click="act(activateDataset,s.row.datasetId)">激活</el-button><el-button type="text" @click="act(disableDataset,s.row.datasetId)">停用</el-button><el-button type="text" class="danger-action" :loading="deletingDatasetId === s.row.datasetId" :disabled="deletingDatasetId !== null" @click="removeDataset(s.row)">删除</el-button></template></el-table-column>
           </el-table>
           <div class="task-action"><el-button type="primary" :disabled="!selected.length" @click="openTaskDialog">使用所选数据集创建任务</el-button></div>
         </el-tab-pane>
@@ -46,12 +46,13 @@
   </div>
 </template>
 <script>
-import { discoverDatasets, fetchDatasetCandidates, fetchRegisteredDatasets, fetchRegisteredNodes, registerDataset, uploadAndRegisterDataset, verifyDataset, activateDataset, disableDataset, createRegisteredTask, preflightRegisteredTask } from '@/api/registrationApi'
+import { discoverDatasets, fetchDatasetCandidates, fetchRegisteredDatasets, fetchRegisteredNodes, registerDataset, uploadAndRegisterDataset, verifyDataset, activateDataset, disableDataset, unregisterDataset, createRegisteredTask, preflightRegisteredTask } from '@/api/registrationApi'
+import { fetchAllPages } from '@/utils/dataset-catalog'
 export default {
   name: 'DatasetRegistry',
   data: () => ({
     tab: 'candidates', query: '', page: 1, total: 0, rows: [], selected: [], loading: false,
-    dialog: false, form: {},
+    dialog: false, form: {}, deletingDatasetId: null,
     uploadDialog: false, uploadSaving: false, uploadProgress: 0, uploadNodes: [], uploadFile: null, uploadFileList: [],
     uploadForm: { nodeId: null, datasetCode: '', name: '', version: '1.0', dataType: 'NPZ', description: '' },
     taskDialog: false, preflight: null, preflightLoading: false, task: { taskName: '', runtimeImageId: undefined }
@@ -65,8 +66,8 @@ export default {
     async submit() { try { await registerDataset(this.form); this.dialog = false; this.$message.success('数据集已注册'); await this.load() } catch (e) { this.$message.error(e.message || '注册失败') } },
     async openUpload() {
       try {
-        const result = await fetchRegisteredNodes({ page: 1, pageSize: 200, status: 'ACTIVE', enabled: true })
-        this.uploadNodes = (result.list || []).filter(node => node.schedulable && ['STORAGE', 'COMPUTE_STORAGE'].includes(node.role))
+        const nodes = await fetchAllPages(params => fetchRegisteredNodes({ ...params, status: 'ACTIVE', enabled: true }))
+        this.uploadNodes = nodes.filter(node => node.schedulable && ['STORAGE', 'COMPUTE_STORAGE'].includes(node.role))
         if (!this.uploadNodes.length) return this.$message.warning('当前没有可用的存储节点')
         this.uploadForm = { nodeId: this.uploadNodes[0].nodeId, datasetCode: '', name: '', version: '1.0', dataType: 'NPZ', description: '' }
         this.uploadFile = null
@@ -103,6 +104,22 @@ export default {
       } catch (e) { this.$message.error(e.message || '上传注册失败') } finally { this.uploadSaving = false }
     },
     async act(api, id) { try { await api(id); this.$message.success('操作完成'); await this.load() } catch (e) { this.$message.error(e.message || '操作失败') } },
+    async removeDataset(row) {
+      if (this.deletingDatasetId !== null) return
+      this.deletingDatasetId = row.datasetId
+      try {
+        await this.$confirm(`确认删除数据集“${row.name || row.datasetCode}”（ID: ${row.datasetId}，版本: ${row.version}）？仅删除注册记录，保留节点上的原始文件。`, '删除数据集', {
+          type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消', distinguishCancelAndClose: true
+        })
+        await unregisterDataset(row.datasetId)
+        this.selected = this.selected.filter(item => item.datasetId !== row.datasetId)
+        if (this.rows.length === 1 && this.page > 1) this.page--
+        this.$message.success('数据集已删除，原始文件已保留')
+        await this.load()
+      } catch (e) {
+        if (e !== 'cancel' && e !== 'close') this.$message.error(e.message || '删除数据集失败')
+      } finally { this.deletingDatasetId = null }
+    },
     healthTag(status) { return status === 'HEALTHY' ? 'success' : status === 'DEGRADED' ? 'warning' : 'danger' },
     taskPayload() { const payload = { taskName: this.task.taskName, datasetIds: this.selected.map(x => x.datasetId) }; if (this.task.runtimeImageId) payload.runtimeImageId = this.task.runtimeImageId; return payload },
     async openTaskDialog() { this.task.taskName = this.task.taskName || `注册任务-${Date.now()}`; this.taskDialog = true; await this.runPreflight() },
@@ -112,4 +129,4 @@ export default {
   }
 }
 </script>
-<style scoped>.registry-page{padding:20px}.toolbar{display:flex;align-items:center;justify-content:space-between;font-weight:600}.search{width:220px;margin-right:8px}.task-action{margin-top:16px}.preflight-table{margin-top:12px}.upload-tip{margin-bottom:18px}.full-width{width:100%}.el-pagination{margin-top:18px;text-align:right}</style>
+<style scoped>.registry-page{padding:20px}.toolbar{display:flex;align-items:center;justify-content:space-between;font-weight:600}.search{width:220px;margin-right:8px}.task-action{margin-top:16px}.preflight-table{margin-top:12px}.upload-tip{margin-bottom:18px}.full-width{width:100%}.el-pagination{margin-top:18px;text-align:right}.danger-action{color:#f56c6c}</style>

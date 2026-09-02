@@ -1,96 +1,51 @@
-<!--数据集信息模块-->
+<!-- 数据集信息与注册中心共用逻辑数据集目录 -->
 <template>
   <el-container class="analyze-page">
     <el-main class="page-main">
       <div class="content-card">
         <div class="search-container">
-          <el-form :inline="true" :model="formInline" size="medium">
+          <el-form :inline="true" :model="formInline" size="medium" @submit.native.prevent="onSearch">
             <el-form-item>
-              <el-input v-model="formInline.name" placeholder="请输入数据集名称" />
+              <el-input v-model="formInline.name" clearable placeholder="请输入数据集名称 / 编码" @keyup.enter.native="onSearch" />
             </el-form-item>
             <el-button @click="onSearch">搜索</el-button>
             <el-button @click="onCancel">重置</el-button>
           </el-form>
           <div class="action-buttons">
-            <el-button type="primary" @click="onUpdateHeatAll" :loading="heatLoading">热度全部更新</el-button>
-            <el-button type="primary" @click="onHeatSensitiveStorage" :loading="storageLoading" :disabled="hasTaskData">热敏存储</el-button>
-            <el-button type="primary" @click="onInSituAggregation" :loading="aggregationLoading" :disabled="!hasTaskData">原位汇聚</el-button>
+            <el-button :loading="loading" @click="fetchData()">刷新</el-button>
+            <el-button type="primary" @click="$router.push('/RegistrationCenter/DatasetRegistry')">数据集注册</el-button>
           </div>
           <live-refresh-status class="live-refresh-anchor" :updated-at="lastUpdatedAt" />
         </div>
+        <el-alert v-if="loadError" :title="loadError" type="error" :closable="false" show-icon />
 
         <div class="content-row">
           <div class="table-card">
             <div class="table-wrapper">
-              <el-table
-                class="my-table"
-                :data="currentPageData"
-                style="width: 100%;"
-              >
-                <el-table-column
-                  prop="dataName"
-                  label="数据名称"
-                  :min-width="150"
-                  align="center"
-                >
-                  <template slot-scope="scope">
-                    <span>{{ scope.row.dataName ? scope.row.dataName.charAt(0).toUpperCase() + scope.row.dataName.slice(1) : '' }}</span>
-                  </template>
+              <el-table v-loading="loading" class="my-table" :data="TaskData" row-key="datasetId" style="width: 100%;">
+                <el-table-column prop="datasetId" label="ID" width="70" align="center" />
+                <el-table-column prop="datasetCode" label="编码" min-width="160" show-overflow-tooltip />
+                <el-table-column prop="name" label="数据名称" min-width="160" show-overflow-tooltip />
+                <el-table-column prop="version" label="版本" width="80" align="center" />
+                <el-table-column prop="fileType" label="类型" width="80" align="center" />
+                <el-table-column label="大小" width="115" align="center">
+                  <template slot-scope="scope">{{ formatBytes(scope.row.dataSize) }}</template>
                 </el-table-column>
-                <el-table-column
-                  prop="dataSize"
-                  label="大小(MB)"
-                  :min-width="140"
-                  align="center"
-                >
-                  <template slot-scope="scope">
-                    <span>{{ scope.row.dataSize ? (scope.row.dataSize / 1024 / 1024).toFixed(2) + ' MB' : '0 MB' }}</span>
-                  </template>
+                <el-table-column prop="status" label="注册状态" width="130" align="center" />
+                <el-table-column label="副本健康" width="140" align="center">
+                  <template slot-scope="scope"><el-tag size="mini" :type="healthTag(scope.row.healthStatus)">{{ scope.row.healthStatus }}</el-tag></template>
                 </el-table-column>
-                <el-table-column
-                  prop="dataHeat"
-                  label="热度"
-                  :min-width="140"
-                  align="center"
-                />
-                <el-table-column
-                  prop="dataStatus"
-                  label="状态"
-                  :min-width="140"
-                  align="center"
-                >
-                  <template slot-scope="scope">
-                    <span>{{ scope.row.dataStatus === 1 ? '可用' : '禁用' }}</span>
-                  </template>
+                <el-table-column label="可用副本" width="100" align="center">
+                  <template slot-scope="scope">{{ scope.row.availableReplicaCount }}/{{ scope.row.totalReplicaCount }}</template>
                 </el-table-column>
-                <el-table-column
-                  prop="dataServer"
-                  label="存储节点"
-                  :min-width="140"
-                  align="center"
-                />
-                <el-table-column
-                  prop="backupServer"
-                  label="备份节点"
-                  :min-width="140"
-                  align="center"
-                />
-                <el-table-column label="操作" :min-width="180" align="center" header-align="center">
+                <el-table-column label="存储节点" min-width="140" show-overflow-tooltip>
+                  <template slot-scope="scope">{{ storageNodes(scope.row) }}</template>
+                </el-table-column>
+                <el-table-column prop="statusReason" label="状态原因" min-width="180" show-overflow-tooltip />
+                <el-table-column label="操作" width="180" align="center" fixed="right">
                   <template slot-scope="scope">
-                    <el-button 
-                      type="text" 
-                      @click="openTaskDialog(scope.row)"
-                      class="link-btn"
-                    >
-                      更新
-                    </el-button>
-                    <el-button 
-                      type="text" 
-                      @click="deletescopeTask(scope.row)"
-                      class="link-btn"
-                    >
-                      {{ scope.row.dataStatus === 1 ? '禁用' : '启用' }}
-                    </el-button>
+                    <el-button type="text" class="link-btn" @click="openTaskDialog(scope.row)">详情</el-button>
+                    <el-button type="text" class="link-btn" :disabled="pendingDatasetId !== null" @click="toggleStatus(scope.row)">{{ scope.row.status === 'ACTIVE' ? '停用' : '激活' }}</el-button>
                   </template>
                 </el-table-column>
               </el-table>
@@ -98,81 +53,36 @@
           </div>
         </div>
 
-        <!-- 资源使用情况弹窗 -->
-        <el-dialog
-          :title="`${selectedNodeTitle} 资源使用情况`"
-          :visible.sync="dialogVisibleCharts"
-          width="900px"
-          @opened="initCharts"
-        >
-          <div class="charts">
-            <div id="radar" class="chart radar"></div>
-            <div class="gauges">
-              <div class="gauge">
-                <div class="gauge-title">CPU 使用率</div>
-                <div id="gaugeCpu" class="chart"></div>
-              </div>
-              <div class="gauge">
-                <div class="gauge-title">内存 使用率</div>
-                <div id="gaugeMem" class="chart"></div>
-              </div>
-              <div class="gauge">
-                <div class="gauge-title">存储 使用率</div>
-                <div id="gaugeDisk" class="chart"></div>
-              </div>
-            </div>
-          </div>
-
-          <span slot="footer" class="dialog-footer">
-            <el-button @click="dialogVisibleCharts=false">关 闭</el-button>
-          </span>
-        </el-dialog>
-
-        <!-- 节点详情对话框 -->
-        <el-dialog title="数据详情" :visible="dialogVisibleDetail" @close="closeTaskDialog" custom-class="node-detail-dialog">
-          <el-form :model="selectedTask" :rules="rules" ref="taskForm">
-            <el-form-item label="数据名称" prop="dataName">
-              <el-input v-model="selectedTask.dataName" disabled></el-input>
-            </el-form-item>
-            <el-form-item label="大小（字节）" prop="dataSize">
-              <el-input v-model="selectedTask.dataSize" disabled></el-input>
-            </el-form-item>
-            <el-form-item label="热度" prop="dataHeat">
-              <el-input-number v-model="selectedTask.dataHeat" :min="0" :max="100" :disabled="!editing"></el-input-number>
-            </el-form-item>
-            <el-form-item label="状态" prop="dataStatus">
-              <el-input v-model="selectedTask.dataStatus" :disabled="true"></el-input>
-            </el-form-item>
-            <el-form-item label="存储节点" prop="dataServer">
-              <el-input v-model="selectedTask.dataServer" disabled></el-input>
-            </el-form-item>
-            <el-form-item label="备份节点" prop="backupServer">
-              <el-input v-model="selectedTask.backupServer" disabled></el-input>
-            </el-form-item>
+        <el-dialog title="数据集详情" :visible.sync="dialogVisibleDetail" width="80%" custom-class="node-detail-dialog">
+          <el-form label-width="100px">
+            <el-form-item label="数据集 ID">{{ selectedTask.datasetId }}</el-form-item>
+            <el-form-item label="编码 / 版本">{{ selectedTask.datasetCode }} / {{ selectedTask.version }}</el-form-item>
+            <el-form-item label="数据名称">{{ selectedTask.name }}</el-form-item>
+            <el-form-item label="描述">{{ selectedTask.description || '暂无描述' }}</el-form-item>
+            <el-form-item label="大小">{{ formatBytes(selectedTask.dataSize) }}</el-form-item>
+            <el-form-item label="注册状态">{{ selectedTask.status }}</el-form-item>
+            <el-form-item label="副本健康">{{ selectedTask.healthStatus }}（{{ selectedTask.availableReplicaCount }}/{{ selectedTask.totalReplicaCount }} 可用）</el-form-item>
           </el-form>
-
-          <el-button v-if="!editing" @click="editing = true">修改</el-button>
-          <el-button v-else @click="saveChanges">提交</el-button>
+          <el-table :data="selectedTask.replicas || []" row-key="replicaId">
+            <el-table-column prop="replicaId" label="副本 ID" width="90" />
+            <el-table-column prop="nodeId" label="节点 ID" width="90" />
+            <el-table-column prop="filePath" label="文件路径" min-width="260" show-overflow-tooltip />
+            <el-table-column label="大小" width="115"><template slot-scope="scope">{{ formatBytes(scope.row.sizeBytes) }}</template></el-table-column>
+            <el-table-column prop="effectiveAvailability" label="可用性" width="140" />
+            <el-table-column prop="statusReason" label="状态原因" min-width="180" show-overflow-tooltip />
+          </el-table>
+          <span slot="footer"><el-button @click="dialogVisibleDetail = false">关闭</el-button></span>
         </el-dialog>
 
         <div class="page-footer">
           <div class="pagination-container">
-            <span class="pagination-total">共 {{ filteredDataCount }} 条</span>
+            <span class="pagination-total">共 {{ total }} 条</span>
             <span class="pagination-sizes-label">每页</span>
             <el-select v-model="pageSize" size="mini" class="pagination-sizes-select" @change="handleSizeChange">
-              <el-option :value="5" label="5"></el-option>
-              <el-option :value="10" label="10"></el-option>
-              <el-option :value="20" label="20"></el-option>
-              <el-option :value="50" label="50"></el-option>
+              <el-option v-for="size in [5, 10, 20, 50]" :key="size" :value="size" :label="String(size)" />
             </el-select>
             <span class="pagination-sizes-label">条</span>
-            <el-pagination
-              :current-page="currentPage"
-              :page-size="pageSize"
-              layout="prev, pager, next, jumper"
-              :total="filteredDataCount"
-              @current-change="handleCurrentChange"
-            />
+            <el-pagination :current-page="currentPage" :page-size="pageSize" layout="prev, pager, next, jumper" :total="total" @current-change="handleCurrentChange" />
           </div>
         </div>
       </div>
@@ -182,75 +92,35 @@
 </template>
 
 <script>
-import * as echarts from 'echarts'
 import LiveRefreshStatus from '@/components/LiveRefreshStatus'
 import { keepStableCollection } from '@/utils/live-refresh'
-import { 
-  fetchDataManagementList, 
-  updateDataItem, 
-  toggleDataStatus,
-  updateDataHeatAll,
-  saveDataStorageAll,
-  fetchTaskList
-} from '@/api/managementCenterApi'
+import { datasetRow, formatBytes } from '@/utils/dataset-catalog'
+import { fetchRegisteredDatasets, activateDataset, disableDataset } from '@/api/registrationApi'
 
 export default {
-  name: 'NodeList',
+  name: 'DataManagement',
   components: { LiveRefreshStatus },
   data() {
     return {
       currentPage: 1,
       pageSize: 5,
-      dialogVisibleYaml: false,
-      yamlKey: 0,
-      dialogVisibleLogs: false,
       dialogVisibleDetail: false,
-      dialogVisibleCharts: false,
-      logsKey: 0,
-      selected: null,
-      systemName: '数据集信息',
-      headerRightText: '欢迎使用',
       loading: false,
       refreshing: false,
       requestVersion: 0,
       refreshTimer: null,
       lastUpdatedAt: '',
+      loadError: '',
       total: 0,
-      heatLoading: false,
-      storageLoading: false,
-      aggregationLoading: false,
-      hasTaskData: false,
-      // 用于表单搜索
-      formInline: {
-        name: ''
-      },
-      // 从服务器获取的数据
+      pendingDatasetId: null,
+      formInline: { name: '' },
       TaskData: [],
-      // 用于传递参数
-      node_name: '',
-      selectedTask: {}, // 存储选中的任务数据
-      editing: false,   // 是否处于编辑模式
-      rules: {
-        // 表单校验规则
-      }
-    }
-  },
-  computed: {
-    selectedNodeTitle() {
-      return this.selected ? (this.selected.node_name || '') : ''
-    },
-    filteredDataCount() {
-      return this.total
-    },
-    currentPageData() {
-      // 数据已在服务端分页，直接返回
-      return this.TaskData
+      selectedTask: {}
     }
   },
   created() {
     this.fetchData()
   },
-
   mounted() {
     this.refreshTimer = window.setInterval(() => this.fetchData(true), 1000)
   },
@@ -259,6 +129,14 @@ export default {
     this.requestVersion++
   },
   methods: {
+    formatBytes,
+    healthTag(status) {
+      return status === 'HEALTHY' ? 'success' : status === 'DEGRADED' ? 'warning' : 'danger'
+    },
+    storageNodes(dataset) {
+      const ids = [...new Set((dataset.replicas || []).map(replica => replica.nodeId))]
+      return ids.map(id => `节点 #${id}`).join('、') || '暂无副本'
+    },
     async fetchData(silent = false) {
       if (silent && this.refreshing) return
       const version = ++this.requestVersion
@@ -266,19 +144,28 @@ export default {
       if (!silent) this.loading = true
       try {
         const options = silent ? { silent: true } : {}
-        const [dataRes, taskRes] = await Promise.all([
-          fetchDataManagementList(this.currentPage, this.pageSize, this.formInline.name, options),
-          fetchTaskList(1, 1, '', options).catch(() => null)
-        ])
+        const res = await fetchRegisteredDatasets({ page: this.currentPage, pageSize: this.pageSize, query: this.formInline.name }, options)
         if (version !== this.requestVersion) return
-        this.TaskData = keepStableCollection(this.TaskData, dataRes.list)
-        this.total = dataRes.total || this.TaskData.length
-        if (taskRes) this.hasTaskData = taskRes.total > 0
+        // 注册中心删除记录后，当前页可能已超出最后一页。
+        const lastPage = Math.max(1, Math.ceil(res.total / this.pageSize))
+        if (this.currentPage > lastPage) {
+          this.currentPage = lastPage
+          this.refreshing = false
+          return this.fetchData(silent)
+        }
+        this.TaskData = keepStableCollection(this.TaskData, res.list.map(dataset => datasetRow(dataset)))
+        this.total = res.total
+        if (this.dialogVisibleDetail) {
+          const selected = this.TaskData.find(dataset => dataset.datasetId === this.selectedTask.datasetId)
+          if (selected) this.selectedTask = selected
+          else this.dialogVisibleDetail = false
+        }
         this.lastUpdatedAt = new Date().toLocaleTimeString('zh-CN', { hour12: false })
+        this.loadError = ''
       } catch (err) {
         if (version !== this.requestVersion) return
-        console.error('获取数据失败:', err)
-        if (!silent) this.$message.error('获取数据失败')
+        this.loadError = `数据更新失败（保留上次结果）：${err.message}`
+        if (!silent) this.$message.error(err.message || '获取数据集列表失败')
       } finally {
         if (version === this.requestVersion) {
           this.loading = false
@@ -295,10 +182,6 @@ export default {
       this.currentPage = 1
       this.fetchData()
     },
-    onRefresh() {
-      console.log('refresh!')
-      this.fetchData()
-    },
     handleSizeChange(val) {
       this.pageSize = val
       this.currentPage = 1
@@ -308,151 +191,25 @@ export default {
       this.currentPage = val
       this.fetchData()
     },
-    openTaskDialog(task) {
-      this.selectedTask = { ...task }
+    openTaskDialog(dataset) {
+      this.selectedTask = dataset
       this.dialogVisibleDetail = true
     },
-    closeTaskDialog() {
-      this.dialogVisibleDetail = false
-      this.editing = false
-    },
-    async saveChanges() {
+    async toggleStatus(dataset) {
+      if (this.pendingDatasetId !== null) return
+      this.pendingDatasetId = dataset.datasetId
+      const active = dataset.status === 'ACTIVE'
       try {
-        await updateDataItem({ dataId: this.selectedTask.dataId, dataHeat: this.selectedTask.dataHeat })
-        this.editing = false
-        this.$message({ message: '修改成功', type: 'success' })
-        this.fetchData()
+        await (active ? disableDataset : activateDataset)(dataset.datasetId)
+        this.$message.success(active ? '数据集已停用' : '数据集已激活')
+        await this.fetchData()
       } catch (err) {
-        console.error('修改失败:', err)
-        this.$message.error(err.message || '修改失败')
-      }
-    },
-    async deletescopeTask(task) {
-      try {
-        await toggleDataStatus(task.dataName)
-        this.$message({ message: '禁用成功', type: 'success' })
-        this.fetchData()
-      } catch (err) {
-        console.error('禁用失败:', err)
-        this.$message.error('禁用失败')
-      }
-    },
-
-    // 热度全部更新
-    async onUpdateHeatAll() {
-      this.heatLoading = true
-      try {
-        await updateDataHeatAll()
-        this.$message({ message: '热度全部更新成功', type: 'success' })
-        this.fetchData()
-      } catch (err) {
-        console.error('热度更新失败:', err)
-        this.$message.error('热度更新失败')
+        this.$message.error(err.message || '更新注册状态失败')
       } finally {
-        this.heatLoading = false
+        this.pendingDatasetId = null
       }
-    },
-    // 热敏存储 — 按热度重新分配存储节点（仅限 task_management 为空时）
-    async onHeatSensitiveStorage() {
-      this.storageLoading = true
-      try {
-        await saveDataStorageAll('heat')
-        this.$message({ message: '热敏存储执行成功', type: 'success' })
-        this.fetchData()
-      } catch (err) {
-        console.error('热敏存储失败:', err)
-        this.$message.error('热敏存储失败')
-      } finally {
-        this.storageLoading = false
-      }
-    },
-    // 原位汇聚 — 仅限 task_management 有数据时可用
-    async onInSituAggregation() {
-      this.aggregationLoading = true
-      try {
-        await saveDataStorageAll('aggregation')
-        this.$message({ message: '原位汇聚执行成功', type: 'success' })
-        this.fetchData()
-      } catch (err) {
-        console.error('原位汇聚失败:', err)
-        this.$message.error('原位汇聚失败')
-      } finally {
-        this.aggregationLoading = false
-      }
-    },
-
-    openDetail(row) {
-      this.selected = row
-      this.dialogVisibleCharts = true
-    },
-    initCharts() {
-      if (!this.selected) return
-      const { cpu, mem, disk } = this.selected.metrics
-
-      const radar = echarts.init(document.getElementById('radar'))
-      radar.setOption({
-        tooltip: {},
-        radar: {
-          indicator: [
-            { name: 'CPU', max: 100 },
-            { name: '存储', max: 100 },
-            { name: '内存', max: 100 }
-          ],
-          center: ['50%', '65%'],
-          radius: 90,
-          splitArea: { areaStyle: { color: ['#fafafa','#f5f5f5'] } }
-        },
-        series: [{
-          type: 'radar',
-          data: [{ value: [cpu, disk, mem] }],
-          lineStyle: { width: 2 },
-          areaStyle: { opacity: 0.1 }
-        }]
-      })
-
-      const mkGauge = (elId, val) => {
-        const inst = echarts.init(document.getElementById(elId))
-        inst.setOption({
-          series: [{
-            type: 'gauge',
-            startAngle: 200,
-            endAngle: -20,
-            min: 0,
-            max: 100,
-            splitNumber: 10,
-            axisLine: {
-              lineStyle: {
-                width: 12,
-                color: [
-                  [0.3, '#91cc75'],
-                  [0.7, '#5470c6'],
-                  [1, '#ee6666']
-                ]
-              }
-            },
-            pointer: { show: true, length: '65%', width: 6},
-            axisTick: { show: false },
-            splitLine: { show: false },
-            axisLabel: { show: false },
-            detail: { valueAnimation: true, formatter: '{value}%', fontSize: 22, offsetCenter: [0, '70%']},
-            data: [{ value: val }]
-          }]
-        })
-        return inst
-      }
-      mkGauge('gaugeCpu', cpu)
-      mkGauge('gaugeMem', mem)
-      mkGauge('gaugeDisk', disk)
-
-      window.addEventListener('resize', () => {
-        radar.resize()
-        echarts.getInstanceByDom(document.getElementById('gaugeCpu'))?.resize()
-        echarts.getInstanceByDom(document.getElementById('gaugeMem'))?.resize()
-        echarts.getInstanceByDom(document.getElementById('gaugeDisk'))?.resize()
-      }, { once: true })
     }
   }
-
 }
 </script>
 
@@ -473,21 +230,21 @@ export default {
   padding: 0 24px;
   box-sizing: border-box;
 }
-.brand { 
-  font-size: 16px; 
-  font-weight: 600; 
+.brand {
+  font-size: 16px;
+  font-weight: 600;
 }
-.header-meta { 
-  display: flex; 
-  align-items: center; 
-  gap: 8px; 
-  font-size: 14px; 
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
 }
-.header-avatar { 
-  margin-right: 4px; 
+.header-avatar {
+  margin-right: 4px;
 }
-.header-user { 
-  font-size: 14px; 
+.header-user {
+  font-size: 14px;
 }
 .breadcrumb-bar {
   height: 40px;
@@ -559,10 +316,10 @@ export default {
   gap: 8px;
   flex-wrap: wrap;
 }
-.content-row { 
-  display: flex; 
-  flex-wrap: wrap; 
-  gap: 16px; 
+.content-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 .table-card {
   flex: 1;
@@ -723,17 +480,17 @@ export default {
   grid-column-gap: 24px;
   margin-top: 40px;
 }
-.gauge { 
-  text-align: center; 
+.gauge {
+  text-align: center;
 }
-.gauge-title { 
-  margin-bottom: 8px; 
-  font-weight: 600; 
-  color: #333; 
+.gauge-title {
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #333;
 }
-.chart { 
-  width: 100%; 
-  height: 180px; 
+.chart {
+  width: 100%;
+  height: 180px;
 }
 .node-detail-dialog .el-dialog__body {
   padding-bottom: 24px;
