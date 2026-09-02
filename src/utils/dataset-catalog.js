@@ -30,9 +30,11 @@ export function datasetRow(dataset, replicas = dataset.replicas || []) {
   }
 }
 
-export function datasetsForNode(datasets, nodeId) {
+export function datasetsForNode(datasets, nodeId, { excludeMissing = false } = {}) {
   return datasets.reduce((rows, dataset) => {
-    const replicas = (dataset.replicas || []).filter(r => String(r.nodeId) === String(nodeId))
+    // Filter replicas before deriving names, paths, sizes and counts for the node.
+    const replicas = (dataset.replicas || []).filter(r => String(r.nodeId) === String(nodeId) &&
+      (!excludeMissing || (r.availability !== 'MISSING' && r.effectiveAvailability !== 'MISSING')))
     if (replicas.length) rows.push(datasetRow(dataset, replicas))
     return rows
   }, [])
@@ -46,4 +48,9 @@ export function formatBytes(value) {
   const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
   const index = Math.min(Math.max(Math.floor(Math.log(bytes) / Math.log(1024)), 0), units.length - 1)
   return `${(bytes / Math.pow(1024, index)).toFixed(index === 0 ? 0 : 2)} ${units[index]}`
+}
+
+export function formatHeat(value) {
+  if (value == null || value === '' || !Number.isFinite(Number(value))) return '暂无数据'
+  return Number(value).toFixed(2)
 }

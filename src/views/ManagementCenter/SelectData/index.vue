@@ -113,10 +113,10 @@
             <span class="pagination-total">共 {{ total }} 条</span>
             <span class="pagination-sizes-label">每页</span>
             <el-select v-model="pageSize" size="mini" class="pagination-sizes-select" @change="handleSizeChange">
-              <el-option :value="5" label="5"></el-option>
-              <el-option :value="10" label="10"></el-option>
-              <el-option :value="20" label="20"></el-option>
-              <el-option :value="50" label="50"></el-option>
+              <el-option :value="5" label="5" />
+              <el-option :value="10" label="10" />
+              <el-option :value="20" label="20" />
+              <el-option :value="50" label="50" />
             </el-select>
             <span class="pagination-sizes-label">条</span>
             <el-pagination
@@ -152,7 +152,7 @@ export default {
       dialogVisibleLogs: false,
       logsKey: 0,
       selected: null,
-      //currentPageData: [],
+      // currentPageData: [],
       selectedRows: [],
       systemName: '可选数据',
       headerRightText: '欢迎使用',
@@ -175,7 +175,7 @@ export default {
       // 用于传递参数
       dataset_name: '',
       selectedTask: {}, // 存储选中的任务数据
-      editing: false,   // 是否处于编辑模式
+      editing: false, // 是否处于编辑模式
       rules: {
         // 表单校验规则
       }
@@ -267,8 +267,8 @@ export default {
     //   this.dialogVisibleDetail = true;
     // },
     closeTaskDialog() {
-      this.dialogVisibleDetail = false;
-      this.editing = false; // 退出编辑模式
+      this.dialogVisibleDetail = false
+      this.editing = false // 退出编辑模式
     },
     handleSelectionChange(selection) {
       this.selectedRows = selection
@@ -291,7 +291,7 @@ export default {
       const datasetIds = this.selectedRows.map(r => r.datasetId).sort((a, b) => a - b)
       const signature = JSON.stringify(datasetIds)
       if (!this.pendingSubmission || this.pendingSubmission.signature !== signature) {
-        this.pendingSubmission = { signature, key: requestId(), body: { datasetIds, taskName: `数据任务-${new Date().toISOString()}` } }
+        this.pendingSubmission = { signature, key: requestId(), body: { datasetIds, taskName: `数据任务-${new Date().toISOString()}` }}
       }
       try {
         const { body, key } = this.pendingSubmission
@@ -339,21 +339,21 @@ export default {
   padding: 0 24px;
   box-sizing: border-box;
 }
-.brand { 
-  font-size: 16px; 
-  font-weight: 600; 
+.brand {
+  font-size: 16px;
+  font-weight: 600;
 }
-.header-meta { 
-  display: flex; 
-  align-items: center; 
-  gap: 8px; 
-  font-size: 14px; 
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
 }
-.header-avatar { 
-  margin-right: 4px; 
+.header-avatar {
+  margin-right: 4px;
 }
-.header-user { 
-  font-size: 14px; 
+.header-user {
+  font-size: 14px;
 }
 .breadcrumb-bar {
   height: 40px;
@@ -392,37 +392,46 @@ export default {
   align-items: center;
   padding: 0;
   gap: 8px;
+  flex-wrap: wrap;
   background: transparent;
 }
 .live-refresh-anchor {
   margin-left: auto;
 }
-.search-container :deep(.el-form--inline) {
+.search-container ::v-deep .el-form--inline {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
-.search-container :deep(.el-form--inline .el-form-item) {
-  margin-right: 8px;
-  margin-bottom: 0;
+.search-container ::v-deep .el-form--inline .el-form-item {
+  margin: 0;
 }
-.search-container :deep(.el-form-item__content) {
+.search-container ::v-deep .el-form-item__content {
   line-height: 32px;
 }
-.search-container :deep(.el-input__inner) {
+.search-container ::v-deep .el-input__inner {
   height: 32px;
   line-height: 32px;
 }
-.search-container :deep(.el-button) {
+.search-container ::v-deep .el-button {
   height: 32px;
-  line-height: 32px;
+  line-height: 1;
   padding: 0 16px;
+  margin: 0;
 }
-.content-row { 
+.action-buttons {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.content-row {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  display: flex; 
-  flex-wrap: wrap; 
+  display: flex;
+  flex-wrap: wrap;
   gap: 16px;
 }
 .table-card {
@@ -434,11 +443,11 @@ export default {
   box-shadow: none;
   box-sizing: border-box;
 }
-.table-wrapper { 
-  width: 100%; 
-  overflow-x: auto; 
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
 }
-.page-footer { 
+.page-footer {
   flex-shrink: 0;
   padding: 8px 0;
   box-sizing: border-box;
@@ -479,7 +488,6 @@ export default {
   line-height: 54px;
 }
 
-
 :deep(.el-table__empty-block) {
   min-height: 54px;            /* 空状态区域高度 */
   display: flex;
@@ -493,7 +501,6 @@ export default {
   font-size: 14px;
   letter-spacing: 1px;
 }
-
 
 :deep(.el-button--primary) {
   background: linear-gradient(90deg, #4ec58c, #497aae);

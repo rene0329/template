@@ -12,40 +12,50 @@
             <el-button @click="onCancel">重置</el-button>
           </el-form>
           <div class="action-buttons">
+            <el-button type="primary" :loading="heatLoading" @click="onUpdateHeatAll">热度全部更新</el-button>
+            <el-tooltip :disabled="!!storagePolicy.heatEnabled" :content="storagePolicy.heatReason || policyError || '正在加载存储策略'" placement="top">
+              <span><el-button type="primary" :disabled="heatLoading || !storagePolicy.heatEnabled" @click="openStoragePlan('heat')">热敏存储</el-button></span>
+            </el-tooltip>
+            <el-tooltip :disabled="!!storagePolicy.aggregationEnabled" :content="storagePolicy.aggregationReason || policyError || '正在加载存储策略'" placement="top">
+              <span><el-button type="primary" :disabled="heatLoading || !storagePolicy.aggregationEnabled" @click="openStoragePlan('aggregation')">原位汇聚</el-button></span>
+            </el-tooltip>
             <el-button :loading="loading" @click="fetchData()">刷新</el-button>
             <el-button type="primary" @click="$router.push('/RegistrationCenter/DatasetRegistry')">数据集注册</el-button>
           </div>
           <live-refresh-status class="live-refresh-anchor" :updated-at="lastUpdatedAt" />
         </div>
         <el-alert v-if="loadError" :title="loadError" type="error" :closable="false" show-icon />
+        <el-alert v-if="policyError" :title="policyError" type="warning" :closable="false" show-icon />
+        <el-alert v-if="nodeNameError && !dialogVisibleDetail" :title="nodeNameError" type="warning" :closable="false" show-icon />
 
         <div class="content-row">
           <div class="table-card">
             <div class="table-wrapper">
               <el-table v-loading="loading" class="my-table" :data="TaskData" row-key="datasetId" style="width: 100%;">
                 <el-table-column prop="datasetId" label="ID" width="70" align="center" />
-                <el-table-column prop="datasetCode" label="编码" min-width="160" show-overflow-tooltip />
                 <el-table-column prop="name" label="数据名称" min-width="160" show-overflow-tooltip />
+                <el-table-column prop="dataHeat" label="热度" width="100" align="center" sortable>
+                  <template slot-scope="scope">{{ formatHeat(scope.row.dataHeat) }}</template>
+                </el-table-column>
+                <el-table-column prop="datasetCode" label="编码" min-width="160" show-overflow-tooltip />
                 <el-table-column prop="version" label="版本" width="80" align="center" />
                 <el-table-column prop="fileType" label="类型" width="80" align="center" />
                 <el-table-column label="大小" width="115" align="center">
                   <template slot-scope="scope">{{ formatBytes(scope.row.dataSize) }}</template>
                 </el-table-column>
                 <el-table-column prop="status" label="注册状态" width="130" align="center" />
-                <el-table-column label="副本健康" width="140" align="center">
-                  <template slot-scope="scope"><el-tag size="mini" :type="healthTag(scope.row.healthStatus)">{{ scope.row.healthStatus }}</el-tag></template>
-                </el-table-column>
                 <el-table-column label="可用副本" width="100" align="center">
                   <template slot-scope="scope">{{ scope.row.availableReplicaCount }}/{{ scope.row.totalReplicaCount }}</template>
                 </el-table-column>
                 <el-table-column label="存储节点" min-width="140" show-overflow-tooltip>
                   <template slot-scope="scope">{{ storageNodes(scope.row) }}</template>
                 </el-table-column>
-                <el-table-column prop="statusReason" label="状态原因" min-width="180" show-overflow-tooltip />
                 <el-table-column label="操作" width="180" align="center" fixed="right">
                   <template slot-scope="scope">
                     <el-button type="text" class="link-btn" @click="openTaskDialog(scope.row)">详情</el-button>
-                    <el-button type="text" class="link-btn" :disabled="pendingDatasetId !== null" @click="toggleStatus(scope.row)">{{ scope.row.status === 'ACTIVE' ? '停用' : '激活' }}</el-button>
+                    <el-tooltip :disabled="canSchedule(scope.row)" content="仅已激活且有可用副本的数据集可以调度" placement="top">
+                      <span><el-button type="text" class="link-btn" :disabled="!canSchedule(scope.row)" @click="openScheduleDialog(scope.row)">调度</el-button></span>
+                    </el-tooltip>
                   </template>
                 </el-table-column>
               </el-table>
@@ -60,19 +70,25 @@
             <el-form-item label="数据名称">{{ selectedTask.name }}</el-form-item>
             <el-form-item label="描述">{{ selectedTask.description || '暂无描述' }}</el-form-item>
             <el-form-item label="大小">{{ formatBytes(selectedTask.dataSize) }}</el-form-item>
+            <el-form-item label="热度">{{ formatHeat(selectedTask.dataHeat) }}</el-form-item>
+            <el-form-item label="热度更新时间">{{ selectedTask.heatUpdatedAt ? new Date(selectedTask.heatUpdatedAt).toLocaleString('zh-CN', { hour12: false }) : '暂无数据' }}</el-form-item>
             <el-form-item label="注册状态">{{ selectedTask.status }}</el-form-item>
-            <el-form-item label="副本健康">{{ selectedTask.healthStatus }}（{{ selectedTask.availableReplicaCount }}/{{ selectedTask.totalReplicaCount }} 可用）</el-form-item>
           </el-form>
-          <el-table :data="selectedTask.replicas || []" row-key="replicaId">
+          <el-alert v-if="nodeNameError" :title="nodeNameError" type="warning" :closable="false" show-icon />
+          <el-table :data="detailReplicas" row-key="replicaId" empty-text="暂无未缺失的副本">
             <el-table-column prop="replicaId" label="副本 ID" width="90" />
-            <el-table-column prop="nodeId" label="节点 ID" width="90" />
+            <el-table-column label="节点名称" min-width="150" show-overflow-tooltip>
+              <template slot-scope="scope"><span :title="`节点 ID：${scope.row.nodeId}`">{{ nodeName(scope.row.nodeId) }}</span></template>
+            </el-table-column>
             <el-table-column prop="filePath" label="文件路径" min-width="260" show-overflow-tooltip />
             <el-table-column label="大小" width="115"><template slot-scope="scope">{{ formatBytes(scope.row.sizeBytes) }}</template></el-table-column>
             <el-table-column prop="effectiveAvailability" label="可用性" width="140" />
-            <el-table-column prop="statusReason" label="状态原因" min-width="180" show-overflow-tooltip />
           </el-table>
           <span slot="footer"><el-button @click="dialogVisibleDetail = false">关闭</el-button></span>
         </el-dialog>
+
+        <manual-schedule-dialog ref="manualSchedule" @submitted="fetchData()" />
+        <storage-plan-dialog ref="storagePlan" @submitted="fetchData()" />
 
         <div class="page-footer">
           <div class="pagination-container">
@@ -93,17 +109,20 @@
 
 <script>
 import LiveRefreshStatus from '@/components/LiveRefreshStatus'
+import ManualScheduleDialog from './ManualScheduleDialog'
+import StoragePlanDialog from './StoragePlanDialog'
 import { keepStableCollection } from '@/utils/live-refresh'
-import { datasetRow, formatBytes } from '@/utils/dataset-catalog'
-import { fetchRegisteredDatasets, activateDataset, disableDataset } from '@/api/registrationApi'
+import { datasetRow, fetchAllPages, formatBytes, formatHeat } from '@/utils/dataset-catalog'
+import { fetchRegisteredDatasets, fetchRegisteredNodes } from '@/api/registrationApi'
+import { fetchStoragePolicy, refreshDatasetHeat } from '@/api/datasetStorageApi'
 
 export default {
   name: 'DataManagement',
-  components: { LiveRefreshStatus },
+  components: { LiveRefreshStatus, ManualScheduleDialog, StoragePlanDialog },
   data() {
     return {
       currentPage: 1,
-      pageSize: 5,
+      pageSize: 10,
       dialogVisibleDetail: false,
       loading: false,
       refreshing: false,
@@ -111,11 +130,22 @@ export default {
       refreshTimer: null,
       lastUpdatedAt: '',
       loadError: '',
+      policyError: '',
+      storagePolicy: {},
+      heatLoading: false,
       total: 0,
-      pendingDatasetId: null,
       formInline: { name: '' },
       TaskData: [],
-      selectedTask: {}
+      selectedTask: {},
+      nodeNames: {},
+      nodeNameError: '',
+      nodeNamesLoading: false,
+      nodeNameRequest: 0
+    }
+  },
+  computed: {
+    detailReplicas() {
+      return this.nonMissingReplicas(this.selectedTask)
     }
   },
   created() {
@@ -127,25 +157,55 @@ export default {
   beforeDestroy() {
     window.clearInterval(this.refreshTimer)
     this.requestVersion++
+    this.nodeNameRequest++
   },
   methods: {
     formatBytes,
-    healthTag(status) {
-      return status === 'HEALTHY' ? 'success' : status === 'DEGRADED' ? 'warning' : 'danger'
+    formatHeat,
+    async onUpdateHeatAll() {
+      if (this.heatLoading) return
+      this.heatLoading = true
+      try {
+        const result = await refreshDatasetHeat()
+        this.$message.success(`已更新 ${result.updatedCount} 个数据集的热度`)
+        await this.fetchData()
+      } catch (error) {
+        this.$message.error(`热度更新失败：${error.message}`)
+      } finally {
+        this.heatLoading = false
+      }
+    },
+    openStoragePlan(mode) {
+      const enabled = mode === 'heat' ? this.storagePolicy.heatEnabled : mode === 'aggregation' && this.storagePolicy.aggregationEnabled
+      if (!this.heatLoading && enabled) this.$refs.storagePlan.open(mode)
+    },
+    nonMissingReplicas(dataset) {
+      return (dataset.replicas || []).filter(replica => replica.availability !== 'MISSING' && replica.effectiveAvailability !== 'MISSING')
     },
     storageNodes(dataset) {
-      const ids = [...new Set((dataset.replicas || []).map(replica => replica.nodeId))]
-      return ids.map(id => `节点 #${id}`).join('、') || '暂无副本'
+      const ids = [...new Set(this.nonMissingReplicas(dataset).map(replica => replica.nodeId))]
+      return ids.map(id => this.nodeName(id)).join('、') || '暂无副本'
+    },
+    nodeName(nodeId) {
+      return this.nodeNames[nodeId] || (this.nodeNamesLoading ? '名称加载中…' : `节点 #${nodeId}（名称未找到）`)
     },
     async fetchData(silent = false) {
       if (silent && this.refreshing) return
       const version = ++this.requestVersion
       this.refreshing = true
       if (!silent) this.loading = true
+      // Refresh names on entry/manual refresh, without blocking the dataset list
+      // or requesting the node catalog on every one-second background poll.
+      if (!silent) this.loadNodeNames()
       try {
         const options = silent ? { silent: true } : {}
-        const res = await fetchRegisteredDatasets({ page: this.currentPage, pageSize: this.pageSize, query: this.formInline.name }, options)
+        const [res, policy] = await Promise.all([
+          fetchRegisteredDatasets({ page: this.currentPage, pageSize: this.pageSize, query: this.formInline.name }, options),
+          fetchStoragePolicy({ silent: true }).catch(error => ({ error }))
+        ])
         if (version !== this.requestVersion) return
+        this.storagePolicy = policy.error ? {} : policy
+        this.policyError = policy.error ? `批量存储暂不可用：${policy.error.message}` : ''
         // 注册中心删除记录后，当前页可能已超出最后一页。
         const lastPage = Math.max(1, Math.ceil(res.total / this.pageSize))
         if (this.currentPage > lastPage) {
@@ -194,20 +254,30 @@ export default {
     openTaskDialog(dataset) {
       this.selectedTask = dataset
       this.dialogVisibleDetail = true
+      return this.loadNodeNames()
     },
-    async toggleStatus(dataset) {
-      if (this.pendingDatasetId !== null) return
-      this.pendingDatasetId = dataset.datasetId
-      const active = dataset.status === 'ACTIVE'
+    async loadNodeNames() {
+      const request = ++this.nodeNameRequest
+      this.nodeNamesLoading = true
+      this.nodeNameError = ''
       try {
-        await (active ? disableDataset : activateDataset)(dataset.datasetId)
-        this.$message.success(active ? '数据集已停用' : '数据集已激活')
-        await this.fetchData()
-      } catch (err) {
-        this.$message.error(err.message || '更新注册状态失败')
+        const nodes = await fetchAllPages(fetchRegisteredNodes, { silent: true })
+        if (request !== this.nodeNameRequest) return
+        this.nodeNames = nodes.reduce((names, node) => {
+          names[node.nodeId] = node.displayName || node.k8sNodeName
+          return names
+        }, {})
+      } catch (error) {
+        if (request === this.nodeNameRequest) this.nodeNameError = '节点名称加载失败，保留已加载的名称；未匹配的节点暂用 ID，可点击刷新重试。'
       } finally {
-        this.pendingDatasetId = null
+        if (request === this.nodeNameRequest) this.nodeNamesLoading = false
       }
+    },
+    canSchedule(dataset) {
+      return dataset.status === 'ACTIVE' && dataset.availableReplicaCount > 0
+    },
+    openScheduleDialog(dataset) {
+      if (this.canSchedule(dataset)) this.$refs.manualSchedule.open(dataset)
     }
   }
 }
@@ -276,7 +346,7 @@ export default {
 }
 .search-container {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   padding: 0;
   gap: 8px;
@@ -286,33 +356,31 @@ export default {
 .live-refresh-anchor {
   margin-left: auto;
 }
-.search-container :deep(.el-form--inline) {
+.search-container ::v-deep .el-form--inline {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
-.search-container :deep(.el-form--inline .el-form-item) {
-  margin-right: 8px;
-  margin-bottom: 0;
+.search-container ::v-deep .el-form--inline .el-form-item {
+  margin: 0;
 }
-.search-container :deep(.el-form-item__content) {
+.search-container ::v-deep .el-form-item__content {
   line-height: 32px;
 }
-.search-container :deep(.el-input__inner) {
+.search-container ::v-deep .el-input__inner {
   height: 32px;
   line-height: 32px;
 }
-.search-container :deep(.el-button) {
+.search-container ::v-deep .el-button {
   height: 32px;
-  line-height: 32px;
+  line-height: 1;
   padding: 0 16px;
-}
-.action-buttons :deep(.el-button) {
-  height: 32px;
-  line-height: 32px;
-  padding: 0 16px;
+  margin: 0;
 }
 .action-buttons {
   display: flex;
+  align-items: center;
   gap: 8px;
   flex-wrap: wrap;
 }

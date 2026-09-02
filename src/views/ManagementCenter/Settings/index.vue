@@ -132,19 +132,19 @@
           @opened="initCharts"
         >
           <div class="charts">
-            <div id="radar" class="chart radar"></div>
+            <div id="radar" class="chart radar" />
             <div class="gauges">
               <div class="gauge">
                 <div class="gauge-title">CPU 使用率</div>
-                <div id="gaugeCpu" class="chart"></div>
+                <div id="gaugeCpu" class="chart" />
               </div>
               <div class="gauge">
                 <div class="gauge-title">内存 使用率</div>
-                <div id="gaugeMem" class="chart"></div>
+                <div id="gaugeMem" class="chart" />
               </div>
               <div class="gauge">
                 <div class="gauge-title">存储 使用率</div>
-                <div id="gaugeDisk" class="chart"></div>
+                <div id="gaugeDisk" class="chart" />
               </div>
             </div>
           </div>
@@ -155,25 +155,25 @@
         </el-dialog>
 
         <!-- 节点详情对话框 -->
-        <el-dialog title="节点详情" :visible="dialogVisibleDetail" @close="closeTaskDialog" custom-class="node-detail-dialog">
-          <el-form :model="selectedTask" :rules="rules" ref="taskForm">
+        <el-dialog title="节点详情" :visible="dialogVisibleDetail" custom-class="node-detail-dialog" @close="closeTaskDialog">
+          <el-form ref="taskForm" :model="selectedTask" :rules="rules">
             <el-form-item label="节点名称" prop="nodeName">
-              <el-input v-model="selectedTask.nodeName" disabled></el-input>
+              <el-input v-model="selectedTask.nodeName" disabled />
             </el-form-item>
             <el-form-item label="显示名称" prop="displayName">
-              <el-input v-model="selectedTask.displayName" :disabled="!editing"></el-input>
+              <el-input v-model="selectedTask.displayName" :disabled="!editing" />
             </el-form-item>
             <el-form-item label="内网IP" prop="internalIp">
-              <el-input v-model="selectedTask.internalIp" :disabled="true"></el-input>
+              <el-input v-model="selectedTask.internalIp" :disabled="true" />
             </el-form-item>
             <el-form-item label="外网IP" prop="externalIp">
-              <el-input v-model="selectedTask.externalIp" :disabled="true"></el-input>
+              <el-input v-model="selectedTask.externalIp" :disabled="true" />
             </el-form-item>
             <el-form-item label="节点类型" prop="node_type">
-              <el-input :value="nodeTypeLabel(selectedTask.type || selectedTask.node_type)" :disabled="true"></el-input>
+              <el-input :value="nodeTypeLabel(selectedTask.type || selectedTask.node_type)" :disabled="true" />
             </el-form-item>
             <el-form-item label="所属集群" prop="cluster">
-              <el-input v-model="selectedTask.cluster" disabled></el-input>
+              <el-input v-model="selectedTask.cluster" disabled />
             </el-form-item>
           </el-form>
 
@@ -186,10 +186,10 @@
             <span class="pagination-total">共 {{ total }} 条</span>
             <span class="pagination-sizes-label">每页</span>
             <el-select v-model="pageSize" class="pagination-sizes-select" size="mini" @change="handleSizeChange">
-              <el-option :value="5" label="5"></el-option>
-              <el-option :value="10" label="10"></el-option>
-              <el-option :value="20" label="20"></el-option>
-              <el-option :value="50" label="50"></el-option>
+              <el-option :value="5" label="5" />
+              <el-option :value="10" label="10" />
+              <el-option :value="20" label="20" />
+              <el-option :value="50" label="50" />
             </el-select>
             <span class="pagination-sizes-label">条</span>
             <el-pagination
@@ -268,7 +268,7 @@ export default {
     },
     selectedNodeDatasets() {
       if (!this.selectedDatasetNode) return []
-      return datasetsForNode(this.datasets, this.selectedDatasetNode.nodeId)
+      return datasetsForNode(this.datasets, this.selectedDatasetNode.nodeId, { excludeMissing: true })
     }
   },
   created() {
@@ -313,7 +313,7 @@ export default {
         })))
         this.total = nodePage.total
         if (!this.TaskData.some(node => String(node.nodeId) === this.selectedNodeId)) {
-          const preferred = this.TaskData.find(node => datasetsForNode(this.datasets, node.nodeId).length)
+          const preferred = this.TaskData.find(node => this.datasetCountForNode(node) > 0)
           this.selectedNodeId = preferred ? String(preferred.nodeId) : (this.TaskData[0] ? String(this.TaskData[0].nodeId) : '')
         }
         this.lastUpdatedAt = new Date().toLocaleTimeString('zh-CN', { hour12: false })
@@ -364,7 +364,7 @@ export default {
       return String(dataset.dataServer || '').trim() === String(node.nodeName || '').trim()
     },
     datasetCountForNode(node) {
-      return datasetsForNode(this.datasets, node.nodeId).length
+      return datasetsForNode(this.datasets, node.nodeId, { excludeMissing: true }).length
     },
     formatBytes,
     openTaskDialog(task) {
@@ -464,7 +464,7 @@ export default {
           ],
           center: ['50%', '65%'],
           radius: 90,
-          splitArea: { areaStyle: { color: ['#fafafa','#f5f5f5'] } }
+          splitArea: { areaStyle: { color: ['#fafafa', '#f5f5f5'] }}
         },
         series: [{
           type: 'radar',
@@ -494,11 +494,11 @@ export default {
                 ]
               }
             },
-            pointer: { show: val != null, length: '65%', width: 6},
+            pointer: { show: val != null, length: '65%', width: 6 },
             axisTick: { show: false },
             splitLine: { show: false },
             axisLabel: { show: false },
-            detail: { valueAnimation: true, formatter: val == null ? '暂无数据' : '{value}%', fontSize: 22, offsetCenter: [0, '70%']},
+            detail: { valueAnimation: true, formatter: val == null ? '暂无数据' : '{value}%', fontSize: 22, offsetCenter: [0, '70%'] },
             data: [{ value: val }]
           }]
         })
@@ -536,21 +536,21 @@ export default {
   padding: 0 24px;
   box-sizing: border-box;
 }
-.brand { 
-  font-size: 16px; 
-  font-weight: 600; 
+.brand {
+  font-size: 16px;
+  font-weight: 600;
 }
-.header-meta { 
-  display: flex; 
-  align-items: center; 
-  gap: 8px; 
-  font-size: 14px; 
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
 }
-.header-avatar { 
-  margin-right: 4px; 
+.header-avatar {
+  margin-right: 4px;
 }
-.header-user { 
-  font-size: 14px; 
+.header-user {
+  font-size: 14px;
 }
 .breadcrumb-bar {
   height: 40px;
@@ -779,17 +779,17 @@ export default {
   grid-column-gap: 24px;
   margin-top: 40px;
 }
-.gauge { 
-  text-align: center; 
+.gauge {
+  text-align: center;
 }
-.gauge-title { 
-  margin-bottom: 8px; 
-  font-weight: 600; 
-  color: #333; 
+.gauge-title {
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #333;
 }
-.chart { 
-  width: 100%; 
-  height: 180px; 
+.chart {
+  width: 100%;
+  height: 180px;
 }
 .node-detail-dialog .el-dialog__body {
   padding-bottom: 24px;

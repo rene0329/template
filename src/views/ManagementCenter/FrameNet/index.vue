@@ -174,7 +174,7 @@ export default {
     nodes() {
       return this.topologyNodes.map(node => {
         const details = this.registeredNodes.find(registered => String(registered.nodeId) === String(node.nodeId)) || {}
-        const datasets = datasetsForNode(this.datasets, node.nodeId)
+        const datasets = datasetsForNode(this.datasets, node.nodeId, { excludeMissing: true })
         const externalIp = node.externalIp || details.externalIp
         return {
           ...node,

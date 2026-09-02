@@ -75,6 +75,34 @@ it('a failed catalog load does not suppress topology updates', async() => {
   expect(vm.datasetError).toContain('catalog offline')
 })
 
+it('excludes missing replicas from topology labels, tooltips and the selected node panel', () => {
+  const vm = context(FrameNet)
+  vm.topologyNodes = [{ id: 'a', nodeId: 7 }, { id: 'b', nodeId: 8 }]
+  vm.datasets = [
+    { datasetId: 1, name: 'present', replicas: [
+      { nodeId: 7, availability: 'AVAILABLE', effectiveAvailability: 'USABLE', filePath: '/present' },
+      { nodeId: 7, availability: 'MISSING', filePath: '/old-path' }
+    ] },
+    { datasetId: 2, name: 'moved', replicas: [
+      { nodeId: 7, availability: 'MISSING', effectiveAvailability: 'MISSING' },
+      { nodeId: 8, availability: 'AVAILABLE', effectiveAvailability: 'USABLE' }
+    ] }
+  ]
+  vm.selectedNodeId = 'a'
+  expect(vm.selectedNode.datasetSummary).toBe('present（1个）')
+  expect(vm.selectedNodeDatasets).toHaveLength(1)
+  expect(vm.selectedNodeDatasets[0]).toMatchObject({ replicaCount: 1, replicaStatus: 'USABLE', filePath: '/present' })
+  vm.showTip('node', vm.selectedNode, { clientX: 100, clientY: 100 })
+  expect(vm.tip.html).toContain('present（1个）')
+  expect(vm.tip.html).not.toContain('moved')
+  vm.selectedNodeId = 'b'
+  expect(vm.selectedNode.datasetSummary).toBe('moved（1个）')
+  vm.datasets[1].replicas[1].availability = 'MISSING'
+  vm.datasets[1].replicas[1].effectiveAvailability = 'MISSING'
+  expect(vm.selectedNode.datasetSummary).toBe('暂无数据集（0个）')
+  expect(vm.selectedNodeDatasets).toEqual([])
+})
+
 it('preserves topology zoom, pan and selection when polling only changes metrics or ordering', async() => {
   const vm = context(FrameNet)
   vm.svgWidth = 1000
