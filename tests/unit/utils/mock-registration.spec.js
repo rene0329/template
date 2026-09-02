@@ -1,6 +1,23 @@
 const routes = require('../../../mock/management')
 const route = (url, type = 'get') => routes.find(r => r.url === url && r.type === type)
 
+it('demo rejects the same invalid task fields as the real preflight endpoint', () => {
+  const preflight = route('/api/v1/tasks/preflight$', 'post')
+  for (const [body, message] of [
+    [null, 'request body is required'],
+    [{ datasetIds: [1] }, 'taskName is required'],
+    [{ taskName: '  ', datasetIds: [1] }, 'taskName is required'],
+    [{ taskName: 'test', datasetIds: [] }, 'datasetIds must not be empty'],
+    [{ taskName: 'test', datasetIds: [1, 1] }, 'datasetIds must be unique and non-null'],
+    [{ taskName: 'test', datasetIds: [null] }, 'datasetIds must be unique and non-null'],
+    [{ taskName: 'test', datasetIds: [1], resourceOverrides: { cpu: -1 } }, 'resourceOverrides values must not be negative']
+  ]) {
+    let error
+    try { preflight.response({ body }) } catch (caught) { error = caught }
+    expect(error).toMatchObject({ message, status: 422 })
+  }
+})
+
 it('demo uses the same strict page limit and replica availability vocabulary', () => {
   const datasets = route('/api/v1/datasets$')
   expect(() => datasets.response({ query: { pageSize: 101 } })).toThrow('1 and 100')
@@ -24,4 +41,10 @@ it('demo enforces edit restrictions and real task idempotency', () => {
   expect(create.response(req)).toEqual(first)
   expect(first.data.taskId).toBeGreaterThan(0)
   expect(() => create.response({ ...req, body: { ...req.body, taskName: 'changed' } })).toThrow('different payload')
+  // Like the backend, an omitted key is a fresh request, not a client error.
+  const withoutKey = { ...req, headers: {} }
+  expect(create.response(withoutKey).data.taskId).not.toBe(create.response(withoutKey).data.taskId)
+  let error
+  try { create.response({ ...req, headers: { 'idempotency-key': 'short' } }) } catch (caught) { error = caught }
+  expect(error.status).toBe(422)
 })

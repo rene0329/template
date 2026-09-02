@@ -1,4 +1,6 @@
 // Business fixtures are only mounted by the explicit local demo mode.
+const { randomUUID } = require('crypto')
+
 module.exports = ({ nodes, datasets, tasks, page }) => {
   const ok = data => ({ code: 0, msg: 'ok', data })
   const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }) }
@@ -38,7 +40,15 @@ module.exports = ({ nodes, datasets, tasks, page }) => {
     }
   })
   const preflight = body => {
-    if (!Array.isArray(body.datasetIds) || !body.datasetIds.length) fail('datasetIds is required')
+    if (!body) fail('request body is required', 422)
+    if (body.taskName == null || !String(body.taskName).trim()) fail('taskName is required', 422)
+    if (!Array.isArray(body.datasetIds) || !body.datasetIds.length) fail('datasetIds must not be empty', 422)
+    if (new Set(body.datasetIds).size !== body.datasetIds.length || body.datasetIds.includes(null)) {
+      fail('datasetIds must be unique and non-null', 422)
+    }
+    if (body.resourceOverrides && ['cpu', 'memoryGi', 'gpu'].some(key => body.resourceOverrides[key] < 0)) {
+      fail('resourceOverrides values must not be negative', 422)
+    }
     const all = datasetViews()
     const checks = body.datasetIds.map(id => {
       const dataset = all.find(d => d.datasetId === id)
@@ -65,8 +75,8 @@ module.exports = ({ nodes, datasets, tasks, page }) => {
       ['name', 'description'], req.query.page, req.query.pageSize)) },
     { url: '/api/v1/tasks/preflight$', type: 'post', response: req => ok(preflight(req.body)) },
     { url: '/api/v1/tasks$', type: 'post', response: (req, res) => {
-      const key = req.headers['idempotency-key']
-      if (!key) fail('Idempotency-Key is required')
+      const key = String(req.headers['idempotency-key'] || '').trim() || randomUUID()
+      if (key.length < 8 || key.length > 128) fail('Idempotency-Key must contain 8–128 characters', 422)
       const signature = JSON.stringify(req.body)
       if (taskRequests.has(key)) {
         const previous = taskRequests.get(key)
