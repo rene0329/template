@@ -1,10 +1,10 @@
 import SelectData from '@/views/ManagementCenter/SelectData/index.vue'
 import FrameNet from '@/views/ManagementCenter/FrameNet/index.vue'
-import { fetchRegisteredDatasets, createRegisteredTask, preflightRegisteredTask } from '@/api/registrationApi'
+import { fetchRegisteredDatasets, fetchRegisteredNodes, createRegisteredTask, preflightRegisteredTask } from '@/api/registrationApi'
 import { fetchNetworkTopology } from '@/api/managementCenterApi'
 
 jest.mock('@/api/registrationApi', () => ({
-  fetchRegisteredDatasets: jest.fn(), createRegisteredTask: jest.fn(),
+  fetchRegisteredDatasets: jest.fn(), fetchRegisteredNodes: jest.fn(), createRegisteredTask: jest.fn(),
   preflightRegisteredTask: jest.fn(), requestId: () => 'stable-request-key'
 }))
 jest.mock('@/api/managementCenterApi', () => ({ fetchNetworkTopology: jest.fn() }))
@@ -12,7 +12,7 @@ jest.mock('@/api/managementCenterApi', () => ({ fetchNetworkTopology: jest.fn() 
 function context(component) {
   const vm = { ...component.data(), $message: { error: jest.fn(), success: jest.fn() },
     $refs: { datasetTable: { clearSelection: jest.fn() }}, $alert: jest.fn().mockResolvedValue(),
-    $nextTick: jest.fn(), computeClusters: jest.fn() }
+    $nextTick: jest.fn() }
   Object.entries(component.methods).forEach(([key, method]) => { vm[key] = method.bind(vm) })
   Object.entries(component.computed || {}).forEach(([key, get]) => Object.defineProperty(vm, key, { get: () => get.call(vm) }))
   return vm
@@ -68,10 +68,99 @@ it('retains selection during polling', async() => {
 
 it('a failed catalog load does not suppress topology updates', async() => {
   const vm = context(FrameNet)
-  vm.computeClusters = jest.fn()
   fetchRegisteredDatasets.mockRejectedValue(new Error('catalog offline'))
-  fetchNetworkTopology.mockResolvedValue({ nodes: [{ id: 'n', nodeId: 8, x: 10, y: 20 }], edges: [] })
+  fetchNetworkTopology.mockResolvedValue({ nodes: [{ id: 'n', nodeId: 8 }], edges: [] })
   await Promise.all([vm.refreshDatasets(), vm.fetchData(false, true)])
   expect(vm.nodes[0].nodeId).toBe(8)
   expect(vm.datasetError).toContain('catalog offline')
+})
+
+it('preserves topology zoom, pan and selection when polling only changes metrics or ordering', async() => {
+  const vm = context(FrameNet)
+  vm.svgWidth = 1000
+  vm.svgHeight = 300
+  const nodes = [{ id: 'a', cpu: 10 }, { id: 'b', cpu: 20 }]
+  const edges = [{ source: 'a', target: 'b', active: false }]
+  fetchNetworkTopology.mockResolvedValueOnce({ nodes, edges })
+    .mockResolvedValueOnce({ nodes: [...nodes].reverse().map(node => ({ ...node, cpu: 50 })), edges })
+  await vm.fetchData()
+  vm.$nextTick.mockClear()
+  vm.pan = { x: 45, y: 60 }
+  vm.scale = 1.5
+  vm.selectedNodeId = 'b'
+  await vm.fetchData(false, true)
+  expect(vm.pan).toEqual({ x: 45, y: 60 })
+  expect(vm.scale).toBe(1.5)
+  expect(vm.selectedNodeId).toBe('b')
+  expect(vm.$nextTick).not.toHaveBeenCalled()
+})
+
+it('zooms around the pointer and pans the topology when dragging the canvas', () => {
+  const vm = context(FrameNet)
+  vm.$refs.svg = { getBoundingClientRect: () => ({ left: 10, top: 20 }) }
+  vm.$el = { style: {}}
+  vm.handleWheel({ preventDefault: jest.fn(), deltaY: -1, clientX: 110, clientY: 120 })
+  expect(vm.scale).toBeCloseTo(1.1)
+  expect(vm.pan.x).toBeCloseTo(-10)
+  expect(vm.pan.y).toBeCloseTo(-10)
+  vm.startDrag({ button: 0, clientX: 110, clientY: 120 })
+  vm.handleMouseMove({ clientX: 140, clientY: 150 })
+  expect(vm.pan.x).toBeCloseTo(20)
+  expect(vm.pan.y).toBeCloseTo(20)
+  vm.stopDrag()
+  expect(vm.isDragging).toBe(false)
+})
+
+it('joins registered IP and location by node ID without replacing live topology state', async() => {
+  const vm = context(FrameNet)
+  vm.topologyNodes = [{ id: 'display-name', nodeId: 4, effectiveStatus: 'AVAILABLE' }]
+  fetchRegisteredNodes.mockResolvedValue({ list: [
+    { nodeId: 3, internalIp: '10.212.14.88' },
+    { nodeId: 4, internalIp: '10.213.0.1', clusterId: 'in-cluster-default', effectiveStatus: 'OFFLINE' }
+  ], total: 2 })
+  await vm.refreshNodeDetails()
+  expect(vm.nodes[0].internalIp).toBe('10.213.0.1')
+  expect(vm.nodes[0].location).toBe('中国 · 浙江 · 杭州')
+  expect(vm.nodes[0].effectiveStatus).toBe('AVAILABLE')
+})
+
+it('retains IP metadata when a background registration request fails', async() => {
+  const vm = context(FrameNet)
+  vm.registeredNodes = [{ nodeId: 4, internalIp: '10.213.0.1' }]
+  fetchRegisteredNodes.mockRejectedValueOnce(new Error('offline'))
+  await vm.refreshNodeDetails()
+  expect(vm.registeredNodes[0].internalIp).toBe('10.213.0.1')
+  expect(vm.nodeDetailsError).toContain('加载失败')
+  expect(vm.nodeDetailsLoading).toBe(false)
+})
+
+it('shows IP and corresponding location in escaped tooltip text', () => {
+  const vm = context(FrameNet)
+  vm.showTip('node', { label: 'alihz', internalIp: '10.213.0.1', location: '杭州 <机房>', datasets: [] }, { clientX: 100, clientY: 100 })
+  expect(vm.tip.html).toContain('<b>内网 IP：</b>10.213.0.1')
+  expect(vm.tip.html).toContain('<b>公网 IP：</b>未获取')
+  expect(vm.tip.html).toContain('<b>对应位置：</b>杭州 &lt;机房&gt;')
+  expect(vm.tip.html).not.toContain('<机房>')
+  vm.showTip('node', { label: 'unknown', datasets: [] }, { clientX: 100, clientY: 100 })
+  expect(vm.tip.html).toContain('<b>内网 IP：</b>未登记')
+  expect(vm.tip.html).toContain('<b>公网 IP：</b>未获取')
+  expect(vm.tip.html).toContain('位置未配置')
+})
+
+it('always shows separate internal and public IP rows without substituting one for the other', () => {
+  const vm = context(FrameNet)
+  const event = { clientX: 100, clientY: 100 }
+  vm.showTip('node', { label: 'dual-ip', internalIp: '10.213.0.1', externalIp: '203.0.113.10', datasets: [] }, event)
+  expect(vm.tip.html).toContain('<b>内网 IP：</b>10.213.0.1')
+  expect(vm.tip.html).toContain('<b>公网 IP：</b>203.0.113.10')
+  vm.showTip('node', { label: 'public-only', externalIp: '203.0.113.10', datasets: [] }, event)
+  expect(vm.tip.html).toContain('<b>内网 IP：</b>未登记')
+  expect(vm.tip.html).toContain('<b>公网 IP：</b>203.0.113.10')
+})
+
+it('prefers the latest topology public IP to the slower registration metadata poll', () => {
+  const vm = context(FrameNet)
+  vm.topologyNodes = [{ id: 'node-a', nodeId: 4, externalIp: '203.0.113.20' }]
+  vm.registeredNodes = [{ nodeId: 4, externalIp: '203.0.113.10' }]
+  expect(vm.nodes[0].externalIp).toBe('203.0.113.20')
 })

@@ -3,126 +3,84 @@
     <el-main class="page-main">
       <div v-loading="loading" class="content-card">
         <div class="kiali-topo">
-          <div class="toolbar">
-            <el-button size="small" @click="fit">自适应</el-button>
-            <el-switch v-model="activeOnly" active-text="只看可用节点" @change="refreshTopology" />
-            <span class="legend">
-              <i class="dot available" />可用
-              <i class="dot inactive" />未启用
-              <i class="dot offline" />异常/离线
-            </span>
-            <span class="refresh-time" title="最近更新时间">
-              <i class="el-icon-time" />{{ lastUpdatedAt || '--:--:--' }}
-            </span>
+          <div class="topology-header">
+            <div class="topology-heading">
+              <h2>网络拓扑</h2>
+              <span>{{ nodes.length }} 个节点<span class="count-divider">/</span>{{ edges.length }} 条连接</span>
+            </div>
+            <div class="toolbar">
+              <span class="refresh-time" title="最近更新时间">
+                <i class="el-icon-time" />{{ lastUpdatedAt || '--:--:--' }}
+              </span>
+              <el-switch v-model="activeOnly" active-text="只看可用节点" @change="refreshTopology" />
+              <el-button size="small" icon="el-icon-full-screen" @click="fit">自适应</el-button>
+            </div>
           </div>
 
-          <div
-            class="svg-container"
-            @wheel.prevent="handleWheel"
-            @mousedown="startDrag"
-            @mousemove="handleMouseMove"
-            @mouseup="stopDrag"
-            @mouseleave="stopDrag"
-          >
-            <svg ref="svg" :width="svgWidth" :height="svgHeight">
-              <g :transform="`translate(${pan.x}, ${pan.y}) scale(${scale})`">
-                <!-- 集群 -->
-                <g v-for="c in clusters" :key="c.id">
-                  <rect
-                    :x="c.bounds.x"
-                    :y="c.bounds.y"
-                    :width="c.bounds.width"
-                    :height="c.bounds.height"
-                    fill="transparent"
-                    stroke="#aaa"
-                    stroke-width="2"
-                    stroke-dasharray="5,3"
-                    rx="6"
-                  />
-                  <text
-                    :x="c.center.x"
-                    :y="c.bounds.y - 15"
-                    font-size="15"
-                    font-weight="bold"
-                    fill="#555"
-                    text-anchor="middle"
-                  >{{ c.label }}</text>
-                </g>
-
-                <!-- 箭头 -->
-                <defs>
-                  <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-                    <path d="M0,0 L0,6 L9,3 z" fill="#666" />
-                  </marker>
-                </defs>
-
-                <!-- 链路 -->
-                <g v-for="e in edges" :key="e.id">
-                  <path
-                    :d="getEdgePath(e)"
-                    :stroke="getEdgeColor(e.latency)"
-                    :stroke-width="getEdgeWidth(e.bandwidth)"
-                    :stroke-dasharray="e.active === false ? '7,5' : ''"
-                    fill="none"
-                    stroke-linecap="round"
-                    style="cursor: pointer; pointer-events: stroke;"
-                    @mouseover="showTip('edge', e, $event)"
-                    @mouseout="hideTip"
-                  />
-                </g>
-
-                <!-- 节点 -->
-                <g v-for="n in nodes" :key="n.id" class="topology-node" @click.stop="selectNode(n)">
-                  <rect
-                    :x="n.x - n.width/2"
-                    :y="n.y - n.height/2"
-                    :width="n.width"
-                    :height="n.height"
-                    rx="8"
-                    :fill="getNodeFill(n)"
-                    :stroke="getNodeColor(n)"
-                    :stroke-width="selectedNodeId === n.id ? 4 : 2"
-                    style="cursor: pointer;"
-                    @mouseover="showTip('node', n, $event)"
-                    @mouseout="hideTip"
-                  />
-                  <g
-                    class="server-icon"
-                    :transform="`translate(${n.x - 9}, ${n.y - 28})`"
-                    aria-hidden="true"
-                  >
-                    <rect x="0" y="0" width="18" height="7" rx="2" />
-                    <circle cx="3.5" cy="3.5" r="1" />
-                    <line x1="7" y1="3.5" x2="14.5" y2="3.5" />
-                    <rect x="0" y="9" width="18" height="7" rx="2" />
-                    <circle cx="3.5" cy="12.5" r="1" />
-                    <line x1="7" y1="12.5" x2="14.5" y2="12.5" />
+          <div class="topology-canvas">
+            <div
+              class="svg-container"
+              @wheel.prevent="handleWheel"
+              @mousedown="startDrag"
+              @mousemove="handleMouseMove"
+              @mouseup="stopDrag"
+              @mouseleave="stopDrag"
+            >
+              <svg ref="svg" :width="svgWidth" :height="svgHeight" aria-label="网络节点连接图">
+                <g :transform="`translate(${pan.x}, ${pan.y}) scale(${scale})`">
+                  <!-- 链路 -->
+                  <g v-for="e in edges" :key="e.id" class="topology-edge" @mouseenter="showTip('edge', e, $event)" @mouseleave="hideTip">
+                    <path
+                      :d="getEdgePath(e)"
+                      class="edge-line"
+                      :class="{ 'is-connected': isConnectedEdge(e), 'is-unavailable': e.active === false }"
+                      :stroke-dasharray="e.active === false ? '5 6' : null"
+                    />
+                    <path :d="getEdgePath(e)" class="edge-hit-area" />
                   </g>
-                  <text
-                    :x="n.x"
-                    :y="n.y + 3"
-                    font-size="12"
-                    fill="#333"
-                    text-anchor="middle"
-                    dominant-baseline="middle"
-                    style="pointer-events:none"
-                  >{{ n.label }}</text>
-                  <text
-                    :x="n.x"
-                    :y="n.y + 21"
-                    font-size="10"
-                    fill="#606266"
-                    text-anchor="middle"
-                    dominant-baseline="middle"
-                    style="pointer-events:none"
-                  >{{ n.datasets.length }} 个数据集</text>
+
+                  <!-- 节点 -->
+                  <g
+                    v-for="n in nodes"
+                    :key="n.id"
+                    class="topology-node"
+                    :class="{ 'is-selected': selectedNodeId === n.id }"
+                    :transform="`translate(${n.x}, ${n.y})`"
+                    role="button"
+                    tabindex="0"
+                    :aria-label="`${n.label}，${n.datasetSummary}`"
+                    :aria-pressed="selectedNodeId === n.id ? 'true' : 'false'"
+                    @mousedown.stop
+                    @click.stop="selectNode(n)"
+                    @keydown.enter.prevent="selectNode(n)"
+                    @keydown.space.prevent="selectNode(n)"
+                    @mouseenter="showTip('node', n, $event)"
+                    @mouseleave="hideTip"
+                  >
+                    <circle class="node-halo" :r="nodeRadius + 8" />
+                    <circle class="node-disc" :r="nodeRadius" />
+                    <circle r="5" :fill="getNodeColor(n)" class="node-status" />
+                    <text y="46" class="node-name" text-anchor="middle">{{ n.label }}</text>
+                    <text y="64" class="node-datasets" text-anchor="middle">{{ n.datasetSummary }}</text>
+                  </g>
                 </g>
-              </g>
-            </svg>
+              </svg>
+            </div>
+            <div v-if="!nodes.length && !loading" class="topology-empty">{{ activeOnly ? '暂无可用节点' : '暂无网络节点' }}</div>
+          </div>
+
+          <div class="topology-caption">
+            <span>滚轮缩放 · 拖拽平移 · 点击节点查看数据集</span>
+            <span class="legend">
+              <span><i class="dot available" />可用</span>
+              <span><i class="dot inactive" />未启用</span>
+              <span><i class="dot offline" />异常/离线</span>
+              <span><i class="legend-line" />链路未就绪</span>
+            </span>
           </div>
 
           <!-- 悬浮提示 -->
-          <div v-if="tip.visible" class="tooltip" :style="tip.style" v-html="tip.html" />
+          <div v-if="tip.visible" ref="topologyTip" class="tooltip" :style="tip.style" v-html="tip.html" />
         </div>
 
         <section class="dataset-panel">
@@ -169,9 +127,11 @@
 
 <script>
 import { fetchNetworkTopology } from '@/api/managementCenterApi'
-import { fetchRegisteredDatasets } from '@/api/registrationApi'
+import { fetchRegisteredDatasets, fetchRegisteredNodes } from '@/api/registrationApi'
 import { fetchAllPages, datasetsForNode, formatBytes } from '@/utils/dataset-catalog'
 import { keepStableCollection } from '@/utils/live-refresh'
+import { layoutTopology, topologyEdgePath, NODE_RADIUS } from '@/utils/topology-layout'
+import { nodeLocation, summarizeNodeDatasets } from '@/utils/topology-node-details'
 
 export default {
   name: 'FrameNet',
@@ -192,11 +152,15 @@ export default {
       datasets: [],
       datasetTimer: null,
       datasetsLoading: false,
+      registeredNodes: [],
+      nodeDetailsLoading: false,
+      nodeDetailsError: '',
+      nodeDetailsTimer: null,
       refreshTimer: null,
       lastUpdatedAt: '',
       selectedNodeId: '',
       activeOnly: false,
-      clusters: [],
+      nodeRadius: NODE_RADIUS,
       // 从服务器获取的数据
       topologyNodes: [],
       edges: [],
@@ -208,7 +172,18 @@ export default {
   },
   computed: {
     nodes() {
-      return this.topologyNodes.map(node => ({ ...node, datasets: datasetsForNode(this.datasets, node.nodeId) }))
+      return this.topologyNodes.map(node => {
+        const details = this.registeredNodes.find(registered => String(registered.nodeId) === String(node.nodeId)) || {}
+        const datasets = datasetsForNode(this.datasets, node.nodeId)
+        return {
+          ...node,
+          internalIp: details.internalIp || node.internalIp,
+          externalIp: node.externalIp || details.externalIp,
+          location: nodeLocation({ ...node, ...details }),
+          datasets,
+          datasetSummary: summarizeNodeDatasets(datasets)
+        }
+      })
     },
     selectedNode() {
       return this.nodes.find(node => node.id === this.selectedNodeId) || null
@@ -219,18 +194,39 @@ export default {
   },
   mounted() {
     window.addEventListener('resize', this.onResize)
+    this.resizeObserver = new ResizeObserver(this.onResize)
+    this.resizeObserver.observe(this.$refs.svg.parentElement)
     this.fetchData()
     this.refreshDatasets()
+    this.refreshNodeDetails()
+    this.nodeDetailsTimer = window.setInterval(this.refreshNodeDetails, 10000)
     this.datasetTimer = window.setInterval(this.refreshDatasets, 10000)
     this.refreshTimer = window.setInterval(() => this.fetchData(false, true), 1000)
   },
   beforeDestroy() {
     window.removeEventListener('resize', this.onResize)
+    this.resizeObserver.disconnect()
+    window.clearTimeout(this.resizeTimer)
     window.clearInterval(this.refreshTimer)
     window.clearInterval(this.datasetTimer)
+    window.clearInterval(this.nodeDetailsTimer)
     this.requestVersion++
   },
   methods: {
+    async refreshNodeDetails() {
+      if (this.nodeDetailsLoading) return
+      this.nodeDetailsLoading = true
+      try {
+        const nodes = await fetchAllPages(fetchRegisteredNodes, { silent: true })
+        if (this._isDestroyed) return
+        this.registeredNodes = keepStableCollection(this.registeredNodes, nodes)
+        this.nodeDetailsError = ''
+      } catch (error) {
+        this.nodeDetailsError = 'IP / 位置信息加载失败，保留上次结果'
+      } finally {
+        this.nodeDetailsLoading = false
+      }
+    },
     async refreshDatasets() {
       if (this.datasetsLoading) return
       this.datasetsLoading = true
@@ -254,8 +250,13 @@ export default {
         const options = silent ? { silent: true } : {}
         const topology = await fetchNetworkTopology(this.activeOnly, options)
         if (version !== this.requestVersion) return
-        const nextNodes = this.normalizeNodes(topology.nodes || [])
         const nextEdges = this.normalizeEdges(topology.edges || [])
+        const nextNodes = layoutTopology(this.normalizeNodes(topology.nodes || []), nextEdges)
+        const layoutChanged = nextNodes.length !== this.topologyNodes.length || nextNodes.some(node => {
+          const previous = this.topologyNodes.find(current => current.id === node.id)
+          return !previous || previous.x !== node.x || previous.y !== node.y
+        })
+        refit = refit || layoutChanged
         this.topologyNodes = keepStableCollection(this.topologyNodes, nextNodes)
         this.edges = keepStableCollection(this.edges, nextEdges)
         if (!this.nodes.some(node => node.id === this.selectedNodeId)) {
@@ -272,7 +273,6 @@ export default {
         if (version === this.requestVersion) {
           this.loading = false
           this.refreshing = false
-          this.computeClusters()
           // 数据轮询只更新内容，不重复把 SVG 的实测高度写回布局。
           // 否则 SVG 的行盒基线会在每次测量时累加约 4px，持续把下方数据集面板向下推。
           if (refit || !this.svgWidth || !this.svgHeight) {
@@ -291,21 +291,14 @@ export default {
       return (nodes || []).map((n, index) => {
         const id = String(n.id ?? n.label ?? n.name ?? `node-${index}`).trim()
         const label = String(n.label ?? n.name ?? id).trim()
-        const x = Number(n.x)
-        const y = Number(n.y)
-
         return {
           ...n,
           id,
           label,
-          x,
-          y,
-          width: Number(n.width) || 110,
-          height: Math.max(Number(n.height) || 44, 74),
           cpu: n.cpu == null ? null : Number(n.cpu),
           disk: n.memory == null ? n.disk : n.memory
         }
-      }).filter(n => Number.isFinite(n.x) && Number.isFinite(n.y))
+      })
     },
     normalizeEdges(edges) {
       return (edges || []).map((e, index) => ({
@@ -331,35 +324,6 @@ export default {
       this.hideTip()
     },
     formatBytes,
-    computeClusters() {
-      if (!this.nodes.length) {
-        this.clusters = []
-        return
-      }
-
-      const xs = this.nodes.flatMap(n => [n.x - n.width / 2, n.x + n.width / 2])
-      const ys = this.nodes.flatMap(n => [n.y - n.height / 2, n.y + n.height / 2])
-      const minX = Math.min(...xs)
-      const maxX = Math.max(...xs)
-      const minY = Math.min(...ys)
-      const maxY = Math.max(...ys)
-      const padding = 60
-
-      this.clusters = [
-        {
-          id: 'all-nodes',
-          label: '集群 1',
-          bounds: {
-            x: minX - padding,
-            y: minY - padding,
-            width: maxX - minX + padding * 2,
-            height: maxY - minY + padding * 2
-          },
-          center: { x: (minX + maxX) / 2, y: minY - padding - 20 }
-        }
-      ]
-    },
-
     initSvgSize() {
       const container = this.$refs.svg && this.$refs.svg.parentElement
       if (!container) return
@@ -379,27 +343,17 @@ export default {
     fit() {
       if (!this.nodes.length || !this.svgWidth || !this.svgHeight) return
 
-      const pad = 40
-      const nodeXs = this.nodes.flatMap(n => [n.x - n.width / 2, n.x + n.width / 2])
-      const nodeYs = this.nodes.flatMap(n => [n.y - n.height / 2, n.y + n.height / 2])
+      const pad = 20
+      const nodeXs = this.nodes.flatMap(n => {
+        const halfWidth = Math.max(140, n.label.length * 4.5)
+        return [n.x - halfWidth, n.x + halfWidth]
+      })
+      const nodeYs = this.nodes.flatMap(n => [n.y - this.nodeRadius - 8, n.y + 72])
 
       let minX = Math.min(...nodeXs)
       let maxX = Math.max(...nodeXs)
       let minY = Math.min(...nodeYs)
       let maxY = Math.max(...nodeYs)
-
-      if (this.clusters.length) {
-        const clusterXs = this.clusters.flatMap(c => [c.bounds.x, c.bounds.x + c.bounds.width])
-        const clusterYs = this.clusters.flatMap(c => {
-          const labelTop = c.bounds.y - 40
-          return [labelTop, c.bounds.y + c.bounds.height]
-        })
-
-        minX = Math.min(minX, ...clusterXs)
-        maxX = Math.max(maxX, ...clusterXs)
-        minY = Math.min(minY, ...clusterYs)
-        maxY = Math.max(maxY, ...clusterYs)
-      }
 
       minX -= pad
       maxX += pad
@@ -464,23 +418,14 @@ export default {
     getEdgePath(e) {
       const s = this.nodes.find(n => n.id === e.source)
       const t = this.nodes.find(n => n.id === e.target)
-      if (!s || !t) return ''
-      return `M${s.x},${s.y} L${t.x},${t.y}`
+      return topologyEdgePath(s, t)
     },
-    getEdgeColor(latency) {
-      const r = Math.min(latency / 200, 1)
-      return `rgb(${82 + 173 * r}, ${196 - 119 * r}, ${26 + 53 * r})`
-    },
-    getEdgeWidth(bw) {
-      return Math.max(1, Math.min(6, (bw - 50) / 950 * 5 + 1))
+    isConnectedEdge(edge) {
+      return edge.source === this.selectedNodeId || edge.target === this.selectedNodeId
     },
     getNodeColor(node) {
-      const colors = { AVAILABLE: '#52c41a', DISABLED: '#909399', INACTIVE: '#e6a23c' }
-      return colors[node.effectiveStatus] || '#f56c6c'
-    },
-    getNodeFill(node) {
-      const colors = { AVAILABLE: '#f0f9eb', DISABLED: '#f4f4f5', INACTIVE: '#fdf6ec' }
-      return colors[node.effectiveStatus] || '#fef0f0'
+      const colors = { AVAILABLE: '#279b76', DISABLED: '#a4acb9', INACTIVE: '#a4acb9' }
+      return colors[node.effectiveStatus] || '#df7373'
     },
 
     // 悬浮提示
@@ -493,13 +438,17 @@ export default {
         html = `
           <div style="min-width:220px;line-height:1.6;">
             <div><b>节点名称：</b>${esc(data.label)}</div>
+            <div><b>内网 IP：</b>${esc(data.internalIp || (this.nodeDetailsLoading ? '加载中…' : '未登记'))}</div>
+            <div title="节点探测到的公网出口 IP；共用 NAT 的节点可能相同"><b>公网 IP：</b>${esc(data.externalIp || (this.nodeDetailsLoading ? '加载中…' : '未获取'))}</div>
+            <div><b>对应位置：</b>${esc(data.location || '位置未配置')}</div>
+            ${this.nodeDetailsError ? `<div class="tip-warning">${esc(this.nodeDetailsError)}</div>` : ''}
             <div><b>CPU：</b>${data.cpu == null ? '暂无数据' : data.cpu + '%'}</div>
             <div><b>内存：</b>${data.disk == null ? '暂无数据' : data.disk + '%'}</div>
             <div><b>有效状态：</b>${esc(data.effectiveStatus || 'UNKNOWN')}</div>
             <div><b>注册状态：</b>${esc(data.registrationStatus || 'UNKNOWN')}</div>
             <div><b>观测状态：</b>${esc(data.observedStatus || 'UNKNOWN')}</div>
             <div><b>可调度：</b>${data.schedulable ? '是' : '否'}</div>
-            <div><b>数据集：</b>${data.datasets.length} 个</div>
+            <div><b>数据集：</b>${esc(summarizeNodeDatasets(data.datasets))}</div>
             ${data.statusReason ? `<div><b>原因：</b>${esc(data.statusReason)}</div>` : ''}
           </div>
         `
@@ -508,7 +457,8 @@ export default {
         const t = this.nodes.find(n => n.id === data.target)?.label || data.target
         html = `
           <div style="min-width:220px;line-height:1.6;">
-            <div><b>源 → 目的：</b>${esc(s)} → ${esc(t)}</div>
+            <div><b>连接：</b>${esc(s)} — ${esc(t)}</div>
+            <div><b>链路状态：</b>${esc(data.status || (data.active === false ? '未就绪' : '可用'))}</div>
             <div><b>延迟：</b>${data.latency} ms</div>
             <div><b>带宽：</b>${data.bandwidth} Mbps</div>
           </div>
@@ -518,8 +468,17 @@ export default {
       this.tip = {
         visible: true,
         html,
-        style: { left: `${this.mousePos.x + 15}px`, top: `${this.mousePos.y + 15}px` }
+        style: { left: `${Math.min(event.clientX + 16, window.innerWidth - 300)}px`, top: `${Math.max(8, Math.min(event.clientY + 16, window.innerHeight - 270))}px` }
       }
+      this.$nextTick(() => {
+        const tipElement = this.$refs.topologyTip
+        if (!tipElement || !this.tip.visible) return
+        const { width, height } = tipElement.getBoundingClientRect()
+        this.tip.style = {
+          left: `${Math.max(8, Math.min(event.clientX + 16, window.innerWidth - width - 8))}px`,
+          top: `${Math.max(8, Math.min(event.clientY + 16, window.innerHeight - height - 8))}px`
+        }
+      })
     },
     hideTip() {
       this.tip.visible = false
@@ -604,6 +563,8 @@ export default {
 }
 .kiali-topo {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   flex: 1 1 0;
   min-height: 0;
@@ -611,11 +572,23 @@ export default {
   background: #ffffff;
   user-select: none;
 }
+.topology-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px 10px;
+  flex-shrink: 0;
+}
+.topology-heading { display: flex; align-items: center; gap: 16px; }
+.topology-heading h2 { margin: 0; font-size: 16px; font-weight: 600; color: #344252; }
+.topology-heading > span { color: #939daa; font-size: 12px; white-space: nowrap; }
+.count-divider { margin: 0 10px; color: #d5dae1; }
 .toolbar {
-  position: absolute; top: 12px; left: 12px; z-index: 100;
-  background: rgba(255,255,255,0.95); padding: 8px 12px;
-  border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  display: flex; align-items: center; gap: 12px; font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  font-size: 12px;
 }
 .refresh-time {
   display: inline-flex;
@@ -626,12 +599,35 @@ export default {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.refresh-time i { color: #497aae; }
-.legend { display: flex; align-items: center; gap: 8px; color: #666; }
-.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-.available { background: #52c41a; }
-.inactive { background: #909399; }
-.offline { background: #f56c6c; }
+.refresh-time i { color: #939daa; }
+.topology-canvas { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+.topology-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 24px 0;
+  flex-shrink: 0;
+  color: #939daa;
+  font-size: 12px;
+}
+.legend { display: flex; align-items: center; gap: 18px; }
+.legend > span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.available { background: #279b76; }
+.inactive { background: #a4acb9; }
+.offline { background: #df7373; }
+.legend-line { width: 18px; border-top: 1px dashed #9aa6b5; }
+.topology-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-size: 14px;
+  color: #939daa;
+}
 .svg-container {
   position: absolute;
   inset: 0;
@@ -642,14 +638,28 @@ export default {
 }
 .svg-container svg { display: block; }
 .svg-container:active { cursor: grabbing; }
-.server-icon {
-  pointer-events: none;
-  fill: rgba(255, 255, 255, 0.9);
-  stroke: #497aae;
-  stroke-width: 1.2;
+.edge-line {
+  fill: none;
+  stroke: #9aa6b5;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
 }
-.server-icon circle { fill: #52c41a; stroke: none; }
-.server-icon line { stroke: #7a8494; stroke-width: 1; }
+.edge-line.is-connected { stroke: #789b93; stroke-width: 1.8; }
+.edge-hit-area { fill: none; stroke: transparent; stroke-width: 14; vector-effect: non-scaling-stroke; pointer-events: stroke; }
+.topology-node { cursor: pointer; outline: none; }
+.node-halo { fill: #e8f4ef; opacity: 0; transition: opacity 150ms; }
+.node-disc { fill: #fff; stroke: #697788; stroke-width: 1.8; vector-effect: non-scaling-stroke; }
+.topology-node.is-selected .node-halo,
+.topology-node:hover .node-halo,
+.topology-node:focus-visible .node-halo { opacity: 1; }
+.topology-node.is-selected .node-disc,
+.topology-node:hover .node-disc,
+.topology-node:focus-visible .node-disc { stroke: #279b76; fill: #f9fdfb; }
+.node-name { font-size: 17px; font-weight: 600; fill: #384452; }
+.node-datasets { font-size: 14px; fill: #8c97a5; }
+.node-name, .node-datasets { pointer-events: none; paint-order: stroke fill; stroke: #fff; stroke-width: 4px; stroke-linejoin: round; }
+.node-status { pointer-events: none; }
 .dataset-panel {
   flex: 0 0 auto;
   min-height: 190px;
@@ -679,24 +689,16 @@ export default {
   font-size: 12px;
 }
 .page-footer { padding: 0 3vw 3vw; box-sizing: border-box; }
-:deep(.el-button--primary),
-:deep(.el-button--default) {
-  background: linear-gradient(90deg, #4ec58c, #497aae);
-  border-color: #4ec58c;
-  color: #ffffff;
-}
-:deep(.el-button--primary:hover),
-:deep(.el-button--primary:focus),
-:deep(.el-button--default:hover),
-:deep(.el-button--default:focus) {
-  background: linear-gradient(90deg, #3da371, #335f8d);
-  border-color: #0bb677;
-  color: #ffffff;
-}
 .tooltip {
   position: fixed; z-index: 9999; background: white; border-radius: 8px;
   padding: 12px 16px; font-size: 13px; color: #333; pointer-events: none;
   box-shadow: 0 4px 16px rgba(0,0,0,0.18); border: 1px solid #eee;
   max-width: 280px; line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1000px) {
+  .topology-header { flex-wrap: wrap; gap: 10px; padding-top: 12px; }
+  .topology-caption { flex-wrap: wrap; gap: 8px; }
+  .toolbar { gap: 12px; }
 }
 </style>
