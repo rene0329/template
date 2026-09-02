@@ -10,7 +10,8 @@ module.exports = ({ nodes, datasets, tasks, page }) => {
     internalIp: node.internalIp, externalIp: node.externalIp,
     effectiveStatus: node.effectiveStatus, schedulable: node.schedulable,
     statusReason: node.statusReason || null, version: node.version || 0,
-    enabled: node.schedulable, registrationStatus: node.schedulable ? 'ACTIVE' : 'DISABLED',
+    enabled: node.effectiveStatus !== 'DISABLED',
+    registrationStatus: node.effectiveStatus === 'INACTIVE' ? 'REGISTERED' : (node.effectiveStatus === 'DISABLED' ? 'DISABLED' : 'ACTIVE'),
     observedStatus: node.effectiveStatus === 'OFFLINE' ? 'OFFLINE' : 'ONLINE',
     ...node.metrics, maxMemoryGi: node.metrics.maxMemory, currentMemoryGi: node.metrics.currentMemory
   })
@@ -21,18 +22,18 @@ module.exports = ({ nodes, datasets, tasks, page }) => {
     const replicas = owners.map((node, index) => ({
       datasetId, replicaId: datasetId * 10 + index, nodeId: node.nodeId,
       filePath: dataset.filePath, sizeBytes: dataset.dataSize,
-      availability: 'AVAILABLE', effectiveAvailability: node.schedulable ? 'AVAILABLE' : 'NODE_UNAVAILABLE',
+      availability: 'AVAILABLE', effectiveAvailability: node.schedulable ? 'USABLE' : 'UNREACHABLE',
       statusReason: node.schedulable ? null : '节点不可用', checksum: null,
       lastSeenAt: '2026-09-02T00:00:00Z', updatedAt: '2026-09-02T00:00:00Z'
     }))
-    const availableReplicaCount = replicas.filter(r => r.effectiveAvailability === 'AVAILABLE').length
+    const availableReplicaCount = replicas.filter(r => r.effectiveAvailability === 'USABLE').length
     return {
       datasetId, datasetCode: `demo-${datasetId}`, name: dataset.dataName,
       version: '1.0', description: dataset.dataDescription, dataType: dataset.fileType,
       category: 'OTHER', format: dataset.fileType, status: dataset.dataStatus === 1 ? 'ACTIVE' : 'DISABLED',
       labels: { environment: 'demo' }, requiredResources: { cpu: 1, memoryGi: 1, gpu: 0 },
       defaultRuntimeImageId: 1, replicas, availableReplicaCount, totalReplicaCount: replicas.length,
-      healthStatus: availableReplicaCount ? 'HEALTHY' : 'UNAVAILABLE',
+      healthStatus: availableReplicaCount === 0 ? 'UNAVAILABLE' : (availableReplicaCount < replicas.length ? 'DEGRADED' : 'HEALTHY'),
       statusReason: availableReplicaCount ? null : '没有可用副本', rowVersion: 0
     }
   })

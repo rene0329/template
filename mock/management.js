@@ -256,28 +256,28 @@ const datasets = [
 ]
 
 const tasks = [
-  { taskId: 'TASK-20260902-006', selectedData: 'sarawak-rainfall-2026、river-level-realtime', createTime: '2026-09-02 15:42:18', status: '执行中' },
-  { taskId: 'TASK-20260902-005', selectedData: 'traffic-camera-snapshots', createTime: '2026-09-02 14:27:05', status: '已完成' },
-  { taskId: 'TASK-20260902-004', selectedData: 'satellite-borneo-l2、forest-fire-risk', createTime: '2026-09-02 13:08:42', status: '已完成' },
-  { taskId: 'TASK-20260902-003', selectedData: 'power-grid-load', createTime: '2026-09-02 11:51:36', status: '排队中' },
-  { taskId: 'TASK-20260901-002', selectedData: 'port-cargo-manifest', createTime: '2026-09-01 18:20:11', status: '已完成' },
-  { taskId: 'TASK-20260901-001', selectedData: 'crop-yield-samples、coastal-tide-series', createTime: '2026-09-01 16:03:29', status: '已完成' }
+  { taskId: 6, selectedData: 'sarawak-rainfall-2026、river-level-realtime', createTime: '2026-09-02 15:42:18', status: '执行中' },
+  { taskId: 5, selectedData: 'traffic-camera-snapshots', createTime: '2026-09-02 14:27:05', status: '已完成' },
+  { taskId: 4, selectedData: 'satellite-borneo-l2、forest-fire-risk', createTime: '2026-09-02 13:08:42', status: '已完成' },
+  { taskId: 3, selectedData: 'power-grid-load', createTime: '2026-09-02 11:51:36', status: '排队中' },
+  { taskId: 2, selectedData: 'port-cargo-manifest', createTime: '2026-09-01 18:20:11', status: '已完成' },
+  { taskId: 1, selectedData: 'crop-yield-samples、coastal-tide-series', createTime: '2026-09-01 16:03:29', status: '已完成' }
 ]
 
 const schedules = [
-  { taskId: 'TASK-20260902-006', schedule: '数据就近汇聚：sibu-edge-01\n计算节点：kuching-compute-01\n预计传输：380 MB', createTime: '2026-09-02 15:42:21' },
-  { taskId: 'TASK-20260902-005', schedule: '原位计算：kuching-compute-01\n无需跨节点迁移\n预计耗时：8 分 20 秒', createTime: '2026-09-02 14:27:08' },
-  { taskId: 'TASK-20260902-004', schedule: '边缘协同：miri-edge-01 → kuching-compute-01\n带宽预留：800 Mbps\n预计传输：1.17 GB', createTime: '2026-09-02 13:08:45' },
-  { taskId: 'TASK-20260902-003', schedule: '等待计算资源：kuching-compute-01\n调度优先级：普通', createTime: '2026-09-02 11:51:39' },
-  { taskId: 'TASK-20260901-002', schedule: '存储内计算：kuching-storage-01\n结果写回：sibu-edge-01', createTime: '2026-09-01 18:20:15' },
-  { taskId: 'TASK-20260901-001', schedule: '并行计算：sibu-edge-01 / miri-edge-01\n结果汇聚：kuching-master-01', createTime: '2026-09-01 16:03:33' }
+  { taskId: 6, schedule: '数据就近汇聚：sibu-edge-01\n计算节点：kuching-compute-01\n预计传输：380 MB', createTime: '2026-09-02 15:42:21' },
+  { taskId: 5, schedule: '原位计算：kuching-compute-01\n无需跨节点迁移\n预计耗时：8 分 20 秒', createTime: '2026-09-02 14:27:08' },
+  { taskId: 4, schedule: '边缘协同：miri-edge-01 → kuching-compute-01\n带宽预留：800 Mbps\n预计传输：1.17 GB', createTime: '2026-09-02 13:08:45' },
+  { taskId: 3, schedule: '等待计算资源：kuching-compute-01\n调度优先级：普通', createTime: '2026-09-02 11:51:39' },
+  { taskId: 2, schedule: '存储内计算：kuching-storage-01\n结果写回：sibu-edge-01', createTime: '2026-09-01 18:20:15' },
+  { taskId: 1, schedule: '并行计算：sibu-edge-01 / miri-edge-01\n结果汇聚：kuching-master-01', createTime: '2026-09-01 16:03:33' }
 ]
 
 const analyses = [
-  { taskId: 'TASK-20260902-005', t2: 13.84, t1: 4.21, rating: 3.29 },
-  { taskId: 'TASK-20260902-004', t2: 31.42, t1: 8.76, rating: 3.59 },
-  { taskId: 'TASK-20260901-002', t2: 18.65, t1: 5.92, rating: 3.15 },
-  { taskId: 'TASK-20260901-001', t2: 24.18, t1: 6.43, rating: 3.76 }
+  { taskId: 5, t2: 13.84, t1: 4.21, rating: 3.29 },
+  { taskId: 4, t2: 31.42, t1: 8.76, rating: 3.59 },
+  { taskId: 2, t2: 18.65, t1: 5.92, rating: 3.15 },
+  { taskId: 1, t2: 24.18, t1: 6.43, rating: 3.76 }
 ]
 
 const edges = [
@@ -332,8 +332,9 @@ function topologyNode(node) {
     cpu: node.cpu,
     disk: node.disk,
     effectiveStatus: node.effectiveStatus,
-    registrationStatus: node.registrationStatus,
-    observedStatus: node.observedStatus,
+    enabled: node.effectiveStatus !== 'DISABLED',
+    registrationStatus: node.effectiveStatus === 'AVAILABLE' ? 'ACTIVE' : node.registrationStatus,
+    observedStatus: node.observedStatus === 'READY' ? 'ONLINE' : node.observedStatus,
     schedulable: node.schedulable,
     statusReason: node.statusReason || ''
   }
