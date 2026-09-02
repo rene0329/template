@@ -44,6 +44,7 @@
       <el-button :loading="loading" type="primary" style="width:100%;margin-bottom:30px;" @click.native.prevent="handleLogin">Login</el-button>
 
       <div class="tips">
+        <p>当前为模板入口，不提供真实身份认证；业务操作连接所配置的后端。</p>
         <span style="margin-right:20px;">username: admin</span>
         <span> password: any</span>
       </div>

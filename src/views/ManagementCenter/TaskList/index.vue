@@ -11,6 +11,7 @@
             <el-button @click="onSearch">搜索</el-button>
             <el-button @click="onCancel">重置</el-button>
           </el-form>
+          <live-refresh-status class="live-refresh-anchor" :updated-at="lastUpdatedAt" />
         </div>
 
         <div class="content-row">
@@ -47,7 +48,13 @@
                   label="任务状态"
                   :min-width="140"
                   align="center"
-                />
+                >
+                  <template slot-scope="scope">
+                    <el-tag size="mini" :type="taskStatusType(scope.row.status)">
+                      {{ scope.row.status || '-' }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
               </el-table>
             </div>
           </div>
@@ -80,10 +87,12 @@
 
 <script>
 import { fetchTaskList, updateTask, deleteTask } from '@/api/managementCenterApi'
-import * as echarts from 'echarts'
+import LiveRefreshStatus from '@/components/LiveRefreshStatus'
+import { keepStableCollection } from '@/utils/live-refresh'
 
 export default {
   name: 'NodeList',
+  components: { LiveRefreshStatus },
   data() {
     return {
       currentPage: 1,
@@ -100,6 +109,9 @@ export default {
       loading: false,
       total: 0,
       pollingTimer: null,
+      refreshing: false,
+      requestVersion: 0,
+      lastUpdatedAt: '',
       // 用于表单搜索
       formInline: {
         name: ''
@@ -124,6 +136,7 @@ export default {
     }
   },
   created() {
+    if (this.$route.query.taskId) this.formInline.name = String(this.$route.query.taskId)
     this.fetchData()
   },
   mounted() {
@@ -131,19 +144,30 @@ export default {
   },
   beforeDestroy() {
     this.stopPolling()
+    this.requestVersion++
   },
   methods: {
-    async fetchData() {
-      this.loading = true
+    async fetchData(silent = false) {
+      if (silent && this.refreshing) return
+      const version = ++this.requestVersion
+      this.refreshing = true
+      if (!silent) this.loading = true
       try {
-        const res = await fetchTaskList(this.currentPage, this.pageSize, this.formInline.name)
-        this.TaskData = res.list || []
+        const options = silent ? { silent: true } : {}
+        const res = await fetchTaskList(this.currentPage, this.pageSize, this.formInline.name, options)
+        if (version !== this.requestVersion) return
+        this.TaskData = keepStableCollection(this.TaskData, res.list)
         this.total = res.total || this.TaskData.length
+        this.lastUpdatedAt = new Date().toLocaleTimeString('zh-CN', { hour12: false })
       } catch (err) {
+        if (version !== this.requestVersion) return
         console.error('获取任务列表失败:', err)
-        this.$message.error('获取任务列表失败')
+        if (!silent) this.$message.error('获取任务列表失败')
       } finally {
-        this.loading = false
+        if (version === this.requestVersion) {
+          this.loading = false
+          this.refreshing = false
+        }
       }
     },
     onSearch() {
@@ -159,16 +183,25 @@ export default {
       this.fetchData()
     },
     startPolling() {
-      this.pollingTimer = setInterval(() => {
-        const hasPending = this.TaskData.some(t => t.status === '执行中')
-        if (hasPending) this.fetchData()
-      }, 5000)
+      this.pollingTimer = window.setInterval(() => this.fetchData(true), 1000)
     },
     stopPolling() {
       if (this.pollingTimer) {
-        clearInterval(this.pollingTimer)
+        window.clearInterval(this.pollingTimer)
         this.pollingTimer = null
       }
+    },
+    taskStatusType(status) {
+      const map = {
+        '已完成': 'success',
+        '已接收': 'info',
+        '执行失败': 'danger',
+        '部分完成': 'warning',
+        '执行中': 'warning',
+        '排队中': 'info',
+        '失败': 'danger'
+      }
+      return map[status] || 'info'
     },
     handleSizeChange(val) {
       this.pageSize = val
@@ -300,6 +333,9 @@ export default {
   padding: 0;
   gap: 8px;
   background: transparent;
+}
+.live-refresh-anchor {
+  margin-left: auto;
 }
 .search-container :deep(.el-form--inline) {
   display: flex;

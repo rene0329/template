@@ -7,10 +7,14 @@ import 'nprogress/nprogress.css'
 
 // 1. 利用axios对象的方法create方法去创建一个axios实例
 // request就是axios,只不过稍微配置一下
+const isDemoMode = process.env.VUE_APP_DEMO_MODE === 'true'
+
 const request = axios.create({
   // 基础路径：发请求的时候，路径中会带有api 这里改成我们的地址
   // Vue 在 Docker 构建阶段注入；未设置时使用新集群的后端 NodePort。
-  baseURL: process.env.VUE_APP_PRACTICE_API || 'http://10.212.14.88:31081',
+  baseURL: isDemoMode
+    ? process.env.VUE_APP_BASE_API
+    : (process.env.VUE_APP_PRACTICE_API || 'http://10.212.14.88:31081'),
   // 代表请求超时的时间为50s --20230803修改-何诗锟--很重要
   // 延长了请求超时的时间，因为工作流创建比较缓慢 --20230815修改-康力
   timeout: 120000
@@ -32,31 +36,46 @@ export function setBaseURL(url) {
 // 配置请求拦截器,在请求发出去之前，拦截器可以监测到，可以在请求发出之前做一些事情
 request.interceptors.request.use((config) => {
   // config 是一个配置对象，对象里有一个属性很重要，就是header请求头
-  nprogress.start()
+  if (!config.silent) nprogress.start()
   return config
 })
 
 // 响应拦截器
 request.interceptors.response.use(
   (res) => {
-    nprogress.done()
+    if (!res.config.silent) nprogress.done()
     const payload = res.data // 期望格式 { code, msg, data }
     if (payload === undefined) {
       return Promise.reject(new Error('Empty response'))
     }
-    const { code, msg, data } = payload
+    const { code, data } = payload
     if (code === 0) {
       // 成功时返回 data，分页场景直接是 { list, total, pageNum, pageSize }
       return data
     }
     // 非 0 认为失败，抛出带 msg 的错误，方便 UI 提示
-    return Promise.reject(new Error(msg || 'Request failed'))
+    return Promise.reject(apiError(payload, res.status))
   },
   (error) => {
-    nprogress.done()
-    return Promise.reject(error) // 返回一个失败的promise,会进入到axios的catch中
+    if (!error.config || !error.config.silent) nprogress.done()
+    if (error.response) {
+      const normalized = apiError(error.response.data, error.response.status)
+      normalized.response = error.response
+      return Promise.reject(normalized)
+    }
+    return Promise.reject(error)
     // 20230803修改-何诗锟--很重要
   }
 )
+
+function apiError(payload, status) {
+  const body = payload && typeof payload === 'object' ? payload : {}
+  const error = new Error(body.msg || body.message || `请求失败（HTTP ${status}）`)
+  error.status = status
+  error.code = body.code
+  error.errorCode = body.errorCode
+  error.traceId = body.traceId
+  return error
+}
 
 export default request

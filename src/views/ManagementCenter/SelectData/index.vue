@@ -12,48 +12,97 @@
             <el-button @click="onCancel">重置</el-button>
           </el-form>
           <div class="action-buttons">
-            <el-button type="primary" @click="handleSubmit" :disabled="selectedRows.length === 0">新建任务</el-button>
+            <el-button type="primary" :loading="submitting" :disabled="selectedRows.length === 0 || submitting" @click="handleSubmit">新建任务</el-button>
           </div>
+          <live-refresh-status class="live-refresh-anchor" :updated-at="lastUpdatedAt" />
         </div>
         <div class="content-row">
           <div class="table-card">
+            <el-alert v-if="loadError" :title="loadError" type="warning" :closable="false" />
+            <el-alert v-if="lastTaskId" :title="`任务 ${lastTaskId} 已提交，可在任务列表查看`" type="success" :closable="false" />
+            <el-button v-if="lastTaskId" type="text" @click="$router.push({ path: '/ManagementCenter/TaskList', query: { taskId: String(lastTaskId) } })">查看任务 {{ lastTaskId }}</el-button>
             <div class="table-wrapper">
               <el-table
+                ref="datasetTable"
                 class="my-table"
                 :data="currentPageData"
                 style="width: 100%;"
-                :default-sort="{prop: 'id', order: 'upward'}"
-                row-key="dataId"
+                :default-sort="{prop: 'datasetId', order: 'ascending'}"
+                row-key="datasetId"
                 @selection-change="handleSelectionChange"
               >
                 <el-table-column
                   type="selection"
                   width="55"
                   align="center"
+                  reserve-selection
                 />
                 <el-table-column
-                  prop="dataId"
-                  label="编号"
-                  :min-width="80"
+                  prop="datasetId"
+                  label="数据集 ID"
+                  :min-width="70"
                   sortable
                   align="center"
                 />
                 <el-table-column
                   prop="dataName"
                   label="数据集名称"
-                  :min-width="150"
+                  :min-width="170"
                   align="center"
                 >
                   <template slot-scope="scope">
                     <span>{{ scope.row.dataName ? scope.row.dataName.charAt(0).toUpperCase() + scope.row.dataName.slice(1) : '' }}</span>
                   </template>
                 </el-table-column>
+                <el-table-column prop="fileType" label="类型" width="80" align="center">
+                  <template slot-scope="scope">
+                    <el-tag size="mini" type="info">{{ scope.row.fileType || '-' }}</el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column label="大小" width="100" align="right">
+                  <template slot-scope="scope">{{ formatBytes(scope.row.dataSize) }}</template>
+                </el-table-column>
+                <el-table-column prop="version" label="版本" width="85" />
+                <el-table-column prop="category" label="分类" width="100" />
+                <el-table-column label="状态" width="125" align="center">
+                  <template slot-scope="scope">
+                    <el-tag size="mini" :type="scope.row.status === 'ACTIVE' && scope.row.availableReplicaCount > 0 ? 'success' : 'info'">
+                      {{ scope.row.status }}
+                    </el-tag>
+                    <div :title="scope.row.statusReason">{{ scope.row.healthStatus || 'UNKNOWN' }}</div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="可用/全部副本" width="115" align="center">
+                  <template slot-scope="scope">{{ scope.row.availableReplicaCount }} / {{ scope.row.totalReplicaCount }}</template>
+                </el-table-column>
+                <el-table-column label="副本节点 ID" min-width="125" show-overflow-tooltip>
+                  <template slot-scope="scope">{{ scope.row.replicas.map(r => r.nodeId).join(' / ') || '-' }}</template>
+                </el-table-column>
+                <el-table-column label="资源需求" min-width="175">
+                  <template slot-scope="scope">{{ resourceLabel(scope.row.requiredResources) }}</template>
+                </el-table-column>
+                <el-table-column prop="defaultRuntimeImageId" label="运行镜像 ID" width="115" />
+                <el-table-column prop="updatedAt" label="副本更新时间" min-width="180" />
+                <el-table-column prop="filePath" label="文件路径" min-width="200" show-overflow-tooltip />
+                <el-table-column type="expand">
+                  <template slot-scope="scope">
+                    <p>数据集编码：{{ scope.row.datasetCode }}；标签：{{ scope.row.labels }}；不可用原因：{{ scope.row.statusReason || '无' }}</p>
+                    <el-table :data="scope.row.replicas" size="mini">
+                      <el-table-column prop="replicaId" label="副本 ID" />
+                      <el-table-column prop="nodeId" label="节点 ID" />
+                      <el-table-column prop="effectiveAvailability" label="有效状态" />
+                      <el-table-column prop="statusReason" label="状态原因" min-width="180" />
+                      <el-table-column prop="checksum" label="校验值" min-width="180" show-overflow-tooltip />
+                      <el-table-column prop="filePath" label="路径" min-width="220" show-overflow-tooltip />
+                    </el-table>
+                  </template>
+                </el-table-column>
                 <el-table-column
                   prop="dataDescription"
                   label="数据集描述"
                   sortable
-                  :min-width="520"
-                  align="center"
+                  :min-width="220"
+                  show-overflow-tooltip
                 />
               </el-table>
             </div>
@@ -86,11 +135,14 @@
 </template>
 
 <script>
-import { fetchDatasetList, submitTaskWithDatas } from '@/api/managementCenterApi'
-import * as echarts from 'echarts'
+import { fetchRegisteredDatasets, preflightRegisteredTask, createRegisteredTask, requestId } from '@/api/registrationApi'
+import { datasetRow, formatBytes } from '@/utils/dataset-catalog'
+import LiveRefreshStatus from '@/components/LiveRefreshStatus'
+import { keepStableCollection } from '@/utils/live-refresh'
 
 export default {
   name: 'NodeList',
+  components: { LiveRefreshStatus },
   data() {
     return {
       currentPage: 1,
@@ -105,6 +157,14 @@ export default {
       systemName: '可选数据',
       headerRightText: '欢迎使用',
       loading: false,
+      refreshing: false,
+      requestVersion: 0,
+      submitting: false,
+      pendingSubmission: null,
+      lastTaskId: null,
+      loadError: '',
+      refreshTimer: null,
+      lastUpdatedAt: '',
       total: 0,
       // 用于表单搜索
       formInline: {
@@ -131,19 +191,36 @@ export default {
   },
 
   mounted() {
+    this.refreshTimer = window.setInterval(() => this.fetchData(true), 1000)
+  },
+  beforeDestroy() {
+    window.clearInterval(this.refreshTimer)
+    this.requestVersion++
   },
   methods: {
-    async fetchData() {
-      this.loading = true
+    async fetchData(silent = false) {
+      if (silent && this.refreshing) return
+      const version = ++this.requestVersion
+      this.refreshing = true
+      if (!silent) this.loading = true
       try {
-        const res = await fetchDatasetList(this.currentPage, this.pageSize, this.formInline.name)
-        this.TaskData = res.list || []
-        this.total = res.total || this.TaskData.length
+        const options = silent ? { silent: true } : {}
+        const res = await fetchRegisteredDatasets({ page: this.currentPage, pageSize: this.pageSize, query: this.formInline.name }, options)
+        if (version !== this.requestVersion) return
+        this.TaskData = keepStableCollection(this.TaskData, res.list.map(dataset => datasetRow(dataset)))
+        this.total = res.total
+        this.lastUpdatedAt = new Date().toLocaleTimeString('zh-CN', { hour12: false })
+        this.loadError = ''
       } catch (err) {
+        if (version !== this.requestVersion) return
+        this.loadError = `数据更新失败（保留上次结果）：${err.message}`
         console.error('获取数据集列表失败:', err)
-        this.$message.error('获取数据集列表失败')
+        if (!silent) this.$message.error('获取数据集列表失败')
       } finally {
-        this.loading = false
+        if (version === this.requestVersion) {
+          this.loading = false
+          this.refreshing = false
+        }
       }
     },
     onSearch() {
@@ -199,23 +276,45 @@ export default {
     onSelectionChange(selection) {
       this.selectedRows = selection
     },
+    formatBytes,
+    resourceLabel(resources = {}) {
+      return `CPU ${resources.cpu == null ? '-' : resources.cpu} 核 / 内存 ${resources.memoryGi == null ? '-' : resources.memoryGi} GiB / GPU ${resources.gpu == null ? '-' : resources.gpu}`
+    },
     async handleSubmit() {
+      if (this.submitting) return
       if (this.selectedRows.length === 0) {
         this.$message.warning('数据不能为空，请选择数据。')
         return
       }
 
-      const selectedDatas = this.selectedRows.map(r => r.dataName)
-      // 后端路径参数是 Integer，使用秒级时间戳可避免超出 int 范围
-      const currentTaskId = Math.floor(Date.now() / 1000)
-
+      this.submitting = true
+      const datasetIds = this.selectedRows.map(r => r.datasetId).sort((a, b) => a - b)
+      const signature = JSON.stringify(datasetIds)
+      if (!this.pendingSubmission || this.pendingSubmission.signature !== signature) {
+        this.pendingSubmission = { signature, key: requestId(), body: { datasetIds, taskName: `数据任务-${new Date().toISOString()}` } }
+      }
       try {
-        await submitTaskWithDatas(currentTaskId, selectedDatas)
-        this.$message.success('任务已提交，正在后台执行')
+        const { body, key } = this.pendingSubmission
+        if (!this.pendingSubmission.attempted) {
+          const preflight = await preflightRegisteredTask(body)
+          if (!preflight.valid) {
+            const reasons = preflight.checks.filter(check => !check.available).map(check => `${check.name || check.resourceId}: ${check.message || check.status}`)
+            await this.$alert(reasons.join('\n'), '任务预检查未通过', { customClass: 'preflight-message' })
+            return
+          }
+        }
+        this.pendingSubmission.attempted = true
+        const task = await createRegisteredTask(body, key)
+        this.lastTaskId = task.taskId
+        this.pendingSubmission = null
+        this.$message.success(`任务 ${task.taskId} 已提交，正在后台执行`)
+        this.$refs.datasetTable.clearSelection()
         this.selectedRows = []
       } catch (e) {
         console.error('提交失败:', e)
-        this.$message.error('提交失败，请稍后重试')
+        if (e !== 'cancel' && e !== 'close') this.$message.error(e.message || '提交失败；再次提交将复用本次请求编号')
+      } finally {
+        this.submitting = false
       }
     }
   }
@@ -267,6 +366,7 @@ export default {
 }
 .page-main {
   flex: 1;
+  min-height: 0;
   padding: 0px 16px 0px;
   box-sizing: border-box;
   display: flex;
@@ -275,6 +375,7 @@ export default {
 }
 .content-card {
   flex: 1;
+  min-height: 0;
   background: #ffffff;
   border-radius: 6px;
   padding: 16px 24px 8px;
@@ -285,12 +386,16 @@ export default {
   gap: 16px;
 }
 .search-container {
+  flex-shrink: 0;
   display: flex;
   justify-content: flex-start;
   align-items: center;
   padding: 0;
   gap: 8px;
   background: transparent;
+}
+.live-refresh-anchor {
+  margin-left: auto;
 }
 .search-container :deep(.el-form--inline) {
   display: flex;
@@ -313,6 +418,9 @@ export default {
   padding: 0 16px;
 }
 .content-row { 
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
   display: flex; 
   flex-wrap: wrap; 
   gap: 16px;
@@ -331,9 +439,10 @@ export default {
   overflow-x: auto; 
 }
 .page-footer { 
-  padding: 16px 0; 
+  flex-shrink: 0;
+  padding: 8px 0;
   box-sizing: border-box;
-  margin-top: 16px;
+  margin-top: 0;
 }
 .submit-bar {
   margin-top: 16px;
@@ -419,7 +528,7 @@ export default {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  margin: 20px 0;
+  margin: 0;
 }
 .pagination-total {
   font-size: 14px;

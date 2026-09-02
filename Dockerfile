@@ -9,6 +9,7 @@ ENV NODE_OPTIONS=--openssl-legacy-provider
 # 前端地址会编译进静态资源；可在 docker build 时通过 --build-arg 覆盖。
 ARG VUE_APP_PRACTICE_API=http://10.212.14.88:31081
 ENV VUE_APP_PRACTICE_API=${VUE_APP_PRACTICE_API}
+ENV VUE_APP_DEMO_MODE=false
 
 # Docker Web 构建不需要下载 Electron 桌面运行时。
 RUN corepack enable && corepack prepare pnpm@11.19.0 --activate

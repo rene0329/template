@@ -49,7 +49,7 @@
     <el-dialog title="注册节点" :visible.sync="dialog" width="480px">
       <el-form label-width="90px">
         <el-form-item label="显示名称"><el-input v-model="form.displayName" /></el-form-item>
-        <el-form-item label="角色"><el-select v-model="form.role"><el-option label="计算节点" value="COMPUTE" /><el-option label="数据节点" value="DATA" /><el-option label="计算/数据" value="COMPUTE_DATA" /></el-select></el-form-item>
+        <el-form-item label="角色"><el-select v-model="form.role"><el-option label="计算节点" value="COMPUTE" /><el-option label="数据节点" value="STORAGE" /><el-option label="计算/数据" value="COMPUTE_STORAGE" /></el-select></el-form-item>
         <el-form-item label="立即启用"><el-switch v-model="form.enabled" /></el-form-item>
       </el-form>
       <span slot="footer"><el-button @click="dialog=false">取消</el-button><el-button type="primary" :loading="saving" @click="submit">注册</el-button></span>
@@ -60,13 +60,18 @@
 import { discoverNodes, fetchNodeCandidates, fetchRegisteredNodes, registerNode, verifyNode, enableNode, disableNode, unregisterNode } from '@/api/registrationApi'
 export default {
   name: 'NodeRegistry',
-  data: () => ({ tab: 'candidates', query: '', page: 1, total: 0, rows: [], loading: false, discovering: false, saving: false, dialog: false, form: { candidateId: null, displayName: '', role: 'COMPUTE_DATA', enabled: false }}),
+  data: () => ({ tab: 'candidates', query: '', page: 1, total: 0, rows: [], loading: false, discovering: false, saving: false, dialog: false, form: { candidateId: null, displayName: '', role: 'COMPUTE', enabled: false }}),
   created() { this.load() },
   methods: {
     verifyNode, enableNode, disableNode,
     async load() { this.loading = true; try { const api = this.tab === 'candidates' ? fetchNodeCandidates : fetchRegisteredNodes; const r = await api({ page: this.page, pageSize: 20, query: this.query }); this.rows = r.list || []; this.total = r.total || 0 } catch (e) { this.$message.error(e.message || '加载失败') } finally { this.loading = false } },
     async discover() { this.discovering = true; try { await discoverNodes(); this.$message.success('节点发现完成'); await this.load() } catch (e) { this.$message.error(e.message || '发现失败') } finally { this.discovering = false } },
-    openRegister(row) { this.form = { candidateId: row.candidateId, displayName: row.k8sNodeName, role: row.observedRole || 'COMPUTE_DATA', enabled: false }; this.dialog = true },
+    normalizeRole(role) {
+      const normalized = String(role || '').trim().toUpperCase().replace(/-/g, '_')
+      if (normalized === 'STORAGE' || normalized === 'COMPUTE_STORAGE') return normalized
+      return 'COMPUTE'
+    },
+    openRegister(row) { this.form = { candidateId: row.candidateId, displayName: row.k8sNodeName, role: this.normalizeRole(row.observedRole), enabled: false }; this.dialog = true },
     async submit() { this.saving = true; try { await registerNode(this.form); this.dialog = false; this.$message.success('节点已注册'); await this.load() } catch (e) { this.$message.error(e.message || '注册失败') } finally { this.saving = false } },
     async act(api, id, message) { try { await api(id); this.$message.success(message); await this.load() } catch (e) { this.$message.error(e.message || '操作失败') } },
     async unregister(row) {

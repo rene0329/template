@@ -21,19 +21,6 @@ import 'bpmn-js/dist/assets/bpmn-font/css/bpmn.css'
 import 'bpmn-js/dist/assets/bpmn-font/css/bpmn-codes.css'
 import 'bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css'
 import './components/bpmn/assets/css/vue-bmpn.css' // bpmn相关
-/**
- * If you don't want to use mock-server
- * you want to use MockJs for mock api
- * you can execute: mockXHR()
- *
- * Currently MockJs will be used in the production environment,
- * please remove it before going online ! ! !
- */
-if (process.env.NODE_ENV === 'production') {
-  const { mockXHR } = require('../mock')
-  mockXHR()
-}
-
 // set ElementUI lang to EN
 Vue.use(ElementUI)
 // 如果想要中文版 element-ui，按如下方式声明
@@ -49,11 +36,14 @@ Vue.use(echarts)
 Vue.use(VueHighlightJS)
 
 async function startApplication() {
-  try {
-    const config = await getRuntimeConfig()
-    setBaseURL(config.backendUrl)
-  } catch (error) {
-    console.error('加载运行时配置失败，将使用内置后端地址:', error)
+  // 本地 UI demo 直接使用 vue-cli 的 mock server，避免依赖真实后端。
+  if (process.env.VUE_APP_DEMO_MODE !== 'true') {
+    try {
+      const config = await getRuntimeConfig()
+      setBaseURL(config.backendUrl)
+    } catch (error) {
+      console.error('加载运行时配置失败，将使用内置后端地址:', error)
+    }
   }
 
   new Vue({

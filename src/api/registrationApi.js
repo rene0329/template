@@ -1,16 +1,17 @@
 import request from './axiosConfig'
 
-const requestId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`
-const mutation = (url, method = 'post', data) => request({
+export const requestId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`
+const mutation = (url, method = 'post', data, idempotencyKey = requestId()) => request({
   url,
   method,
   data,
-  headers: { 'Idempotency-Key': requestId() }
+  headers: { 'Idempotency-Key': idempotencyKey }
 })
 
 export const discoverNodes = (clusterIds = []) => mutation('/api/v1/node-discovery-runs', 'post', { clusterIds })
 export const fetchNodeCandidates = (params) => request({ url: '/api/v1/node-candidates', method: 'get', params })
-export const fetchRegisteredNodes = (params) => request({ url: '/api/v1/nodes', method: 'get', params })
+export const fetchRegisteredNodes = (params, options = {}) => request({ url: '/api/v1/nodes', method: 'get', params, ...options })
+export const updateRegisteredNode = (id, data) => mutation(`/api/v1/nodes/${id}`, 'patch', data)
 export const registerNode = (data) => mutation('/api/v1/nodes', 'post', data)
 export const verifyNode = (id) => mutation(`/api/v1/nodes/${id}/verify`)
 export const enableNode = (id) => mutation(`/api/v1/nodes/${id}/enable`)
@@ -19,7 +20,7 @@ export const unregisterNode = (id) => mutation(`/api/v1/nodes/${id}`, 'delete')
 
 export const discoverDatasets = (nodeIds = []) => mutation('/api/v1/dataset-discovery-runs', 'post', { nodeIds })
 export const fetchDatasetCandidates = (params) => request({ url: '/api/v1/dataset-candidates', method: 'get', params })
-export const fetchRegisteredDatasets = (params) => request({ url: '/api/v1/datasets', method: 'get', params })
+export const fetchRegisteredDatasets = (params, options = {}) => request({ url: '/api/v1/datasets', method: 'get', params, ...options })
 export const registerDataset = (data) => mutation('/api/v1/datasets', 'post', data)
 export const uploadAndRegisterDataset = (data, onUploadProgress) => request({
   url: '/api/v1/datasets/upload',
@@ -40,5 +41,5 @@ export const verifyRuntimeImage = (id) => mutation(`/api/v1/runtime-images/${id}
 export const activateRuntimeImage = (id) => mutation(`/api/v1/runtime-images/${id}/activate`)
 export const disableRuntimeImage = (id) => mutation(`/api/v1/runtime-images/${id}/disable`)
 
-export const createRegisteredTask = (data) => mutation('/api/v1/tasks', 'post', data)
+export const createRegisteredTask = (data, idempotencyKey) => mutation('/api/v1/tasks', 'post', data, idempotencyKey)
 export const preflightRegisteredTask = (data) => request({ url: '/api/v1/tasks/preflight', method: 'post', data })

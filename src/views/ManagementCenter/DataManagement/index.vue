@@ -16,6 +16,7 @@
             <el-button type="primary" @click="onHeatSensitiveStorage" :loading="storageLoading" :disabled="hasTaskData">热敏存储</el-button>
             <el-button type="primary" @click="onInSituAggregation" :loading="aggregationLoading" :disabled="!hasTaskData">原位汇聚</el-button>
           </div>
+          <live-refresh-status class="live-refresh-anchor" :updated-at="lastUpdatedAt" />
         </div>
 
         <div class="content-row">
@@ -131,22 +132,22 @@
         <el-dialog title="数据详情" :visible="dialogVisibleDetail" @close="closeTaskDialog" custom-class="node-detail-dialog">
           <el-form :model="selectedTask" :rules="rules" ref="taskForm">
             <el-form-item label="数据名称" prop="dataName">
-              <el-input v-model="selectedTask.dataName" :disabled="!editing"></el-input>
+              <el-input v-model="selectedTask.dataName" disabled></el-input>
             </el-form-item>
-            <el-form-item label="大小(MB)" prop="dataSize">
-              <el-input v-model="selectedTask.dataSize" :disabled="!editing"></el-input>
+            <el-form-item label="大小（字节）" prop="dataSize">
+              <el-input v-model="selectedTask.dataSize" disabled></el-input>
             </el-form-item>
             <el-form-item label="热度" prop="dataHeat">
-              <el-input v-model="selectedTask.dataHeat" :disabled="!editing"></el-input>
+              <el-input-number v-model="selectedTask.dataHeat" :min="0" :max="100" :disabled="!editing"></el-input-number>
             </el-form-item>
             <el-form-item label="状态" prop="dataStatus">
               <el-input v-model="selectedTask.dataStatus" :disabled="true"></el-input>
             </el-form-item>
             <el-form-item label="存储节点" prop="dataServer">
-              <el-input v-model="selectedTask.dataServer" :disabled="!editing"></el-input>
+              <el-input v-model="selectedTask.dataServer" disabled></el-input>
             </el-form-item>
             <el-form-item label="备份节点" prop="backupServer">
-              <el-input v-model="selectedTask.backupServer" :disabled="!editing"></el-input>
+              <el-input v-model="selectedTask.backupServer" disabled></el-input>
             </el-form-item>
           </el-form>
 
@@ -182,6 +183,8 @@
 
 <script>
 import * as echarts from 'echarts'
+import LiveRefreshStatus from '@/components/LiveRefreshStatus'
+import { keepStableCollection } from '@/utils/live-refresh'
 import { 
   fetchDataManagementList, 
   updateDataItem, 
@@ -193,6 +196,7 @@ import {
 
 export default {
   name: 'NodeList',
+  components: { LiveRefreshStatus },
   data() {
     return {
       currentPage: 1,
@@ -207,6 +211,10 @@ export default {
       systemName: '数据管理',
       headerRightText: '欢迎使用',
       loading: false,
+      refreshing: false,
+      requestVersion: 0,
+      refreshTimer: null,
+      lastUpdatedAt: '',
       total: 0,
       heatLoading: false,
       storageLoading: false,
@@ -244,23 +252,38 @@ export default {
   },
 
   mounted() {
+    this.refreshTimer = window.setInterval(() => this.fetchData(true), 1000)
+  },
+  beforeDestroy() {
+    window.clearInterval(this.refreshTimer)
+    this.requestVersion++
   },
   methods: {
-    async fetchData() {
-      this.loading = true
+    async fetchData(silent = false) {
+      if (silent && this.refreshing) return
+      const version = ++this.requestVersion
+      this.refreshing = true
+      if (!silent) this.loading = true
       try {
+        const options = silent ? { silent: true } : {}
         const [dataRes, taskRes] = await Promise.all([
-          fetchDataManagementList(this.currentPage, this.pageSize, this.formInline.name),
-          fetchTaskList(1, 1, '')
+          fetchDataManagementList(this.currentPage, this.pageSize, this.formInline.name, options),
+          fetchTaskList(1, 1, '', options).catch(() => null)
         ])
-        this.TaskData = dataRes.list || []
+        if (version !== this.requestVersion) return
+        this.TaskData = keepStableCollection(this.TaskData, dataRes.list)
         this.total = dataRes.total || this.TaskData.length
-        this.hasTaskData = (taskRes.total || 0) > 0
+        if (taskRes) this.hasTaskData = taskRes.total > 0
+        this.lastUpdatedAt = new Date().toLocaleTimeString('zh-CN', { hour12: false })
       } catch (err) {
+        if (version !== this.requestVersion) return
         console.error('获取数据失败:', err)
-        this.$message.error('获取数据失败')
+        if (!silent) this.$message.error('获取数据失败')
       } finally {
-        this.loading = false
+        if (version === this.requestVersion) {
+          this.loading = false
+          this.refreshing = false
+        }
       }
     },
     onSearch() {
@@ -295,13 +318,13 @@ export default {
     },
     async saveChanges() {
       try {
-        await updateDataItem(this.selectedTask)
+        await updateDataItem({ dataId: this.selectedTask.dataId, dataHeat: this.selectedTask.dataHeat })
         this.editing = false
         this.$message({ message: '修改成功', type: 'success' })
         this.fetchData()
       } catch (err) {
         console.error('修改失败:', err)
-        this.$message.error('修改失败')
+        this.$message.error(err.message || '修改失败')
       }
     },
     async deletescopeTask(task) {
@@ -502,6 +525,9 @@ export default {
   gap: 8px;
   background: transparent;
   flex-wrap: wrap;
+}
+.live-refresh-anchor {
+  margin-left: auto;
 }
 .search-container :deep(.el-form--inline) {
   display: flex;

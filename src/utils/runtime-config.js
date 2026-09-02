@@ -3,7 +3,7 @@ import axios from 'axios'
 const STORAGE_KEY = 'vdcs_runtime_config'
 const DEFAULT_CONFIG = {
   backendUrl: process.env.VUE_APP_PRACTICE_API || 'http://10.212.14.88:31081',
-  healthPath: '/health',
+  healthPath: '/actuator/health',
   timeout: 120000
 }
 
@@ -16,7 +16,8 @@ function normalizeConfig(config = {}) {
     throw new Error('后端地址必须以 http:// 或 https:// 开头')
   }
 
-  const healthPath = String(config.healthPath || DEFAULT_CONFIG.healthPath).trim()
+  let healthPath = String(config.healthPath || DEFAULT_CONFIG.healthPath).trim()
+  if (healthPath === '/health' || healthPath === 'health') healthPath = DEFAULT_CONFIG.healthPath
   return {
     backendUrl,
     healthPath: healthPath.startsWith('/') ? healthPath : `/${healthPath}`,

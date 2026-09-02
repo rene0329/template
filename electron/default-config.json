@@ -1,5 +1,5 @@
 {
   "backendUrl": "http://10.212.14.88:31081",
-  "healthPath": "/health",
+  "healthPath": "/actuator/health",
   "timeout": 120000
 }

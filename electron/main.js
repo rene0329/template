@@ -17,7 +17,8 @@ function normalizeBackendUrl(value) {
 }
 
 function normalizeHealthPath(value) {
-  const result = String(value || '/health').trim()
+  const result = String(value || '/actuator/health').trim()
+  if (result === '/health' || result === 'health') return '/actuator/health'
   return result.startsWith('/') ? result : `/${result}`
 }
 

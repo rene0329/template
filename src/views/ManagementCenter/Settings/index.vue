@@ -2,7 +2,7 @@
 <template>
   <el-container class="analyze-page">
     <el-main class="page-main">
-      <div class="content-card">
+      <div v-loading="loading" class="content-card">
         <div class="search-container">
           <el-form :inline="true" :model="formInline" size="medium">
             <el-form-item>
@@ -11,6 +11,7 @@
             <el-button @click="onSearch">搜索</el-button>
             <el-button @click="onCancel">重置</el-button>
           </el-form>
+          <live-refresh-status class="live-refresh-anchor" :updated-at="lastUpdatedAt" />
         </div>
 
         <div class="content-row">
@@ -21,6 +22,9 @@
                 :data="currentPageData"
                 style="width: 100%; min-width: 960px;"
                 :default-sort="{prop: 'nodeId', order: 'upward'}"
+                highlight-current-row
+                :row-class-name="nodeRowClassName"
+                @row-click="selectDatasetNode"
               >
                 <el-table-column
                   prop="nodeId"
@@ -31,7 +35,7 @@
                 />
                 <el-table-column prop="nodeName" label="节点名称" :min-width="150" align="center">
                   <template slot-scope="{ row }">
-                    <el-link type="primary" @click="openDetail(row)">{{ row.nodeName }}</el-link>
+                    <el-link type="primary" @click.stop="openDetail(row)">{{ row.nodeName }}</el-link>
                   </template>
                 </el-table-column>
                 <el-table-column
@@ -57,15 +61,68 @@
                   :min-width="140"
                   align="center"
                 />
+                <el-table-column label="数据集" :min-width="100" align="center">
+                  <template slot-scope="scope">
+                    <el-button type="text" @click.stop="selectDatasetNode(scope.row)">
+                      {{ datasetCountForNode(scope.row) }} 个
+                    </el-button>
+                  </template>
+                </el-table-column>
+                <el-table-column label="节点状态" :min-width="120" align="center">
+                  <template slot-scope="scope">
+                    <el-tag size="mini" :type="nodeStatusType(scope.row)">
+                      {{ nodeStatusLabel(scope.row) }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
                 <el-table-column label="操作" :min-width="120" align="center" header-align="center">
                   <template slot-scope="scope">
-                    <el-button type="text" size="middle" @click="openTaskDialog(scope.row)">详情</el-button>
+                    <el-button type="text" size="middle" @click.stop="openTaskDialog(scope.row)">详情</el-button>
                   </template>
                 </el-table-column>
               </el-table>
             </div>
           </div>
         </div>
+
+        <section class="dataset-panel">
+          <el-alert v-if="datasetError" :title="datasetError" type="warning" :closable="false" />
+          <el-alert v-if="nodeError" :title="nodeError" type="warning" :closable="false" />
+          <div class="dataset-panel__header">
+            <div>
+              <strong>节点数据集</strong>
+              <el-tag v-if="selectedDatasetNode" size="mini" type="info">
+                {{ selectedDatasetNode.nodeName }}
+              </el-tag>
+              <span class="dataset-count">{{ selectedNodeDatasets.length }} 个数据集 / {{ selectedNodeDatasets.reduce((n, d) => n + d.replicaCount, 0) }} 个副本</span>
+            </div>
+            <span class="dataset-hint">点击节点行切换查看</span>
+          </div>
+          <el-table
+            :data="selectedNodeDatasets"
+            size="mini"
+            max-height="190"
+            empty-text="该节点暂无数据集"
+          >
+            <el-table-column prop="dataName" label="数据集名称" min-width="180" show-overflow-tooltip />
+            <el-table-column prop="fileType" label="类型" width="100" align="center">
+              <template slot-scope="scope">{{ scope.row.fileType || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="大小" width="120" align="right">
+              <template slot-scope="scope">{{ formatBytes(scope.row.dataSize) }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="100" align="center">
+              <template slot-scope="scope">
+                <el-tag size="mini" :type="scope.row.status === 'ACTIVE' ? 'success' : 'info'">
+                  {{ scope.row.status }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="version" label="版本" width="90" align="center" />
+            <el-table-column prop="replicaStatus" label="本节点副本状态" min-width="170" show-overflow-tooltip />
+            <el-table-column prop="filePath" label="文件路径" min-width="260" show-overflow-tooltip />
+          </el-table>
+        </section>
 
         <!-- 资源使用情况弹窗 -->
         <el-dialog
@@ -101,7 +158,10 @@
         <el-dialog title="节点详情" :visible="dialogVisibleDetail" @close="closeTaskDialog" custom-class="node-detail-dialog">
           <el-form :model="selectedTask" :rules="rules" ref="taskForm">
             <el-form-item label="节点名称" prop="nodeName">
-              <el-input v-model="selectedTask.nodeName" :disabled="!editing"></el-input>
+              <el-input v-model="selectedTask.nodeName" disabled></el-input>
+            </el-form-item>
+            <el-form-item label="显示名称" prop="displayName">
+              <el-input v-model="selectedTask.displayName" :disabled="!editing"></el-input>
             </el-form-item>
             <el-form-item label="内网IP" prop="internalIp">
               <el-input v-model="selectedTask.internalIp" :disabled="true"></el-input>
@@ -113,7 +173,7 @@
               <el-input :value="nodeTypeLabel(selectedTask.type || selectedTask.node_type)" :disabled="true"></el-input>
             </el-form-item>
             <el-form-item label="所属集群" prop="cluster">
-              <el-input v-model="selectedTask.cluster" :disabled="!editing"></el-input>
+              <el-input v-model="selectedTask.cluster" disabled></el-input>
             </el-form-item>
           </el-form>
 
@@ -149,10 +209,17 @@
 
 <script>
 import * as echarts from 'echarts'
-import { fetchNodeSettings, updateNodeSettings, fetchNodeMetrics } from '@/api/managementCenterApi'
+import LiveRefreshStatus from '@/components/LiveRefreshStatus'
+import { keepStableCollection } from '@/utils/live-refresh'
+import { fetchRegisteredNodes, fetchRegisteredDatasets, updateRegisteredNode } from '@/api/registrationApi'
+import { fetchAllPages, datasetsForNode, formatBytes } from '@/utils/dataset-catalog'
+import {
+  fetchNodeMetrics
+} from '@/api/managementCenterApi'
 
 export default {
   name: 'NodeList',
+  components: { LiveRefreshStatus },
   data() {
     return {
       currentPage: 1,
@@ -167,12 +234,22 @@ export default {
       systemName: '网络配置',
       headerRightText: '欢迎使用',
       loading: false,
+      refreshing: false,
+      requestVersion: 0,
+      datasetTimer: null,
+      datasetsLoading: false,
+      datasetError: '',
+      nodeError: '',
+      refreshTimer: null,
+      lastUpdatedAt: '',
       total: 0,
       formInline: {
         name: ''
       },
       // 从服务器获取的数据
       TaskData: [],
+      datasets: [],
+      selectedNodeId: '',
       node_name: '',
       selectedTask: {},
       editing: false,
@@ -185,24 +262,72 @@ export default {
     },
     currentPageData() {
       return this.TaskData
+    },
+    selectedDatasetNode() {
+      return this.TaskData.find(node => String(node.nodeId) === this.selectedNodeId) || null
+    },
+    selectedNodeDatasets() {
+      if (!this.selectedDatasetNode) return []
+      return datasetsForNode(this.datasets, this.selectedDatasetNode.nodeId)
     }
   },
   created() {
     this.fetchData()
   },
-  mounted() {},
+  mounted() {
+    this.refreshDatasets()
+    this.datasetTimer = window.setInterval(this.refreshDatasets, 10000)
+    this.refreshTimer = window.setInterval(() => this.fetchData(true), 1000)
+  },
+  beforeDestroy() {
+    window.clearInterval(this.refreshTimer)
+    window.clearInterval(this.datasetTimer)
+    this.requestVersion++
+  },
   methods: {
-    async fetchData() {
-      this.loading = true
+    async refreshDatasets() {
+      if (this.datasetsLoading) return
+      this.datasetsLoading = true
       try {
-        const res = await fetchNodeSettings(this.currentPage, this.pageSize, this.formInline.name)
-        this.TaskData = res.list || []
-        this.total = res.total || this.TaskData.length
-      } catch (err) {
-        console.error('获取节点配置失败:', err)
-        this.$message.error('获取节点配置失败')
+        const datasets = await fetchAllPages(fetchRegisteredDatasets, { silent: true })
+        if (this._isDestroyed) return
+        this.datasets = keepStableCollection(this.datasets, datasets)
+        this.datasetError = ''
+      } catch (error) {
+        this.datasetError = `数据集加载失败（保留上次结果）：${error.message}`
       } finally {
-        this.loading = false
+        this.datasetsLoading = false
+      }
+    },
+    async fetchData(silent = false) {
+      if (silent && this.refreshing) return
+      const version = ++this.requestVersion
+      this.refreshing = true
+      if (!silent) this.loading = true
+      try {
+        const options = silent ? { silent: true } : {}
+        const nodePage = await fetchRegisteredNodes({ page: this.currentPage, pageSize: this.pageSize, query: this.formInline.name }, options)
+        if (version !== this.requestVersion) return
+        this.TaskData = keepStableCollection(this.TaskData, nodePage.list.map(node => ({
+          ...node, nodeName: node.k8sNodeName, cluster: node.clusterId, type: node.role.toLowerCase().replace(/_/g, '-')
+        })))
+        this.total = nodePage.total
+        if (!this.TaskData.some(node => String(node.nodeId) === this.selectedNodeId)) {
+          const preferred = this.TaskData.find(node => datasetsForNode(this.datasets, node.nodeId).length)
+          this.selectedNodeId = preferred ? String(preferred.nodeId) : (this.TaskData[0] ? String(this.TaskData[0].nodeId) : '')
+        }
+        this.lastUpdatedAt = new Date().toLocaleTimeString('zh-CN', { hour12: false })
+        this.nodeError = ''
+      } catch (err) {
+        if (version !== this.requestVersion) return
+        this.nodeError = `节点更新失败（保留上次结果）：${err.message}`
+        console.error('获取节点配置失败:', err)
+        if (!silent) this.$message.error('获取节点配置失败')
+      } finally {
+        if (version === this.requestVersion) {
+          this.loading = false
+          this.refreshing = false
+        }
       }
     },
     onSearch() {
@@ -226,6 +351,22 @@ export default {
       this.currentPage = val
       this.fetchData()
     },
+    selectDatasetNode(node) {
+      this.selectedNodeId = String(node.nodeId)
+    },
+    nodeRowClassName({ row }) {
+      return String(row.nodeId) === this.selectedNodeId ? 'selected-node-row' : ''
+    },
+    datasetBelongsToNode(dataset, node) {
+      if (dataset.dataNodeId != null && node.nodeId != null) {
+        return String(dataset.dataNodeId) === String(node.nodeId)
+      }
+      return String(dataset.dataServer || '').trim() === String(node.nodeName || '').trim()
+    },
+    datasetCountForNode(node) {
+      return datasetsForNode(this.datasets, node.nodeId).length
+    },
+    formatBytes,
     openTaskDialog(task) {
       this.selectedTask = { ...task }
       this.dialogVisibleDetail = true
@@ -244,27 +385,58 @@ export default {
       }
       return map[type] || type || '-'
     },
+    nodeStatus(row) {
+      return row.effectiveStatus || row.observedStatus || row.status || 'UNKNOWN'
+    },
+    nodeStatusLabel(row) {
+      const status = this.nodeStatus(row)
+      const map = {
+        'AVAILABLE': '可用',
+        'READY': '可用',
+        'INACTIVE': '维护中',
+        'DISABLED': '已停用',
+        'OFFLINE': '离线',
+        'NOT_READY': '异常',
+        'UNKNOWN': '未知'
+      }
+      return map[status] || status
+    },
+    nodeStatusType(row) {
+      const status = this.nodeStatus(row)
+      const map = {
+        'AVAILABLE': 'success',
+        'READY': 'success',
+        'INACTIVE': 'warning',
+        'DISABLED': 'info',
+        'OFFLINE': 'danger',
+        'NOT_READY': 'danger'
+      }
+      return map[status] || 'info'
+    },
     async saveChanges() {
       try {
-        await updateNodeSettings(this.selectedTask)
+        const updated = await updateRegisteredNode(this.selectedTask.nodeId, {
+          displayName: this.selectedTask.displayName, version: this.selectedTask.version
+        })
+        this.selectedTask = { ...this.selectedTask, ...updated }
         this.editing = false
         this.$message({ message: '修改成功', type: 'success' })
         this.fetchData()
       } catch (err) {
         console.error('修改失败:', err)
-        this.$message.error('修改失败')
+        this.$message.error(err.message || '修改失败')
       }
     },
     async openDetail(row) {
+      this.selectDatasetNode(row)
       this.selected = row
       // 尝试从服务器获取最新的节点指标
       try {
         const res = await fetchNodeMetrics(row.nodeId)
         if (res) {
-          const cpu = res.maxCpu ? Number(((res.currentCpu || 0) / res.maxCpu * 100).toFixed(2)) : 0
-          const mem = res.maxMemory ? Number(((res.currentMemory || 0) / res.maxMemory * 100).toFixed(2)) : 0
-          // 当前表结构暂无存储使用率字段，先以 0 占位
-          const disk = 0
+          const cpu = res.maxCpu > 0 && res.currentCpu != null ? Number((res.currentCpu / res.maxCpu * 100).toFixed(2)) : null
+          const mem = res.maxMemory > 0 && res.currentMemory != null ? Number((res.currentMemory / res.maxMemory * 100).toFixed(2)) : null
+          const disk = null
           this.selected = {
             ...row,
             ...res,
@@ -278,7 +450,7 @@ export default {
     },
     initCharts() {
       if (!this.selected) return
-      const metrics = this.selected.metrics || { cpu: 0, mem: 0, disk: 0 }
+      const metrics = this.selected.metrics || { cpu: null, mem: null, disk: null }
       const { cpu, mem, disk } = metrics
 
       const radar = echarts.init(document.getElementById('radar'))
@@ -322,11 +494,11 @@ export default {
                 ]
               }
             },
-            pointer: { show: true, length: '65%', width: 6},
+            pointer: { show: val != null, length: '65%', width: 6},
             axisTick: { show: false },
             splitLine: { show: false },
             axisLabel: { show: false },
-            detail: { valueAnimation: true, formatter: '{value}%', fontSize: 22, offsetCenter: [0, '70%']},
+            detail: { valueAnimation: true, formatter: val == null ? '暂无数据' : '{value}%', fontSize: 22, offsetCenter: [0, '70%']},
             data: [{ value: val }]
           }]
         })
@@ -416,6 +588,9 @@ export default {
   gap: 8px;
   background: transparent;
 }
+.live-refresh-anchor {
+  margin-left: auto;
+}
 .search-container :deep(.el-form--inline) {
   display: flex;
   align-items: center;
@@ -453,6 +628,35 @@ export default {
 .table-wrapper {
   width: 100%;
   overflow-x: auto;
+}
+.dataset-panel {
+  min-height: 190px;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #ffffff;
+}
+.dataset-panel__header {
+  min-height: 42px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #ebeef5;
+  background: #f8fafb;
+  color: #303133;
+}
+.dataset-panel__header strong {
+  margin-right: 10px;
+}
+.dataset-count,
+.dataset-hint {
+  margin-left: 10px;
+  color: #909399;
+  font-size: 12px;
+}
+:deep(.selected-node-row > td.el-table__cell) {
+  background: #eef8f4 !important;
 }
 .page-footer {
   padding: 16px 0;

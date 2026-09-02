@@ -1,7 +1,7 @@
 <template>
   <el-container class="analyze-page">
     <el-main class="page-main">
-      <div class="content-card">
+      <div v-loading="loading" class="content-card">
         <div class="kiali-topo">
           <div class="toolbar">
             <el-button size="small" @click="fit">自适应</el-button>
@@ -10,6 +10,9 @@
               <i class="dot available" />可用
               <i class="dot inactive" />未启用
               <i class="dot offline" />异常/离线
+            </span>
+            <span class="refresh-time" title="最近更新时间">
+              <i class="el-icon-time" />{{ lastUpdatedAt || '--:--:--' }}
             </span>
           </div>
 
@@ -69,7 +72,7 @@
                 </g>
 
                 <!-- 节点 -->
-                <g v-for="n in nodes" :key="n.id">
+                <g v-for="n in nodes" :key="n.id" class="topology-node" @click.stop="selectNode(n)">
                   <rect
                     :x="n.x - n.width/2"
                     :y="n.y - n.height/2"
@@ -78,20 +81,41 @@
                     rx="8"
                     :fill="getNodeFill(n)"
                     :stroke="getNodeColor(n)"
-                    stroke-width="2"
+                    :stroke-width="selectedNodeId === n.id ? 4 : 2"
                     style="cursor: pointer;"
                     @mouseover="showTip('node', n, $event)"
                     @mouseout="hideTip"
                   />
+                  <g
+                    class="server-icon"
+                    :transform="`translate(${n.x - 9}, ${n.y - 28})`"
+                    aria-hidden="true"
+                  >
+                    <rect x="0" y="0" width="18" height="7" rx="2" />
+                    <circle cx="3.5" cy="3.5" r="1" />
+                    <line x1="7" y1="3.5" x2="14.5" y2="3.5" />
+                    <rect x="0" y="9" width="18" height="7" rx="2" />
+                    <circle cx="3.5" cy="12.5" r="1" />
+                    <line x1="7" y1="12.5" x2="14.5" y2="12.5" />
+                  </g>
                   <text
                     :x="n.x"
-                    :y="n.y + 1"
+                    :y="n.y + 3"
                     font-size="12"
                     fill="#333"
                     text-anchor="middle"
                     dominant-baseline="middle"
                     style="pointer-events:none"
                   >{{ n.label }}</text>
+                  <text
+                    :x="n.x"
+                    :y="n.y + 21"
+                    font-size="10"
+                    fill="#606266"
+                    text-anchor="middle"
+                    dominant-baseline="middle"
+                    style="pointer-events:none"
+                  >{{ n.datasets.length }} 个数据集</text>
                 </g>
               </g>
             </svg>
@@ -100,6 +124,48 @@
           <!-- 悬浮提示 -->
           <div v-if="tip.visible" class="tooltip" :style="tip.style" v-html="tip.html" />
         </div>
+
+        <section class="dataset-panel">
+          <el-alert v-if="datasetError" :title="datasetError" type="warning" :closable="false" />
+          <el-alert v-if="topologyError" :title="topologyError" type="warning" :closable="false" />
+          <div class="dataset-panel__header">
+            <div>
+              <strong>节点数据集</strong>
+              <el-tag v-if="selectedNode" size="mini" type="info">{{ selectedNode.label }}</el-tag>
+              <span class="dataset-count">{{ selectedNodeDatasets.length }} 个数据集 / {{ selectedNodeDatasets.reduce((n, d) => n + d.replicaCount, 0) }} 个副本</span>
+            </div>
+            <span class="dataset-hint">点击拓扑节点切换查看</span>
+          </div>
+          <el-table
+            :data="selectedNodeDatasets"
+            size="mini"
+            max-height="188"
+            empty-text="该节点暂无数据集"
+          >
+            <el-table-column prop="dataName" label="数据集名称" min-width="150" show-overflow-tooltip />
+            <el-table-column prop="fileType" label="类型" width="90" align="center">
+              <template slot-scope="scope">{{ scope.row.fileType || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="大小" width="110" align="right">
+              <template slot-scope="scope">{{ formatBytes(scope.row.dataSize) }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="90" align="center">
+              <template slot-scope="scope">
+                <el-tag size="mini" :type="scope.row.status === 'ACTIVE' ? 'success' : 'info'">
+                  {{ scope.row.status }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="version" label="版本" width="90" />
+            <el-table-column prop="replicaStatus" label="本节点副本状态" min-width="160" show-overflow-tooltip />
+            <el-table-column prop="filePath" label="文件路径" min-width="260" show-overflow-tooltip>
+              <template slot-scope="scope">{{ scope.row.filePath || '-' }}</template>
+            </el-table-column>
+            <el-table-column prop="dataDescription" label="描述" min-width="220" show-overflow-tooltip>
+              <template slot-scope="scope">{{ scope.row.dataDescription || '-' }}</template>
+            </el-table-column>
+          </el-table>
+        </section>
       </div>
     </el-main>
     <div class="copyright-bar">Copyright©2025 之江实验室 版权所有</div>
@@ -108,6 +174,9 @@
 
 <script>
 import { fetchNetworkTopology } from '@/api/managementCenterApi'
+import { fetchRegisteredDatasets } from '@/api/registrationApi'
+import { fetchAllPages, datasetsForNode, formatBytes } from '@/utils/dataset-catalog'
+import { keepStableCollection } from '@/utils/live-refresh'
 
 export default {
   name: 'FrameNet',
@@ -121,10 +190,20 @@ export default {
       dragStart: { x: 0, y: 0 },
       panStart: { x: 0, y: 0 },
       loading: false,
+      refreshing: false,
+      requestVersion: 0,
+      datasetError: '',
+      topologyError: '',
+      datasets: [],
+      datasetTimer: null,
+      datasetsLoading: false,
+      refreshTimer: null,
+      lastUpdatedAt: '',
+      selectedNodeId: '',
       activeOnly: false,
       clusters: [],
       // 从服务器获取的数据
-      nodes: [],
+      topologyNodes: [],
       edges: [],
       tip: { visible: false, html: '', style: {}},
       mousePos: { x: 0, y: 0 },
@@ -132,30 +211,82 @@ export default {
       headerRightText: '欢迎使用'
     }
   },
+  computed: {
+    nodes() {
+      return this.topologyNodes.map(node => ({ ...node, datasets: datasetsForNode(this.datasets, node.nodeId) }))
+    },
+    selectedNode() {
+      return this.nodes.find(node => node.id === this.selectedNodeId) || null
+    },
+    selectedNodeDatasets() {
+      return this.selectedNode ? this.selectedNode.datasets : []
+    }
+  },
   mounted() {
     window.addEventListener('resize', this.onResize)
     this.fetchData()
-    this.refreshTimer = window.setInterval(() => this.fetchData(false), 15000)
+    this.refreshDatasets()
+    this.datasetTimer = window.setInterval(this.refreshDatasets, 10000)
+    this.refreshTimer = window.setInterval(() => this.fetchData(false, true), 1000)
   },
   beforeDestroy() {
     window.removeEventListener('resize', this.onResize)
     window.clearInterval(this.refreshTimer)
+    window.clearInterval(this.datasetTimer)
+    this.requestVersion++
   },
   methods: {
-    async fetchData(refit = true) {
-      this.loading = true
+    async refreshDatasets() {
+      if (this.datasetsLoading) return
+      this.datasetsLoading = true
       try {
-        const res = await fetchNetworkTopology(this.activeOnly)
-        this.nodes = this.normalizeNodes(res.nodes || [])
-        this.edges = this.normalizeEdges(res.edges || [])
-      } catch (err) {
-        console.error('获取网络拓扑失败:', err)
-        this.$message.error(err.message || '获取网络拓扑失败')
+        const datasets = await fetchAllPages(fetchRegisteredDatasets, { silent: true })
+        if (this._isDestroyed) return
+        this.datasets = keepStableCollection(this.datasets, datasets)
+        this.datasetError = ''
+      } catch (error) {
+        this.datasetError = `数据集加载失败（保留上次结果）：${error.message}`
       } finally {
-        this.loading = false
-        this.computeClusters()
-        this.initSvgSize()
-        if (refit) this.$nextTick(() => this.fit())
+        this.datasetsLoading = false
+      }
+    },
+    async fetchData(refit = true, silent = false) {
+      if (silent && this.refreshing) return
+      const version = ++this.requestVersion
+      this.refreshing = true
+      if (!silent) this.loading = true
+      try {
+        const options = silent ? { silent: true } : {}
+        const topology = await fetchNetworkTopology(this.activeOnly, options)
+        if (version !== this.requestVersion) return
+        const nextNodes = this.normalizeNodes(topology.nodes || [])
+        const nextEdges = this.normalizeEdges(topology.edges || [])
+        this.topologyNodes = keepStableCollection(this.topologyNodes, nextNodes)
+        this.edges = keepStableCollection(this.edges, nextEdges)
+        if (!this.nodes.some(node => node.id === this.selectedNodeId)) {
+          this.selectedNodeId = this.nodes.length ? this.nodes[0].id : ''
+        }
+        this.lastUpdatedAt = new Date().toLocaleTimeString('zh-CN', { hour12: false })
+        this.topologyError = ''
+      } catch (err) {
+        if (version !== this.requestVersion) return
+        this.topologyError = `节点状态更新失败（保留上次结果）：${err.message}`
+        console.error('获取网络拓扑失败:', err)
+        if (!silent) this.$message.error(err.message || '获取网络拓扑失败')
+      } finally {
+        if (version === this.requestVersion) {
+          this.loading = false
+          this.refreshing = false
+          this.computeClusters()
+          // 数据轮询只更新内容，不重复把 SVG 的实测高度写回布局。
+          // 否则 SVG 的行盒基线会在每次测量时累加约 4px，持续把下方数据集面板向下推。
+          if (refit || !this.svgWidth || !this.svgHeight) {
+            this.$nextTick(() => {
+              this.initSvgSize()
+              if (refit) this.fit()
+            })
+          }
+        }
       }
     },
     refreshTopology() {
@@ -175,9 +306,9 @@ export default {
           x,
           y,
           width: Number(n.width) || 110,
-          height: Number(n.height) || 44,
-          cpu: Number(n.cpu ?? n.cpuUsage ?? 0),
-          disk: Number(n.disk ?? n.diskUsage ?? 0)
+          height: Math.max(Number(n.height) || 44, 74),
+          cpu: n.cpu == null ? null : Number(n.cpu),
+          disk: n.memory == null ? n.disk : n.memory
         }
       }).filter(n => Number.isFinite(n.x) && Number.isFinite(n.y))
     },
@@ -191,6 +322,20 @@ export default {
         bandwidth: Number(e.bandwidth ?? e.bw ?? 0)
       })).filter(e => e.source && e.target)
     },
+    datasetBelongsToNode(dataset, node) {
+      if (dataset.dataNodeId != null && node.nodeId != null) {
+        return String(dataset.dataNodeId) === String(node.nodeId)
+      }
+      const nodeNames = [node.id, node.label, node.nodeName, node.name]
+        .filter(Boolean)
+        .map(value => String(value).trim())
+      return dataset.dataServer != null && nodeNames.includes(String(dataset.dataServer).trim())
+    },
+    selectNode(node) {
+      this.selectedNodeId = node.id
+      this.hideTip()
+    },
+    formatBytes,
     computeClusters() {
       if (!this.nodes.length) {
         this.clusters = []
@@ -221,9 +366,11 @@ export default {
     },
 
     initSvgSize() {
-      const rect = this.$refs.svg.parentElement.getBoundingClientRect()
-      this.svgWidth = rect.width
-      this.svgHeight = rect.height
+      const container = this.$refs.svg && this.$refs.svg.parentElement
+      if (!container) return
+      const rect = container.getBoundingClientRect()
+      this.svgWidth = Math.max(0, Math.floor(rect.width))
+      this.svgHeight = Math.max(0, Math.floor(rect.height))
     },
 
     onResize() {
@@ -341,7 +488,7 @@ export default {
       return colors[node.effectiveStatus] || '#fef0f0'
     },
 
-    // 悬浮提示（去掉内存）
+    // 悬浮提示
     showTip(type, data, event) {
       let html = ''
       const esc = value => String(value == null ? '' : value)
@@ -351,12 +498,13 @@ export default {
         html = `
           <div style="min-width:220px;line-height:1.6;">
             <div><b>节点名称：</b>${esc(data.label)}</div>
-            <div><b>CPU：</b>${data.cpu}%</div>
-            <div><b>内存：</b>${data.disk}%</div>
+            <div><b>CPU：</b>${data.cpu == null ? '暂无数据' : data.cpu + '%'}</div>
+            <div><b>内存：</b>${data.disk == null ? '暂无数据' : data.disk + '%'}</div>
             <div><b>有效状态：</b>${esc(data.effectiveStatus || 'UNKNOWN')}</div>
             <div><b>注册状态：</b>${esc(data.registrationStatus || 'UNKNOWN')}</div>
             <div><b>观测状态：</b>${esc(data.observedStatus || 'UNKNOWN')}</div>
             <div><b>可调度：</b>${data.schedulable ? '是' : '否'}</div>
+            <div><b>数据集：</b>${data.datasets.length} 个</div>
             ${data.statusReason ? `<div><b>原因：</b>${esc(data.statusReason)}</div>` : ''}
           </div>
         `
@@ -450,6 +598,7 @@ export default {
 }
 .content-card {
   flex: 1;
+  min-height: 0;
   background: #ffffff;
   border-radius: 6px;
   padding: 0;
@@ -458,20 +607,55 @@ export default {
   display: flex;
   flex-direction: column;
 }
-.kiali-topo { position: relative; width: 100%; flex: 1; background: #ffffff; user-select: none; }
+.kiali-topo {
+  position: relative;
+  width: 100%;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #ffffff;
+  user-select: none;
+}
 .toolbar {
   position: absolute; top: 12px; left: 12px; z-index: 100;
   background: rgba(255,255,255,0.95); padding: 8px 12px;
   border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   display: flex; align-items: center; gap: 12px; font-size: 13px;
 }
+.refresh-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding-left: 4px;
+  color: #7a8494;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.refresh-time i { color: #497aae; }
 .legend { display: flex; align-items: center; gap: 8px; color: #666; }
 .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .available { background: #52c41a; }
 .inactive { background: #909399; }
 .offline { background: #f56c6c; }
-.svg-container { width: 100%; height: 100%; overflow: hidden; cursor: grab; }
+.svg-container {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  cursor: grab;
+}
+.svg-container svg { display: block; }
 .svg-container:active { cursor: grabbing; }
+.server-icon {
+  pointer-events: none;
+  fill: rgba(255, 255, 255, 0.9);
+  stroke: #497aae;
+  stroke-width: 1.2;
+}
+.server-icon circle { fill: #52c41a; stroke: none; }
+.server-icon line { stroke: #7a8494; stroke-width: 1; }
+.dataset-panel { flex: 0 0 auto; min-height: 0; }
 .page-footer { padding: 0 3vw 3vw; box-sizing: border-box; }
 :deep(.el-button--primary),
 :deep(.el-button--default) {

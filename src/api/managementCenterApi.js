@@ -6,11 +6,12 @@ import request from './axiosConfig'
 /**
  * 获取数据管理列表
  */
-export const fetchDataManagementList = (page, pageSize, query = '') => {
+export const fetchDataManagementList = (page, pageSize, query = '', options = {}) => {
   return request({
     url: '/common/dataManagement',
     method: 'get',
-    params: { page, pageSize, query }
+    params: { page, pageSize, query },
+    ...options
   })
 }
 
@@ -74,11 +75,12 @@ export const updateDataItem = (data) => {
 /**
  * 获取任务列表
  */
-export const fetchTaskList = (page, pageSize, query = '') => {
+export const fetchTaskList = (page, pageSize, query = '', options = {}) => {
   return request({
     url: '/common/taskList',
     method: 'get',
-    params: { page, pageSize, query }
+    params: { page, pageSize, query },
+    ...options
   })
 }
 
@@ -108,11 +110,12 @@ export const deleteTask = (task) => {
 /**
  * 获取可选数据集列表
  */
-export const fetchDatasetList = (page, pageSize, query = '') => {
+export const fetchDatasetList = (page, pageSize, query = '', options = {}) => {
   return request({
     url: '/common/datasetList',
     method: 'get',
-    params: { page, pageSize, query }
+    params: { page, pageSize, query },
+    ...options
   })
 }
 
@@ -154,11 +157,12 @@ export const fetchScheduleList = (page, pageSize, query = '') => {
 /**
  * 获取完整网络拓扑数据（节点+边）
  */
-export const fetchNetworkTopology = (activeOnly = false) => {
+export const fetchNetworkTopology = (activeOnly = false, options = {}) => {
   return request({
     url: '/common/networkTopology',
     method: 'get',
-    params: { activeOnly }
+    params: { activeOnly },
+    ...options
   })
 }
 
@@ -178,11 +182,12 @@ export const fetchAnalysisData = (page, pageSize, query = '') => {
 /**
  * 获取节点配置列表
  */
-export const fetchNodeSettings = (page, pageSize, query = '') => {
+export const fetchNodeSettings = (page, pageSize, query = '', options = {}) => {
   return request({
     url: '/common/nodeSettings',
     method: 'get',
-    params: { page, pageSize, query }
+    params: { page, pageSize, query },
+    ...options
   })
 }
 
