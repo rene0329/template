@@ -277,3 +277,12 @@ it('opens manual scheduling only for an active logical dataset with available re
   expect(vm.$refs.manualSchedule.open).toHaveBeenCalledTimes(1)
   expect(DataManagement.methods.toggleStatus).toBeUndefined()
 })
+
+it('opens either mode when both are enabled even with unfinished tasks', () => {
+  const vm = context()
+  vm.$refs = { storagePlan: { open: jest.fn() }}
+  vm.storagePolicy = { heatEnabled: true, aggregationEnabled: true, unfinishedTaskCount: 3 }
+  vm.openStoragePlan('heat')
+  vm.openStoragePlan('aggregation')
+  expect(vm.$refs.storagePlan.open.mock.calls).toEqual([['heat'], ['aggregation']])
+})

@@ -8,6 +8,8 @@ it('uses registered dataset endpoints for heat and previewed storage operations'
   expect(request).toHaveBeenLastCalledWith({ url: '/api/v1/datasets/heat-refresh', method: 'post' })
   previewDatasetStorage('heat')
   expect(request).toHaveBeenLastCalledWith({ url: '/api/v1/scheduling/storage-plans/preview', method: 'post', params: { mode: 'heat' }})
+  previewDatasetStorage('aggregation', { datasetIds: [9, 10], targetNodeId: 2 })
+  expect(request).toHaveBeenLastCalledWith({ url: '/api/v1/scheduling/storage-plans/preview', method: 'post', params: { mode: 'aggregation', datasetIds: '9,10', targetNodeId: 2 }})
   const plan = { externalPlanId: 'stable-request', mode: 'heat', assignments: [] }
   submitDatasetStorage(plan)
   expect(request).toHaveBeenLastCalledWith({ url: '/api/v1/scheduling/storage-plans', method: 'post', data: plan })
