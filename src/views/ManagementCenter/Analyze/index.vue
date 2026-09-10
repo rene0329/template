@@ -22,6 +22,26 @@
           <h2>数据移动加速比</h2>
           <p>集中式耗时 ÷ 分布式耗时；高于 1× 表示加速，低于 1× 表示减速。</p>
         </div>
+        <el-table
+          v-show="!error"
+          v-loading="loading"
+          :data="analysisData"
+          row-key="taskId"
+          class="analysis-table"
+          stripe
+          empty-text="暂无可展示的性能数据"
+        >
+          <el-table-column prop="taskId" label="任务ID" min-width="100" align="center" />
+          <el-table-column prop="t2" label="集中式计算数据移动时间" min-width="220" align="center">
+            <template v-slot:default="scope">{{ milliseconds(scope.row.t2) }}</template>
+          </el-table-column>
+          <el-table-column prop="t1" label="分布式计算数据移动时间" min-width="220" align="center">
+            <template v-slot:default="scope">{{ milliseconds(scope.row.t1) }}</template>
+          </el-table-column>
+          <el-table-column prop="rating" label="数据移动加速比" min-width="160" align="center">
+            <template v-slot:default="scope">{{ speedupText(speedupValue(scope.row)) }}</template>
+          </el-table-column>
+        </el-table>
         <div v-loading="loading" class="chart-panel">
           <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
           <div v-show="!error && analysisData.length" ref="speedupChart" class="speedup-chart" role="img" :aria-label="chartDescription" />
@@ -30,7 +50,7 @@
             <p>完成具有性能分析结果的任务后，可在这里比较加速比；也可以重置搜索条件。</p>
           </div>
         </div>
-        <p v-if="analysisData.length && !error" class="chart-note">展示当前页 {{ analysisData.length }} 个任务，按任务记录顺序排列。悬停查看加速比与两种耗时；暂无有效测量的 {{ unmeasuredCount }} 个任务留空，不按 0× 展示。</p>
+        <p v-if="analysisData.length && !error" class="chart-note">列表与图表展示当前页相同的 {{ analysisData.length }} 个任务，按任务记录顺序排列。悬停查看加速比与两种耗时；暂无有效测量的 {{ unmeasuredCount }} 个任务在图中留空，不按 0× 展示。</p>
 
         <div class="page-footer">
           <el-pagination
@@ -97,6 +117,9 @@ export default {
     this.chart = null
   },
   methods: {
+    milliseconds,
+    speedupText,
+    speedupValue,
     resizeChart() {
       if (this.chart) this.chart.resize()
     },
@@ -159,6 +182,7 @@ export default {
 .chart-heading { margin: 12px 0 20px; }
 .chart-heading h2 { margin: 0 0 10px; color: #253747; font-size: 20px; font-weight: 600; }
 .chart-heading p, .chart-note { color: #697986; font-size: 13px; line-height: 1.7; margin: 0; }
+.analysis-table { width: 100%; margin-bottom: 24px; }
 .chart-panel { min-height: 400px; }
 .speedup-chart { width: 100%; height: 420px; }
 .empty-state { padding: 110px 20px; text-align: center; color: #788692; }
