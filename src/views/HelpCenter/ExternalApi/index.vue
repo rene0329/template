@@ -2,22 +2,17 @@
   <div class="external-api-page">
     <header class="hero-card">
       <div>
-        <p class="eyebrow">HELP CENTER · API REFERENCE</p>
-        <h1>外部调度接口</h1>
-        <p class="hero-copy">面向外部调度系统的数据集发现与调度方案提交协议。</p>
+        <h1>对外接口</h1>
+        <p class="hero-copy">使用数据集查询和调度方案提交接口，将外部调度系统接入虚拟原位数据中心。</p>
       </div>
-      <div class="version-card">
-        <span>接口版本</span>
-        <strong>v1</strong>
-        <small>共 2 个开放接口</small>
-      </div>
+      <div class="base-url"><span>Base URL</span><code>http://&#123;practice-server-host&#125;:&#123;port&#125;</code></div>
     </header>
 
     <div class="document-layout">
       <aside class="api-nav" aria-label="接口目录">
         <div class="nav-title">接口目录</div>
         <button class="nav-link" type="button" @click="scrollTo('overview')">
-          <span class="nav-index">00</span><span>接入说明</span>
+          <i class="el-icon-guide" /><span>接入说明</span>
         </button>
         <button
           v-for="api in apis"
@@ -34,7 +29,6 @@
       <main class="document-content">
         <section id="overview" class="doc-section overview-section">
           <div class="section-heading">
-            <span class="section-number">00</span>
             <div><h2>接入说明</h2><p>所有接口均由 practice-server 提供。</p></div>
           </div>
           <div class="info-grid">
@@ -53,15 +47,13 @@
           <p class="unit-note">文件大小与读取量使用字节；CPU 使用核数；内存使用 GiB。</p>
         </section>
 
-        <section v-for="(api, index) in apis" :id="api.anchor" :key="api.id" class="doc-section api-section">
+        <section v-for="api in apis" :id="api.anchor" :key="api.id" class="doc-section api-section">
           <div class="section-heading api-heading">
-            <span class="section-number">0{{ index + 1 }}</span>
             <div>
               <div class="method-line"><span class="method-badge" :class="api.method.toLowerCase()">{{ api.method }}</span><code>{{ api.path }}</code></div>
               <h2>{{ api.title }}</h2>
               <p>{{ api.description }}</p>
             </div>
-            <span class="status-badge">已实现</span>
           </div>
 
           <h3>{{ api.parameterTitle }}</h3>
@@ -192,22 +184,20 @@ export default {
 
 <style lang="scss" scoped>
 .external-api-page { min-height: calc(100vh - 50px); padding: 24px 28px 0; color: #263247; background: #f3f6fa; }
-.hero-card { display: flex; justify-content: space-between; align-items: center; padding: 32px 38px; color: #fff; border-radius: 12px; background: linear-gradient(125deg, #102a43 0%, #174f73 58%, #167d8d 100%); box-shadow: 0 10px 28px rgba(16, 42, 67, .18); }
-.eyebrow { margin: 0 0 8px; color: #81d8df; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; }
-.hero-card h1 { margin: 0; font-size: 30px; font-weight: 600; }
-.hero-copy { margin: 12px 0 0; color: #d6e8f2; font-size: 15px; }
-.version-card { min-width: 150px; padding: 16px 20px; border: 1px solid rgba(255,255,255,.22); border-radius: 9px; background: rgba(255,255,255,.08); }
-.version-card span, .version-card small { display: block; color: #c7dce7; }.version-card strong { display: block; margin: 4px 0; font-size: 25px; }
+.hero-card { display: flex; justify-content: space-between; align-items: flex-end; gap: 28px; padding: 28px 32px; border: 1px solid #e3e9ef; border-radius: 9px; background: #fff; box-shadow: 0 3px 12px rgba(31, 52, 73, .04); }
+.hero-card h1 { margin: 0; color: #1e293b; font-size: 28px; font-weight: 600; }
+.hero-copy { max-width: 680px; margin: 10px 0 0; color: #64748b; font-size: 14px; line-height: 1.7; }
+.base-url { flex: 0 0 auto; min-width: 330px; padding: 12px 15px; border: 1px solid #dce5ec; border-radius: 6px; background: #f7f9fb; }.base-url span { display: block; margin-bottom: 6px; color: #8391a3; font-size: 11px; font-weight: 600; text-transform: uppercase; }.base-url code { color: #194d66; font-size: 12px; }
 .document-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 22px; margin-top: 22px; align-items: start; }
 .api-nav { position: sticky; top: 16px; padding: 14px 0; background: #fff; border: 1px solid #e3e9ef; border-radius: 9px; box-shadow: 0 3px 12px rgba(31, 52, 73, .05); }
 .nav-title { padding: 7px 18px 13px; color: #8995a5; font-size: 12px; font-weight: 700; letter-spacing: .8px; }
 .nav-link { display: flex; width: 100%; align-items: center; gap: 10px; padding: 12px 18px; color: #42526a; text-align: left; border: 0; border-left: 3px solid transparent; background: none; cursor: pointer; }
-.nav-link:hover { color: #147d8d; border-left-color: #18a1b1; background: #f0fafb; }.nav-index { width: 34px; color: #95a2b2; font: 700 11px monospace; }
+.nav-link:hover { color: #147d8d; border-left-color: #18a1b1; background: #f0fafb; }.nav-link > i { width: 38px; color: #6b7c8f; text-align: center; }
 .method-mini, .method-badge { display: inline-block; color: #fff; border-radius: 4px; font-weight: 700; text-align: center; }.method-mini { width: 38px; padding: 3px 0; font-size: 10px; }.method-badge { min-width: 55px; padding: 5px 9px; font-size: 12px; }
 .get { background: #178f73; }.post { background: #376bd6; }
 .doc-section { scroll-margin-top: 16px; margin-bottom: 22px; padding: 30px 34px; background: #fff; border: 1px solid #e3e9ef; border-radius: 9px; box-shadow: 0 3px 12px rgba(31, 52, 73, .04); }
 .section-heading { display: flex; gap: 17px; align-items: flex-start; padding-bottom: 20px; border-bottom: 1px solid #e9edf2; }.section-heading h2 { margin: 0 0 7px; font-size: 22px; }.section-heading p { margin: 0; color: #718096; line-height: 1.6; }
-.section-number { flex: 0 0 auto; color: #1a98a8; font: 700 13px monospace; }.api-heading > div { flex: 1; }.status-badge { color: #16836b; padding: 5px 9px; border-radius: 12px; background: #e8f7f2; font-size: 12px; }
+.api-heading > div { flex: 1; }
 .method-line { display: flex; align-items: center; gap: 10px; margin-bottom: 13px; }.method-line code { color: #334155; font-size: 15px; font-weight: 600; }
 h3 { margin: 24px 0 12px; color: #344258; font-size: 15px; }
 .info-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 20px; }.info-item { padding: 15px; border-radius: 6px; background: #f6f8fb; }.info-item span { display: block; margin-bottom: 7px; color: #8491a3; font-size: 12px; }.info-item code { color: #194d66; }
@@ -217,5 +207,5 @@ h3 { margin: 24px 0 12px; color: #344258; font-size: 15px; }
 .copyright-bar { padding: 18px 0; color: #9ba6b4; text-align: center; font-size: 12px; }
 ::v-deep .code-block { overflow: hidden; border-radius: 6px; background: #162337; }.code-toolbar { display: flex; justify-content: space-between; padding: 9px 13px; color: #8ea2b9; background: #1e2e44; font: 11px monospace; }.code-toolbar button { color: #c3d2e1; border: 0; background: none; cursor: pointer; }.code-toolbar button:hover { color: #61d2dc; }pre { overflow: auto; max-height: 390px; margin: 0; padding: 17px; color: #d8e4ef; font: 12px/1.65 Consolas, Monaco, monospace; white-space: pre; }
 @media (max-width: 1050px) { .examples-grid { grid-template-columns: 1fr; } }
-@media (max-width: 760px) { .external-api-page { padding: 14px 14px 0; }.hero-card { padding: 24px; }.version-card { display: none; }.document-layout { grid-template-columns: 1fr; }.api-nav { position: static; }.doc-section { padding: 23px 18px; }.info-grid { grid-template-columns: 1fr; }.flow { align-items: flex-start; flex-direction: column; }.flow i { transform: rotate(90deg); }.api-heading { flex-wrap: wrap; }.status-badge { margin-left: 30px; } }
+@media (max-width: 760px) { .external-api-page { padding: 14px 14px 0; }.hero-card { align-items: stretch; flex-direction: column; padding: 22px 20px; }.base-url { min-width: 0; }.document-layout { grid-template-columns: 1fr; }.api-nav { position: static; }.doc-section { padding: 23px 18px; }.info-grid { grid-template-columns: 1fr; }.flow { align-items: flex-start; flex-direction: column; }.flow i { transform: rotate(90deg); }.api-heading { flex-wrap: wrap; } }
 </style>
