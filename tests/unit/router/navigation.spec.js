@@ -5,12 +5,21 @@ jest.mock('@/layout', () => ({ name: 'Layout', render: h => h('router-view') }))
 const groups = constantRoutes.filter(route => !route.hidden)
 
 describe('management navigation', () => {
-  it('shows four top-level groups in the requested order', () => {
+  it('shows the top-level groups in the requested order', () => {
     expect(groups.map(route => route.meta.title)).toEqual([
-      '资源注册中心', '网络中心', '数据管理', '任务管理'
+      '资源注册中心', '网络中心', '数据管理', '任务管理', '帮助中心'
     ])
     expect(groups.every(route => route.alwaysShow)).toBe(true)
     expect(new Set(constantRoutes.map(route => route.path)).size).toBe(constantRoutes.length)
+  })
+
+  it('exposes the external API documentation under help center', () => {
+    const help = groups[4]
+    expect(help.redirect).toBe('/HelpCenter/ExternalApi')
+    expect(help.children.map(route => [route.path, route.name, route.meta.title])).toEqual([
+      ['ExternalApi', 'ExternalApi', '对外接口']
+    ])
+    expect(router.match('/HelpCenter/ExternalApi').matched.map(record => record.meta.title)).toEqual(['帮助中心', '对外接口'])
   })
 
   it('keeps the existing registration navigation', () => {
@@ -53,7 +62,8 @@ describe('management navigation', () => {
     ['/ManagementCenter', '/ManagementCenter/Settings'],
     ['/NetworkCenter', '/ManagementCenter/Settings'],
     ['/DataCenter', '/ManagementCenter/DataManagement'],
-    ['/TaskCenter', '/ManagementCenter/SelectData']
+    ['/TaskCenter', '/ManagementCenter/SelectData'],
+    ['/HelpCenter', '/HelpCenter/ExternalApi']
   ])('opens the default page for %s', (path, target) => {
     expect(router.match(path).path).toBe(target)
   })

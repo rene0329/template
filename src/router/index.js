@@ -590,6 +590,22 @@ export const constantRoutes = [
       },
     ],
   },
+  {
+    path: "/HelpCenter",
+    component: Layout,
+    redirect: "/HelpCenter/ExternalApi",
+    name: "HelpCenter",
+    alwaysShow: true,
+    meta: { title: "帮助中心", icon: "documentation", itemHeight: 48 },
+    children: [
+      {
+        path: "ExternalApi",
+        name: "ExternalApi",
+        component: () => import("@/views/HelpCenter/ExternalApi/index"),
+        meta: { title: "对外接口", icon: "documentation", itemHeight: 40 },
+      },
+    ],
+  },
 
 
   // 404 page must be placed at the end !!!
