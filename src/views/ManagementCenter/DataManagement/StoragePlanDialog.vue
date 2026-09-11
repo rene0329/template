@@ -124,7 +124,7 @@ export default {
     },
     viewLogs() {
       this.visible = false
-      this.$router.push('/ManagementCenter/SchedulingLogs')
+      this.$router.push({ name: 'SchedulingLogs' })
     }
   }
 }

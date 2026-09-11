@@ -5,10 +5,18 @@ jest.mock('@/api/datasetStorageApi', () => ({ previewDatasetStorage: jest.fn(), 
 jest.mock('@/api/registrationApi', () => ({ requestId: () => 'test-request-id', fetchRegisteredDatasets: jest.fn(), fetchRegisteredNodes: jest.fn() }))
 const assignments = [{ datasetId: 9, replicaId: 19, sourceNodeId: 6, targetNodeId: 5, action: 'MOVE' }]
 function context() {
-  const vm = { ...Dialog.data(), $confirm: jest.fn().mockResolvedValue(true), $emit: jest.fn() }
+  const vm = { ...Dialog.data(), $confirm: jest.fn().mockResolvedValue(true), $emit: jest.fn(), $router: { push: jest.fn() }}
   Object.entries(Dialog.methods).forEach(([name, method]) => { vm[name] = method.bind(vm) })
   return vm
 }
+
+it('opens the registered scheduling logs route after a plan is submitted', () => {
+  const vm = context()
+  vm.visible = true
+  vm.viewLogs()
+  expect(vm.visible).toBe(false)
+  expect(vm.$router.push).toHaveBeenCalledWith({ name: 'SchedulingLogs' })
+})
 beforeEach(() => {
   jest.resetAllMocks()
   fetchRegisteredDatasets.mockResolvedValue({ list: [{ datasetId: 9, name: 'test', status: 'ACTIVE' }], total: 1 })
