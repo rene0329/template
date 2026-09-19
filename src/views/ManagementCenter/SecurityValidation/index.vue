@@ -2,7 +2,10 @@
   <el-container class="security-page">
     <el-main>
       <section class="content-card">
-        <h2>安全与完整性验收</h2>
+        <div class="title-row">
+          <h2>安全与完整性验收</h2>
+          <router-link to="/ManagementCenter/PrivacyComputing"><el-button type="primary" plain icon="el-icon-lock">进入隐私协同计算</el-button></router-link>
+        </div>
         <el-alert title="这里只执行功能并保留原始证据；是否满足验收标准由人工 judge。" type="info" :closable="false" show-icon />
 
         <el-tabs v-model="activeTab">
@@ -64,10 +67,15 @@
             </el-table>
           </el-tab-pane>
 
-          <el-tab-pane label="三方安全聚合" name="aggregation">
-            <p class="hint">固定 A/B/C 三个实际参与节点。协调端只接收公钥和掩码后的贡献，任一参与方失败则整轮失败且不返回部分结果。</p>
-            <el-button type="primary" :loading="aggregation.running" @click="runAggregation">启动新一轮整数求和</el-button>
-            <el-button :disabled="!aggregation.result" @click="loadAggregation">刷新本轮证据</el-button>
+          <el-tab-pane label="MP-SPDZ 安全求和（兼容）" name="aggregation">
+            <p class="hint">该旧入口由后端兼容映射到 <code>secure-sum-3p-v1</code>，使用固定 A/B/C 的诚实多数三方恶意安全协议。MP-SPDZ 用于协议功能验收和比较，不代表生产安全认证；是否满足验收仍由人工 judge。</p>
+            <el-form label-width="120px" class="validation-form">
+              <el-form-item label="参与方 A 密钥"><el-input v-model="aggregation.secret" type="password" show-password autocomplete="new-password" placeholder="只保存在当前页面内存" /></el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="aggregation.running" :disabled="!aggregation.secret" @click="runAggregation">启动 MP-SPDZ 三方整数求和</el-button>
+                <el-button :disabled="!aggregation.result || !aggregation.secret" @click="loadAggregation">刷新本轮证据</el-button>
+              </el-form-item>
+            </el-form>
             <el-alert v-if="aggregation.message" :title="aggregation.message" :type="aggregation.error ? 'error' : 'success'" :closable="false" show-icon class="result-alert" />
             <el-descriptions v-if="aggregation.result" :column="3" border>
               <el-descriptions-item label="运行 ID">{{ aggregation.result.runId }}</el-descriptions-item>
@@ -114,7 +122,7 @@ export default {
       actions: ['READ', 'VERIFY'],
       integrity: { datasetId: null, running: false, result: null, message: '', error: false },
       access: { datasetId: null, action: 'READ', targetNode: '', path: '', username: '', password: '', running: false, loadingEvents: false, authorization: null, events: [], message: '', error: false },
-      aggregation: { running: false, result: null, events: [], message: '', error: false }
+      aggregation: { secret: '', running: false, result: null, events: [], message: '', error: false }
     }
   },
   computed: {
@@ -140,6 +148,10 @@ export default {
       this.integrity.message = `验收资源加载失败：${error.message}`
       this.integrity.error = true
     }
+  },
+  beforeDestroy() {
+    this.access.password = ''
+    this.aggregation.secret = ''
   },
   methods: {
     scopeText(scope) { return scope ? `${scope.action} ${scope.datasetId}@${scope.datasetVersion} · ${scope.targetNode} · ${scope.path}` : '—' },
@@ -200,7 +212,8 @@ export default {
       this.aggregation.running = true
       this.aggregation.message = ''
       try {
-        this.aggregation.result = await startSecureAggregation(`aggregate-${Date.now()}`)
+        const credentials = { username: 'A', password: this.aggregation.secret }
+        this.aggregation.result = await startSecureAggregation(`aggregate-${Date.now()}`, credentials)
         await this.loadAggregation()
       } catch (error) {
         this.aggregation.error = true
@@ -210,11 +223,12 @@ export default {
     async loadAggregation() {
       if (!this.aggregation.result) return
       const runId = this.aggregation.result.runId
-      const [result, events] = await Promise.all([fetchSecureAggregationRun(runId), fetchSecureAggregationEvents(runId)])
+      const credentials = { username: 'A', password: this.aggregation.secret }
+      const [result, events] = await Promise.all([fetchSecureAggregationRun(runId, credentials), fetchSecureAggregationEvents(runId, credentials)])
       this.aggregation.result = result
       this.aggregation.events = events
       this.aggregation.error = result.status !== 'COMPLETED'
-      this.aggregation.message = result.status === 'COMPLETED' ? '三方贡献齐全，已输出聚合值和交换元数据。' : `本轮状态：${result.status}${result.failureReason ? `；${result.failureReason}` : ''}`
+      this.aggregation.message = result.status === 'COMPLETED' ? 'MP-SPDZ 三方任务已完成，已保留结果与交换证据。' : `本轮状态：${result.status}${result.failureReason ? `；${result.failureReason}` : ''}`
     }
   }
 }
@@ -224,6 +238,7 @@ export default {
 .security-page { min-height: calc(100vh - 90px); background: #f5f7fa; }
 .content-card { background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0, 0, 0, .04); }
 h2 { margin: 0 0 18px; color: #253747; }
+.title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .el-tabs { margin-top: 18px; }
 .validation-form { max-width: 760px; margin-top: 18px; }
 .hint { color: #697986; line-height: 1.7; }

@@ -33,18 +33,23 @@ export const fetchDatasetAccessAuditEvents = (params = {}) => request({
   params
 })
 
-export const startSecureAggregation = (requestId) => request({
+export const startSecureAggregation = (requestId, credentials) => request({
   url: '/api/v1/security/secure-aggregation/runs',
   method: 'post',
-  headers: { 'Idempotency-Key': requestId }
+  headers: {
+    'Idempotency-Key': requestId,
+    Authorization: encodeBasic(credentials.username, credentials.password)
+  }
 })
 
-export const fetchSecureAggregationRun = (runId) => request({
+export const fetchSecureAggregationRun = (runId, credentials) => request({
   url: `/api/v1/security/secure-aggregation/runs/${encodeURIComponent(runId)}`,
-  method: 'get'
+  method: 'get',
+  headers: { Authorization: encodeBasic(credentials.username, credentials.password) }
 })
 
-export const fetchSecureAggregationEvents = (runId) => request({
+export const fetchSecureAggregationEvents = (runId, credentials) => request({
   url: `/api/v1/security/secure-aggregation/runs/${encodeURIComponent(runId)}/events`,
-  method: 'get'
+  method: 'get',
+  headers: { Authorization: encodeBasic(credentials.username, credentials.password) }
 })

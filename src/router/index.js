@@ -555,6 +555,12 @@ export const constantRoutes = [
         meta: { title: "调度日志", icon: 'documentation', itemHeight: 40 },
       },
       {
+        path: "/ManagementCenter/PrivacyComputing",
+        name: "PrivacyComputing",
+        component: () => import("@/views/ManagementCenter/PrivacyComputing/index"),
+        meta: { title: "隐私协同计算", icon: 'lock', itemHeight: 40 },
+      },
+      {
         path: "/ManagementCenter/SecurityValidation",
         name: "SecurityValidation",
         component: () => import("@/views/ManagementCenter/SecurityValidation/index"),

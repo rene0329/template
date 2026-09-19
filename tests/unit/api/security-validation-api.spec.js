@@ -24,12 +24,17 @@ it('uses verified credentials and preserves the exact requested access scope', (
 })
 
 it('queries raw access decisions and aggregation exchange events', () => {
+  const credentials = { username: 'A', password: 'party-a-secret' }
   fetchDatasetAccessAuditEvents({ runId: 'run-1', limit: 50 })
-  startSecureAggregation('aggregate-request-1')
-  fetchSecureAggregationEvents('run / 1')
+  startSecureAggregation('aggregate-request-1', credentials)
+  fetchSecureAggregationEvents('run / 1', credentials)
   expect(request.mock.calls.map(call => call[0])).toEqual([
     { url: '/api/v1/security/access/events', method: 'get', params: { runId: 'run-1', limit: 50 }},
-    { url: '/api/v1/security/secure-aggregation/runs', method: 'post', headers: { 'Idempotency-Key': 'aggregate-request-1' }},
-    { url: '/api/v1/security/secure-aggregation/runs/run%20%2F%201/events', method: 'get' }
+    { url: '/api/v1/security/secure-aggregation/runs', method: 'post', headers: {
+      'Idempotency-Key': 'aggregate-request-1', Authorization: `Basic ${window.btoa('A:party-a-secret')}`
+    }},
+    { url: '/api/v1/security/secure-aggregation/runs/run%20%2F%201/events', method: 'get', headers: {
+      Authorization: `Basic ${window.btoa('A:party-a-secret')}`
+    }}
   ])
 })
