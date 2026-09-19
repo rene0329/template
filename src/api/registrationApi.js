@@ -21,6 +21,7 @@ export const unregisterNode = (id) => mutation(`/api/v1/nodes/${id}`, 'delete')
 export const discoverDatasets = (nodeIds = []) => mutation('/api/v1/dataset-discovery-runs', 'post', { nodeIds })
 export const fetchDatasetCandidates = (params) => request({ url: '/api/v1/dataset-candidates', method: 'get', params })
 export const fetchRegisteredDatasets = (params, options = {}) => request({ url: '/api/v1/datasets', method: 'get', params, ...options })
+export const fetchRegisteredDataset = (id, options = {}) => request({ url: `/api/v1/datasets/${id}`, method: 'get', ...options })
 export const registerDataset = (data) => mutation('/api/v1/datasets', 'post', data)
 export const uploadAndRegisterDataset = (data, onUploadProgress) => request({
   url: '/api/v1/datasets/upload',
@@ -44,3 +45,7 @@ export const disableRuntimeImage = (id) => mutation(`/api/v1/runtime-images/${id
 
 export const createRegisteredTask = (data, idempotencyKey) => mutation('/api/v1/tasks', 'post', data, idempotencyKey)
 export const preflightRegisteredTask = (data) => request({ url: '/api/v1/tasks/preflight', method: 'post', data })
+export const fetchRegisteredTaskExecution = (taskId) => request({ url: `/api/v1/tasks/${taskId}`, method: 'get' })
+export const fetchTaskRunComparison = (acceptanceRunId, runRound = 1) => request({
+  url: `/api/v1/tasks/runs/${encodeURIComponent(acceptanceRunId)}/comparison`, method: 'get', params: { round: runRound }
+})

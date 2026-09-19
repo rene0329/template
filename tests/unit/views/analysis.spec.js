@@ -1,7 +1,11 @@
 import Analyze from '@/views/ManagementCenter/Analyze/index.vue'
 import { fetchAnalysisData } from '@/api/managementCenterApi'
+import { fetchRegisteredTaskExecution, fetchTaskRunComparison } from '@/api/registrationApi'
 jest.mock('echarts', () => ({ init: jest.fn() }))
 jest.mock('@/api/managementCenterApi', () => ({ fetchAnalysisData: jest.fn() }))
+jest.mock('@/api/registrationApi', () => ({
+  fetchRegisteredTaskExecution: jest.fn(), fetchTaskRunComparison: jest.fn()
+}))
 function context() {
   const vm = { ...Analyze.data(), $nextTick: fn => fn() }
   Object.entries(Analyze.methods).forEach(([name, method]) => { vm[name] = method.bind(vm) })
@@ -37,4 +41,21 @@ it('prevents a slow earlier request from replacing a newer search', async() => {
   await oldRequest
   expect(vm.analysisData[0].taskId).toBe(73)
   expect(vm.total).toBe(1)
+})
+
+it('loads the paired raw measurements and the selected task event stream', async() => {
+  const vm = context()
+  vm.$message = { error: jest.fn() }
+  vm.runLookup = { id: 'judge-run-1', round: 2 }
+  fetchTaskRunComparison.mockResolvedValue({ centralizedTaskId: 10, inPlaceTaskId: 11, comparable: true })
+  fetchRegisteredTaskExecution.mockResolvedValue({ taskId: 11, events: [{ eventType: 'INPUT_READY' }] })
+
+  await vm.loadComparison()
+  await vm.showEvidence(11)
+
+  expect(fetchTaskRunComparison).toHaveBeenCalledWith('judge-run-1', 2)
+  expect(vm.comparison.comparable).toBe(true)
+  expect(fetchRegisteredTaskExecution).toHaveBeenCalledWith(11)
+  expect(vm.evidence.events[0].eventType).toBe('INPUT_READY')
+  expect(vm.evidenceVisible).toBe(true)
 })

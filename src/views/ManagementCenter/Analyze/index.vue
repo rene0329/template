@@ -2,6 +2,27 @@
   <el-container class="analyze-page">
     <el-main class="page-main">
       <section class="content-card">
+        <div class="run-lookup">
+          <el-input v-model.trim="runLookup.id" placeholder="验收运行 ID" clearable />
+          <el-input-number v-model="runLookup.round" :min="1" controls-position="right" />
+          <el-button type="primary" :loading="comparisonLoading" @click="loadComparison">加载实测配对</el-button>
+        </div>
+        <el-alert v-if="comparisonError" :title="comparisonError" type="warning" :closable="false" show-icon />
+        <el-table v-if="comparison" :data="[comparison]" class="comparison-table" border>
+          <el-table-column prop="acceptanceRunId" label="验收运行 ID" min-width="160" />
+          <el-table-column prop="runRound" label="轮次" width="70" />
+          <el-table-column prop="centralizedTaskId" label="集中式任务" width="110">
+            <template slot-scope="s"><el-button type="text" :disabled="!s.row.centralizedTaskId" @click="showEvidence(s.row.centralizedTaskId)">#{{ s.row.centralizedTaskId || '—' }}</el-button></template>
+          </el-table-column>
+          <el-table-column label="集中式 T1" width="120"><template slot-scope="s">{{ rawMs(s.row.centralizedPreparationMs) }}</template></el-table-column>
+          <el-table-column prop="inPlaceTaskId" label="方舱式任务" width="110">
+            <template slot-scope="s"><el-button type="text" :disabled="!s.row.inPlaceTaskId" @click="showEvidence(s.row.inPlaceTaskId)">#{{ s.row.inPlaceTaskId || '—' }}</el-button></template>
+          </el-table-column>
+          <el-table-column label="方舱式 T2" width="120"><template slot-scope="s">{{ rawMs(s.row.inPlacePreparationMs) }}</template></el-table-column>
+          <el-table-column label="T1/T2" width="100"><template slot-scope="s">{{ s.row.centralizedToInPlaceRatio == null ? '—' : `${s.row.centralizedToInPlaceRatio.toFixed(3)}×` }}</template></el-table-column>
+          <el-table-column label="可复算" min-width="180"><template slot-scope="s"><el-tag :type="s.row.comparable ? 'success' : 'warning'">{{ s.row.comparable ? '原始事件完整' : (s.row.reason || '不可比较') }}</el-tag></template></el-table-column>
+        </el-table>
+        <p v-if="comparison" class="chart-note">页面只展示实测值和可复算状态，不自动判定是否通过 1.2 门槛。</p>
         <div class="toolbar">
           <el-form :inline="true" :model="formInline" size="medium" @submit.native.prevent="onSearch">
             <el-form-item>
@@ -64,6 +85,18 @@
           />
         </div>
       </section>
+      <el-dialog title="任务执行原始事件" :visible.sync="evidenceVisible" width="900px">
+        <el-table v-if="evidence" :data="evidence.events || []" max-height="440" size="small">
+          <el-table-column prop="datasetId" label="数据集" width="90" />
+          <el-table-column prop="eventType" label="事件" width="150" />
+          <el-table-column prop="nodeName" label="实际节点" min-width="130" />
+          <el-table-column prop="inputPath" label="输入路径" min-width="200" show-overflow-tooltip />
+          <el-table-column prop="bytesProcessed" label="字节数" width="110" />
+          <el-table-column prop="checksumSha256" label="SHA-256" min-width="170" show-overflow-tooltip />
+          <el-table-column prop="occurredAt" label="时间" min-width="170" />
+        </el-table>
+        <span slot="footer"><el-button @click="evidenceVisible=false">关闭</el-button></span>
+      </el-dialog>
     </el-main>
     <div class="copyright-bar">Copyright©2025 之江实验室 版权所有</div>
   </el-container>
@@ -72,6 +105,7 @@
 <script>
 import * as echarts from 'echarts'
 import { fetchAnalysisData } from '@/api/managementCenterApi'
+import { fetchRegisteredTaskExecution, fetchTaskRunComparison } from '@/api/registrationApi'
 import { buildSpeedupOption, taskLabel, speedupText, milliseconds, speedupValue } from '@/utils/analysis-chart'
 
 export default {
@@ -86,7 +120,13 @@ export default {
       total: 0,
       requestVersion: 0,
       formInline: { name: '' },
-      analysisData: []
+      analysisData: [],
+      runLookup: { id: '', round: 1 },
+      comparison: null,
+      comparisonLoading: false,
+      comparisonError: '',
+      evidenceVisible: false,
+      evidence: null
     }
   },
   computed: {
@@ -120,6 +160,29 @@ export default {
     milliseconds,
     speedupText,
     speedupValue,
+    rawMs(value) { return value == null ? '—' : `${value} ms` },
+    async loadComparison() {
+      if (!this.runLookup.id || this.comparisonLoading) return
+      this.comparisonLoading = true
+      this.comparisonError = ''
+      try {
+        this.comparison = await fetchTaskRunComparison(this.runLookup.id, this.runLookup.round)
+      } catch (error) {
+        this.comparison = null
+        this.comparisonError = `实测配对加载失败：${error.message}`
+      } finally {
+        this.comparisonLoading = false
+      }
+    },
+    async showEvidence(taskId) {
+      if (!taskId) return
+      try {
+        this.evidence = await fetchRegisteredTaskExecution(taskId)
+        this.evidenceVisible = true
+      } catch (error) {
+        this.$message.error(`执行证据加载失败：${error.message}`)
+      }
+    },
     resizeChart() {
       if (this.chart) this.chart.resize()
     },
@@ -177,6 +240,9 @@ export default {
 .analyze-page { min-height: calc(100vh - 90px); background: #f5f7fa; flex-direction: column; }
 .page-main { padding: 0 16px 16px; }
 .content-card { background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0, 0, 0, .04); }
+.run-lookup { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
+.run-lookup .el-input { width: 280px; }
+.comparison-table { margin-bottom: 10px; }
 .toolbar { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; }
 .toolbar .el-form-item { margin-bottom: 12px; }
 .chart-heading { margin: 12px 0 20px; }

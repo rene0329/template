@@ -14,7 +14,7 @@
         </el-form-item>
       </el-form>
       <el-alert :title="mode === 'heat' ? '按热度、存储容量和计算节点邻近度整理全部已激活数据集；跳过正在被任务或调度占用的数据。' : '仅准备所选数据，优先放到目标计算存储节点；目标为纯计算节点或容量不足时选择邻近存储节点。复用已有副本，新增副本只复制，不删除源文件。'" type="info" :closable="false" show-icon />
-      <p v-if="mode === 'heat'">热度排名前半的数据集会在容量允许时补充实际备份，已有副本会保留。请核对下面的复制、迁移清单。</p>
+      <p v-if="mode === 'heat'">近期有真实消费的数据会优先靠近消费节点增加副本；低热度数据可清退冗余副本，但始终保留至少一个已验证可用副本。请核对操作清单。</p>
       <p>两种功能可同时使用；只处理数据，不启动计算任务。同一数据集被占用时请等待结束后重试。</p>
       <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
       <template v-if="preview">
@@ -24,10 +24,11 @@
           <el-table-column label="热度" width="90"><template slot-scope="scope">{{ formatHeat(scope.row.dataHeat) }}</template></el-table-column>
           <el-table-column prop="sourceNode" label="源节点" />
           <el-table-column prop="targetNode" label="目标节点" />
-          <el-table-column label="操作" width="100"><template slot-scope="scope">{{ scope.row.action === 'MOVE' ? '迁移数据' : '复制备份' }}</template></el-table-column>
+          <el-table-column label="操作" width="100"><template slot-scope="scope">{{ actionLabel(scope.row.action) }}</template></el-table-column>
+          <el-table-column prop="reason" label="依据" min-width="220" show-overflow-tooltip />
         </el-table>
         <ul v-if="preview.notices.length"><li v-for="(notice, index) in preview.notices" :key="index">{{ notice }}</li></ul>
-        <el-alert v-if="preview.assignments.some(item => item.action === 'MOVE')" title="迁移成功后会删除对应源文件；只有目标副本保存成功后才会删除。" type="warning" :closable="false" show-icon />
+        <el-alert v-if="preview.assignments.some(item => ['MOVE', 'DELETE'].includes(item.action))" title="迁移与清退会删除源文件；执行端会再次确认至少保留一个已验证可用副本。" type="warning" :closable="false" show-icon />
         <p v-if="!preview.assignments.length">当前没有可执行的复制或迁移，请查看上面的提示。</p>
       </template>
       <el-alert v-if="accepted" :title="`调度计划 #${accepted.planId} 已提交，执行结果请查看调度日志。`" type="success" :closable="false" show-icon />
@@ -55,6 +56,9 @@ export default {
   beforeDestroy() { this.version++ },
   methods: {
     formatHeat,
+    actionLabel(action) {
+      return { COPY: '复制备份', MOVE: '迁移数据', DELETE: '清退副本' }[action] || action
+    },
     async open(mode) {
       this.mode = mode
       this.visible = true
@@ -113,7 +117,8 @@ export default {
       this.submitting = true
       this.error = ''
       try {
-        await this.$confirm(`将执行 ${this.pending.assignments.length} 项数据操作。${this.pending.assignments.some(item => item.action === 'MOVE') ? '迁移项完成后会删除对应源文件。' : '复制保留源文件。'}是否继续？`, '确认批量数据调度', { type: 'warning', confirmButtonText: '确认执行', cancelButtonText: '取消' })
+        const hasDelete = this.pending.assignments.some(item => ['MOVE', 'DELETE'].includes(item.action))
+        await this.$confirm(`将执行 ${this.pending.assignments.length} 项数据操作。${hasDelete ? '迁移或清退项会删除对应源文件，并在执行前复核可用副本数。' : '复制会保留源文件。'}是否继续？`, '确认批量数据调度', { type: 'warning', confirmButtonText: '确认执行', cancelButtonText: '取消' })
         this.accepted = await submitDatasetStorage(this.pending)
         this.$emit('submitted', this.accepted)
       } catch (error) {

@@ -34,7 +34,7 @@ describe('management navigation', () => {
   })
 
   it('places external scheduling logs under data management, separate from task schedules', () => {
-    expect(groups[2].children.map(route => route.meta.title)).toEqual(['数据集信息', '调度日志'])
+    expect(groups[2].children.map(route => route.meta.title)).toEqual(['数据集信息', '调度日志', '安全验收'])
     const route = router.match('/DataCenter/SchedulingLogs')
     expect(route.name).toBe('SchedulingLogs')
     expect(route.matched.map(record => record.meta.title)).toEqual(['数据管理', '调度日志'])
@@ -45,6 +45,7 @@ describe('management navigation', () => {
     ['Settings', '网络中心', '网络配置'],
     ['FrameNet', '网络中心', '网络结构'],
     ['DataManagement', '数据管理', '数据集信息'],
+    ['SecurityValidation', '数据管理', '安全验收'],
     ['SelectData', '任务管理', '数据选择'],
     ['TaskList', '任务管理', '任务列表'],
     ['Schedule', '任务管理', '调度展示'],

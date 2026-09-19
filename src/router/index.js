@@ -554,6 +554,12 @@ export const constantRoutes = [
         component: () => import("@/views/ManagementCenter/SchedulingLogs/index"),
         meta: { title: "调度日志", icon: 'documentation', itemHeight: 40 },
       },
+      {
+        path: "/ManagementCenter/SecurityValidation",
+        name: "SecurityValidation",
+        component: () => import("@/views/ManagementCenter/SecurityValidation/index"),
+        meta: { title: "安全验收", icon: 'form', itemHeight: 40 },
+      },
     ],
   },
   {

@@ -1,7 +1,15 @@
 import DatasetRegistry from '@/views/RegistrationCenter/DatasetRegistry/index.vue'
-import { fetchRegisteredNodes, unregisterDataset } from '@/api/registrationApi'
+import { createRegisteredTask, fetchRegisteredNodes, preflightRegisteredTask, unregisterDataset } from '@/api/registrationApi'
 
-jest.mock('@/api/registrationApi', () => ({ fetchRegisteredNodes: jest.fn(), unregisterDataset: jest.fn() }))
+jest.mock('@/api/registrationApi', () => ({
+  fetchRegisteredNodes: jest.fn(),
+  unregisterDataset: jest.fn(),
+  verifyDataset: jest.fn(),
+  activateDataset: jest.fn(),
+  disableDataset: jest.fn(),
+  preflightRegisteredTask: jest.fn(),
+  createRegisteredTask: jest.fn()
+}))
 
 function context() {
   return {
@@ -135,4 +143,27 @@ describe('dataset deletion', () => {
     await first
     expect(unregisterDataset).toHaveBeenCalledTimes(1)
   })
+})
+
+it('uses the same explicit execution mode and acceptance identity for preflight and creation', async() => {
+  const vm = context()
+  Object.entries(DatasetRegistry.methods).forEach(([name, method]) => { vm[name] = method.bind(vm) })
+  vm.selected = [{ datasetId: 9 }, { datasetId: 10 }]
+  vm.taskDialog = true
+  vm.task = {
+    taskName: 'judge-run centralized', runtimeImageId: 3, executionMode: 'CENTRALIZED',
+    acceptanceRunId: 'judge-run-1', runRound: 2
+  }
+  preflightRegisteredTask.mockResolvedValue({ valid: true, checks: [] })
+  createRegisteredTask.mockResolvedValue({ taskId: 72 })
+
+  await vm.createTask()
+
+  const expected = {
+    taskName: 'judge-run centralized', datasetIds: [9, 10], runtimeImageId: 3,
+    executionMode: 'CENTRALIZED', acceptanceRunId: 'judge-run-1', runRound: 2
+  }
+  expect(preflightRegisteredTask).toHaveBeenCalledWith(expected)
+  expect(createRegisteredTask).toHaveBeenCalledWith(expected)
+  expect(vm.taskDialog).toBe(false)
 })

@@ -84,11 +84,15 @@
             <el-table-column label="大小" width="115"><template slot-scope="scope">{{ formatBytes(scope.row.sizeBytes) }}</template></el-table-column>
             <el-table-column prop="effectiveAvailability" label="可用性" width="140" />
           </el-table>
-          <span slot="footer"><el-button @click="dialogVisibleDetail = false">关闭</el-button></span>
+          <span slot="footer">
+            <el-button type="primary" :disabled="!canSchedule(selectedTask)" @click="$refs.accessTest.open(selectedTask)">访问性能对照</el-button>
+            <el-button @click="dialogVisibleDetail = false">关闭</el-button>
+          </span>
         </el-dialog>
 
         <manual-schedule-dialog ref="manualSchedule" @submitted="fetchData()" />
         <storage-plan-dialog ref="storagePlan" @submitted="fetchData()" />
+        <access-test-dialog ref="accessTest" @completed="fetchData()" />
 
         <div class="page-footer">
           <div class="pagination-container">
@@ -111,6 +115,7 @@
 import LiveRefreshStatus from '@/components/LiveRefreshStatus'
 import ManualScheduleDialog from './ManualScheduleDialog'
 import StoragePlanDialog from './StoragePlanDialog'
+import AccessTestDialog from './AccessTestDialog'
 import { keepStableCollection } from '@/utils/live-refresh'
 import { datasetRow, fetchAllPages, formatBytes, formatHeat } from '@/utils/dataset-catalog'
 import { fetchRegisteredDatasets, fetchRegisteredNodes } from '@/api/registrationApi'
@@ -118,7 +123,7 @@ import { fetchStoragePolicy, refreshDatasetHeat } from '@/api/datasetStorageApi'
 
 export default {
   name: 'DataManagement',
-  components: { LiveRefreshStatus, ManualScheduleDialog, StoragePlanDialog },
+  components: { LiveRefreshStatus, ManualScheduleDialog, StoragePlanDialog, AccessTestDialog },
   data() {
     return {
       currentPage: 1,

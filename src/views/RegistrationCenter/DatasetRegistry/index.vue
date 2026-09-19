@@ -42,7 +42,24 @@
       </el-form>
       <span slot="footer"><el-button :disabled="uploadSaving" @click="uploadDialog=false">取消</el-button><el-button type="primary" :loading="uploadSaving" @click="submitUpload">上传并注册</el-button></span>
     </el-dialog>
-    <el-dialog title="创建任务" :visible.sync="taskDialog" width="620px"><el-form label-width="100px"><el-form-item label="任务名称"><el-input v-model="task.taskName" /></el-form-item><el-form-item label="运行镜像 ID"><el-input-number v-model="task.runtimeImageId" :min="1" placeholder="留空则使用数据集默认镜像" @change="runPreflight" /></el-form-item></el-form><el-alert v-if="preflight" :title="preflight.valid ? '资源预检查通过' : '资源预检查未通过'" :type="preflight.valid ? 'success' : 'error'" :closable="false" show-icon /><el-table v-if="preflight" :data="preflight.checks" size="mini" class="preflight-table"><el-table-column prop="resourceType" label="资源" width="120" /><el-table-column prop="name" label="名称" min-width="130" /><el-table-column prop="status" label="状态" width="110" /><el-table-column label="结果" width="80"><template slot-scope="s"><el-tag size="mini" :type="s.row.available ? 'success' : 'danger'">{{ s.row.available ? '可用' : '不可用' }}</el-tag></template></el-table-column><el-table-column prop="message" label="说明" min-width="190" show-overflow-tooltip /></el-table><span slot="footer"><el-button @click="taskDialog=false">取消</el-button><el-button type="primary" :loading="preflightLoading" :disabled="!preflight || !preflight.valid" @click="createTask">提交任务</el-button></span></el-dialog>
+    <el-dialog title="创建任务" :visible.sync="taskDialog" width="700px">
+      <el-form label-width="120px">
+        <el-form-item label="任务名称"><el-input v-model="task.taskName" /></el-form-item>
+        <el-form-item label="执行模式">
+          <el-radio-group v-model="task.executionMode" @change="runPreflight">
+            <el-radio label="IN_PLACE">方舱 / 原位</el-radio>
+            <el-radio label="CENTRALIZED">集中式</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="验收运行 ID"><el-input v-model.trim="task.acceptanceRunId" maxlength="128" @change="runPreflight" /></el-form-item>
+        <el-form-item label="配对轮次"><el-input-number v-model="task.runRound" :min="1" @change="runPreflight" /></el-form-item>
+        <el-form-item label="运行镜像 ID"><el-input-number v-model="task.runtimeImageId" :min="1" placeholder="留空则使用数据集默认镜像" @change="runPreflight" /></el-form-item>
+      </el-form>
+      <el-alert title="使用相同运行 ID、轮次、数据集、镜像和参数分别提交两种模式，性能分析页会提供原始计时供人工复算。" type="info" :closable="false" show-icon />
+      <el-alert v-if="preflight" :title="preflight.valid ? '资源预检查通过' : '资源预检查未通过'" :type="preflight.valid ? 'success' : 'error'" :closable="false" show-icon />
+      <el-table v-if="preflight" :data="preflight.checks" size="mini" class="preflight-table"><el-table-column prop="resourceType" label="资源" width="145" /><el-table-column prop="name" label="名称" min-width="130" /><el-table-column prop="status" label="状态" width="110" /><el-table-column label="结果" width="80"><template slot-scope="s"><el-tag size="mini" :type="s.row.available ? 'success' : 'danger'">{{ s.row.available ? '可用' : '不可用' }}</el-tag></template></el-table-column><el-table-column prop="message" label="说明" min-width="190" show-overflow-tooltip /></el-table>
+      <span slot="footer"><el-button @click="taskDialog=false">取消</el-button><el-button type="primary" :loading="preflightLoading" :disabled="!preflight || !preflight.valid" @click="createTask">提交任务</el-button></span>
+    </el-dialog>
   </div>
 </template>
 <script>
@@ -55,7 +72,8 @@ export default {
     dialog: false, form: {}, deletingDatasetId: null,
     uploadDialog: false, uploadSaving: false, uploadProgress: 0, uploadNodes: [], uploadFile: null, uploadFileList: [],
     uploadForm: { nodeId: null, datasetCode: '', name: '', version: '1.0', dataType: 'NPZ', description: '' },
-    taskDialog: false, preflight: null, preflightLoading: false, task: { taskName: '', runtimeImageId: undefined }
+    taskDialog: false, preflight: null, preflightLoading: false,
+    task: { taskName: '', runtimeImageId: undefined, executionMode: 'IN_PLACE', acceptanceRunId: '', runRound: 1 }
   }),
   created() { this.load() },
   methods: {
@@ -121,8 +139,8 @@ export default {
       } finally { this.deletingDatasetId = null }
     },
     healthTag(status) { return status === 'HEALTHY' ? 'success' : status === 'DEGRADED' ? 'warning' : 'danger' },
-    taskPayload() { const payload = { taskName: this.task.taskName, datasetIds: this.selected.map(x => x.datasetId) }; if (this.task.runtimeImageId) payload.runtimeImageId = this.task.runtimeImageId; return payload },
-    async openTaskDialog() { this.task.taskName = this.task.taskName || `注册任务-${Date.now()}`; this.taskDialog = true; await this.runPreflight() },
+    taskPayload() { const payload = { taskName: this.task.taskName, datasetIds: this.selected.map(x => x.datasetId), executionMode: this.task.executionMode, acceptanceRunId: this.task.acceptanceRunId, runRound: this.task.runRound }; if (this.task.runtimeImageId) payload.runtimeImageId = this.task.runtimeImageId; return payload },
+    async openTaskDialog() { const now = Date.now(); this.task.taskName = this.task.taskName || `注册任务-${now}`; this.task.acceptanceRunId = this.task.acceptanceRunId || `acceptance-${now}`; this.taskDialog = true; await this.runPreflight() },
     async runPreflight() { if (!this.taskDialog) return; this.preflightLoading = true; try { this.preflight = await preflightRegisteredTask(this.taskPayload()) } catch (e) { this.preflight = null; this.$message.error(e.message || '资源预检查失败') } finally { this.preflightLoading = false } },
     async createTask() { try { await this.runPreflight(); if (!this.preflight || !this.preflight.valid) return; const r = await createRegisteredTask(this.taskPayload()); this.taskDialog = false; this.$message.success(`任务 ${r.taskId} 已接收`) } catch (e) { this.$message.error(e.message || '任务提交失败') } },
     changePage(page) { this.page = page; this.load() }
