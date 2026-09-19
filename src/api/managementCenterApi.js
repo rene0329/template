@@ -38,7 +38,7 @@ export const updateDataHeatAll = () => {
 
 /**
  * 热敏存储 / 原位汇聚
- * mode='heat' 仅限 task_management 为空时；mode='aggregation' 仅限有数据时
+ * mode='heat' 仅限没有未完成任务时；mode='aggregation' 仅限存在未完成任务时
  */
 export const saveDataStorageAll = (mode = 'heat') => {
   return request({
