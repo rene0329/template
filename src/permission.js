@@ -10,6 +10,11 @@ NProgress.configure({ showSpinner: false }) // NProgress Configuration
 
 const whiteList = ['/login'] // no redirect whitelist
 
+const canAccess = route => {
+  const required = route.matched.reduce((all, record) => all.concat(record.meta.roles || []), [])
+  return !required.length || required.some(role => store.getters.roles.includes(role))
+}
+
 router.beforeEach(async(to, from, next) => {
   // start progress bar
   NProgress.start()
@@ -28,13 +33,21 @@ router.beforeEach(async(to, from, next) => {
     } else {
       const hasGetUserInfo = store.getters.name
       if (hasGetUserInfo) {
-        next()
+        if (canAccess(to)) next()
+        else {
+          Message.error('当前账号没有访问该页面的权限')
+          next('/workspace')
+        }
       } else {
         try {
           // get user info
           await store.dispatch('user/getInfo')
 
-          next()
+          if (canAccess(to)) next()
+          else {
+            Message.error('当前账号没有访问该页面的权限')
+            next('/workspace')
+          }
         } catch (error) {
           // remove token and go to login page to re-login
           await store.dispatch('user/resetToken')

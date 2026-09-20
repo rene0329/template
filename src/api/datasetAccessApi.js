@@ -10,7 +10,7 @@ export const runDatasetAccessTest = (datasetId, data, credentials) => request({
   method: 'post',
   data,
   timeout: 900000,
-  headers: { Authorization: basic(credentials.username, credentials.password) }
+  headers: { 'X-Dataset-Authorization': basic(credentials.username, credentials.password) }
 })
 
 export const fetchDatasetAccessEvents = (params = {}) => request({

@@ -2,990 +2,192 @@
   <el-container class="privacy-page">
     <el-main>
       <section class="page-heading">
-        <div>
-          <h2>{{ pageTitle }}</h2>
-          <p>{{ pageDescription }}</p>
-        </div>
-        <router-link to="/logs/abnormal-access">
-          <el-button icon="el-icon-document">异常访问日志</el-button>
-        </router-link>
+        <div><h2>{{ pageTitle }}</h2><p>{{ pageDescription }}</p></div>
+        <el-button icon="el-icon-refresh" :loading="loading" @click="refreshActive">刷新</el-button>
       </section>
-
-      <el-alert
-        title="当前是单 Kubernetes 集群演示：提供协议功能和逻辑域隔离，不声明能够抵御集群管理员。系统不会自动判定验收通过。"
-        type="warning"
-        :closable="false"
-        show-icon
-      />
-
-      <section class="auth-card">
-        <div class="auth-copy">
-          <h3>参与方单次认证</h3>
-          <p>凭据只保存在当前应用内存中，可通过顶栏“协同认证”统一管理；刷新或退出登录后清空，不会写入浏览器存储、URL、任务或下载文件。</p>
-        </div>
-        <el-row :gutter="12" class="secret-row">
-          <el-col v-for="party in ['A', 'B', 'C']" :key="party" :xs="24" :sm="8">
-            <el-input
-              v-model="partySecrets[party]"
-              type="password"
-              show-password
-              autocomplete="new-password"
-              :placeholder="`参与方 ${party} secret`"
-              @input="onSecretChange(party)"
-            ><template slot="prepend">{{ party }}</template></el-input>
-          </el-col>
-        </el-row>
-      </section>
+      <el-alert title="系统提供协议功能和逻辑域隔离，不声明能够抵御同一 Kubernetes 集群管理员；结果与证据仍由人工判定。" type="warning" :closable="false" show-icon />
 
       <el-tabs v-model="activeTab" class="workspace-card" @tab-click="onTabClick">
-        <el-tab-pane label="能力与模板" name="capabilities">
-          <div class="section-heading">
-            <div><h3>执行引擎</h3><span>版本、安全档位和可用状态均来自后端能力注册表</span></div>
-            <el-button size="small" :loading="catalogLoading" @click="loadCatalog">刷新能力</el-button>
-          </div>
-          <el-alert title="MP-SPDZ 仅作为协议功能验收后端，并非生产安全认证产品；恶意安全模板的准确档位是诚实多数三方恶意安全。" type="warning" :closable="false" show-icon class="engine-warning" />
-          <el-table v-loading="catalogLoading" :data="capabilities" border size="small" empty-text="后端未返回执行引擎">
-            <el-table-column prop="displayName" label="引擎" min-width="150">
-              <template slot-scope="s"><strong>{{ s.row.displayName || s.row.provider }}</strong><div class="cell-note">{{ s.row.provider }}</div></template>
-            </el-table-column>
-            <el-table-column label="状态" width="118">
-              <template slot-scope="s"><el-tag size="mini" :type="availabilityTag(s.row.status)">{{ availabilityText(s.row.status) }}</el-tag></template>
-            </el-table-column>
+        <el-tab-pane label="能力说明" name="capabilities">
+          <div class="section-heading"><div><h3>协议执行引擎</h3><span>安全档位、版本与镜像摘要来自后端注册表</span></div></div>
+          <el-table v-loading="catalogLoading" :data="capabilities" border size="small" empty-text="暂无执行引擎">
+            <el-table-column label="引擎" min-width="170"><template slot-scope="s"><strong>{{ s.row.displayName || s.row.provider }}</strong><div class="muted mono">{{ s.row.provider }}</div></template></el-table-column>
+            <el-table-column label="状态" width="110"><template slot-scope="s"><el-tag size="mini" :type="availabilityTag(s.row.status)">{{ availabilityText(s.row.status) }}</el-tag></template></el-table-column>
             <el-table-column prop="version" label="版本" min-width="120" />
-            <el-table-column label="安全档位" min-width="190">
-              <template slot-scope="s"><el-tag v-for="profile in arrayValue(s.row.securityProfiles)" :key="profile" size="mini" class="inline-tag" effect="plain">{{ securityText(profile) }}</el-tag></template>
-            </el-table-column>
-            <el-table-column label="能力" min-width="240">
-              <template slot-scope="s"><span v-if="!arrayValue(s.row.operations).length">—</span><el-tag v-for="operation in arrayValue(s.row.operations)" :key="operation" size="mini" class="inline-tag" type="info">{{ operation }}</el-tag></template>
-            </el-table-column>
-            <el-table-column label="构建信息" min-width="210">
-              <template slot-scope="s"><span class="digest">{{ s.row.imageDigest || '未配置镜像摘要' }}</span><el-tag v-if="s.row.experimental" size="mini" type="warning" class="experimental">实验组件</el-tag></template>
-            </el-table-column>
-            <el-table-column prop="reason" label="不可用原因" min-width="190" show-overflow-tooltip />
+            <el-table-column label="安全档位" min-width="190"><template slot-scope="s"><el-tag v-for="profile in arrayValue(s.row.securityProfiles)" :key="profile" size="mini" class="tag" effect="plain">{{ securityText(profile) }}</el-tag></template></el-table-column>
+            <el-table-column label="能力" min-width="240"><template slot-scope="s"><el-tag v-for="operation in arrayValue(s.row.operations)" :key="operation" size="mini" class="tag" type="info">{{ operation }}</el-tag></template></el-table-column>
+            <el-table-column label="镜像摘要" min-width="210"><template slot-scope="s"><span class="mono">{{ s.row.imageDigest || '未配置' }}</span></template></el-table-column>
           </el-table>
-
-          <div class="section-heading template-heading"><div><h3>固定任务模板</h3><span>模板锁定 Provider 和安全档位，禁止自动降级</span></div></div>
-          <el-table :data="templates" border size="small" empty-text="后端未返回任务模板">
-            <el-table-column prop="displayName" label="模板" min-width="190">
-              <template slot-scope="s"><strong>{{ s.row.displayName || s.row.templateId }}</strong><div class="cell-note">{{ s.row.templateId }}</div></template>
-            </el-table-column>
-            <el-table-column prop="operation" label="操作" width="150" />
+          <div class="section-heading spaced"><div><h3>固定模板</h3><span>模板锁定 Provider 与安全档位，不自动降级</span></div></div>
+          <el-table :data="templates" border size="small" empty-text="暂无协议模板">
+            <el-table-column label="模板" min-width="200"><template slot-scope="s"><strong>{{ s.row.displayName || s.row.templateId }}</strong><div class="muted mono">{{ s.row.templateId }}</div></template></el-table-column>
             <el-table-column prop="provider" label="Provider" min-width="150" />
-            <el-table-column label="安全档位" min-width="150"><template slot-scope="s"><el-tag size="mini" :type="securityTag(s.row.securityProfile)">{{ securityText(s.row.securityProfile) }}</el-tag></template></el-table-column>
-            <el-table-column prop="participantCount" label="参与方" width="75" align="center" />
-            <el-table-column label="状态" width="145"><template slot-scope="s"><el-tag size="mini" :type="s.row.available ? 'success' : 'danger'">{{ s.row.available ? '可用' : '不可用' }}</el-tag><el-tag v-if="s.row.experimental" size="mini" type="warning" class="inline-tag">实验</el-tag></template></el-table-column>
-            <el-table-column label="输出" min-width="185"><template slot-scope="s"><span>{{ arrayValue(s.row.supportedResults).join('、') || '—' }}</span></template></el-table-column>
-            <el-table-column prop="leakageDisclosure" label="泄露说明" min-width="280" show-overflow-tooltip />
-            <el-table-column prop="unavailableReason" label="限制" min-width="180" show-overflow-tooltip />
+            <el-table-column label="参与槽位" width="110"><template slot-scope="s">{{ templateSlots(s.row).length }} 方</template></el-table-column>
+            <el-table-column label="安全档位" min-width="170"><template slot-scope="s">{{ securityText(s.row.securityProfile) }}</template></el-table-column>
+            <el-table-column label="状态" width="100"><template slot-scope="s"><el-tag size="mini" :type="s.row.available ? 'success' : 'danger'">{{ s.row.available ? '可用' : '不可用' }}</el-tag></template></el-table-column>
+            <el-table-column prop="leakageDisclosure" label="泄露与限制说明" min-width="320" show-overflow-tooltip />
           </el-table>
-
-          <div class="section-heading template-heading"><div><h3>明确不提供</h3><span>能力边界会随证据一起展示，不以相近协议冒充</span></div></div>
-          <el-row :gutter="12">
-            <el-col v-for="item in declaredLimits" :key="item.name" :xs="24" :sm="12" :lg="8">
-              <div class="limit-card"><el-tag size="mini" type="danger">UNAVAILABLE</el-tag><strong>{{ item.name }}</strong><p>{{ item.reason }}</p></div>
-            </el-col>
-          </el-row>
         </el-tab-pane>
 
-        <el-tab-pane label="创建任务" name="create">
+        <el-tab-pane v-if="isDataOwner" label="发起计算" name="create">
           <el-form label-position="top" class="job-form">
-            <el-row :gutter="18">
-              <el-col :xs="24" :md="14">
-                <el-form-item label="任务模板" required>
-                  <el-select v-model="jobForm.templateId" filterable style="width:100%" placeholder="选择固定模板" @change="applyTemplate">
-                    <el-option v-for="item in templates" :key="item.templateId" :value="item.templateId" :label="`${item.displayName || item.templateId} · ${securityText(item.securityProfile)}`" :disabled="!item.available" />
-                  </el-select>
-                </el-form-item>
-              </el-col>
-              <el-col :xs="12" :md="5"><el-form-item label="超时（秒）"><el-input-number v-model="jobForm.timeoutSeconds" :min="60" :max="selectedTemplate ? selectedTemplate.maxTimeoutSeconds : 3600" :step="60" controls-position="right" style="width:100%" @change="invalidatePreflight" /></el-form-item></el-col>
-              <el-col :xs="12" :md="5">
-                <el-form-item label="发起方" required>
-                  <el-select v-model="createPrincipal" style="width:100%" @change="onCreatePrincipalChange">
-                    <el-option v-for="party in participantIds" :key="party" :label="`参与方 ${party}`" :value="party" />
-                  </el-select>
-                </el-form-item>
-              </el-col>
-            </el-row>
+            <el-row :gutter="18"><el-col :xs="24" :md="17"><el-form-item label="协议模板" required><el-select v-model="jobForm.templateId" filterable style="width:100%" placeholder="选择固定模板" @change="applyTemplate"><el-option v-for="item in templates" :key="item.templateId" :value="item.templateId" :label="`${item.displayName || item.templateId} · ${securityText(item.securityProfile)}`" :disabled="!item.available" /></el-select></el-form-item></el-col><el-col :xs="24" :md="7"><el-form-item label="超时（秒）"><el-input-number v-model="jobForm.timeoutSeconds" :min="60" :max="selectedTemplate ? selectedTemplate.maxTimeoutSeconds || 3600 : 3600" :step="60" controls-position="right" style="width:100%" @change="invalidatePreflight" /></el-form-item></el-col></el-row>
+            <el-alert v-if="selectedTemplate" :title="selectedTemplate.leakageDisclosure || '模板未声明额外泄露'" :description="`${selectedTemplate.provider} · ${securityText(selectedTemplate.securityProfile)}`" :type="selectedTemplate.experimental ? 'warning' : 'info'" :closable="false" show-icon />
 
-            <el-alert
-              v-if="selectedTemplate"
-              :title="selectedTemplate.leakageDisclosure || '该模板未提供额外泄露说明'"
-              :description="`${selectedTemplate.provider} · ${securityText(selectedTemplate.securityProfile)}${selectedTemplate.experimental ? ' · 实验组件' : ''}`"
-              :type="selectedTemplate.experimental ? 'warning' : 'info'"
-              :closable="false"
-              show-icon
-            />
-
-            <div class="section-heading participant-heading"><div><h3>参与方数据绑定</h3><span>任务创建时冻结数据版本、SHA-256 和字段清单</span></div></div>
+            <div class="section-heading spaced"><div><h3>选择参与数据</h3><span>每个槽位选择一个不同业务域的数据集；持有者同意后才会开始计算</span></div></div>
             <el-row :gutter="14">
-              <el-col v-for="participant in jobForm.participants" :key="participant.partyId" :xs="24" :lg="8">
-                <div class="party-card">
-                  <div class="party-title"><span class="party-badge">{{ participant.partyId }}</span><strong>{{ roleText(participant.role) }}</strong></div>
+              <el-col v-for="input in jobForm.inputs" :key="input.slotId" :xs="24" :lg="8">
+                <div class="slot-card">
+                  <div class="slot-title"><span class="slot-badge">{{ input.slotId }}</span><div><strong>{{ roleText(input.role) }}</strong><div class="muted">{{ input.label || '参与数据' }}</div></div></div>
                   <el-form-item label="数据集" required>
-                    <el-select v-model="participant.datasetId" filterable style="width:100%" placeholder="选择 ACTIVE 数据集" @change="syncParticipantDataset(participant)">
-                      <el-option v-for="dataset in datasets" :key="dataset.datasetId" :value="dataset.datasetId" :label="`${dataset.name || dataset.datasetCode} #${dataset.datasetId} · ${dataset.version}`" />
+                    <el-select v-model="input.datasetId" filterable style="width:100%" placeholder="按域和持有者选择" @change="syncInputDataset(input)">
+                      <el-option-group v-for="group in datasetGroups" :key="group.key" :label="group.label"><el-option v-for="dataset in group.datasets" :key="dataset.datasetId" :label="`${dataset.name || dataset.datasetCode} · ${dataset.version}`" :value="dataset.datasetId"><span>{{ dataset.name || dataset.datasetCode }}</span><span class="option-owner">{{ datasetOwnerName(dataset) }}</span></el-option></el-option-group>
                     </el-select>
                   </el-form-item>
-                  <el-form-item label="数据版本"><el-input :value="participant.datasetVersion || '选择数据集后冻结'" disabled /></el-form-item>
-                  <el-form-item label="权威 / USABLE SHA-256"><el-input :value="participant.displaySha256 || '目录无权威摘要且没有 USABLE 副本摘要'" disabled class="digest-input" /></el-form-item>
-                  <el-form-item label="字段绑定" required>
-                    <el-select v-model="participant.fields" multiple filterable style="width:100%" :disabled="!participantFieldOptions(participant).length" placeholder="从冻结 schema 选择字段" @change="onFieldBindingChange">
-                      <el-option v-for="field in participantFieldOptions(participant)" :key="field" :label="field" :value="field" />
-                    </el-select>
-                    <span v-if="participant.datasetId && !participantFieldOptions(participant).length" class="field-warning">该数据集没有可用的冻结 schema 字段</span>
-                  </el-form-item>
+                  <div v-if="input.datasetId" class="snapshot"><div><span>持有者</span>{{ input.ownerName }}</div><div><span>业务域</span>{{ input.domainName }}</div><div><span>版本</span>{{ input.datasetVersion }}</div><div><span>摘要</span><code>{{ input.displaySha256 || '后端创建时校验' }}</code></div></div>
+                  <el-form-item label="字段绑定" required><el-select v-model="input.fields" multiple filterable style="width:100%" placeholder="从数据 schema 选择" @change="invalidatePreflight"><el-option v-for="field in inputFieldOptions(input)" :key="field" :label="field" :value="field" /></el-select></el-form-item>
                 </div>
               </el-col>
             </el-row>
 
             <div v-if="selectedTemplate" class="policy-card">
-              <div class="section-heading"><div><h3>模板执行策略</h3><span>只提交当前模板白名单中的参数</span></div></div>
-              <el-alert v-if="jobForm.templateId === 'secure-sum-3p-v1'" title="安全求和模板没有可调引擎参数。" type="info" :closable="false" show-icon />
-              <el-row v-else :gutter="16">
-                <template v-if="jobForm.templateId === 'private-stats-3p-v1'">
-                  <el-col :xs="24" :sm="8"><el-form-item label="定点数 scale"><el-input-number v-model="jobForm.enginePolicy.scale" :min="1" :max="1000000" controls-position="right" style="width:100%" @change="onPolicyChange" /></el-form-item></el-col>
-                </template>
-                <template v-else-if="jobForm.templateId === 'private-threshold-3p-v1'">
-                  <el-col :xs="24" :sm="10"><el-form-item label="预注册 programId"><el-input v-model="jobForm.enginePolicy.programId" disabled /></el-form-item></el-col>
-                  <el-col :xs="12" :sm="7"><el-form-item label="固定阈值"><el-input-number v-model="jobForm.enginePolicy.threshold" disabled style="width:100%" /></el-form-item></el-col>
-                  <el-col :xs="12" :sm="7"><el-form-item label="定点数 scale"><el-input-number v-model="jobForm.enginePolicy.scale" :min="1" :max="1000000" controls-position="right" style="width:100%" @change="onPolicyChange" /></el-form-item></el-col>
-                </template>
-                <template v-else-if="jobForm.templateId === 'psi-2p-v1' || jobForm.templateId === 'psi-3p-v1'">
-                  <el-col :xs="24" :sm="14"><el-form-item label="求交键 keyColumns"><el-select v-model="jobForm.enginePolicy.keyColumns" multiple filterable style="width:100%" @change="onPolicyChange"><el-option v-for="field in psiKeyOptions" :key="field" :label="field" :value="field" /></el-select></el-form-item></el-col>
-                  <el-col :xs="24" :sm="10"><el-form-item label="输出模式 outputMode"><el-select v-model="jobForm.enginePolicy.outputMode" style="width:100%" @change="onOutputModeChange"><el-option label="仅接收方 A" value="RECEIVER_ONLY" /><el-option label="全部参与方" value="ALL_PARTIES" /></el-select></el-form-item></el-col>
-                </template>
-                <template v-else-if="jobForm.templateId === 'pir-keyword-2p-v1'">
-                  <el-col :xs="24" :sm="10"><el-form-item label="查询列 queryColumn"><el-select v-model="jobForm.enginePolicy.queryColumn" style="width:100%" @change="onPolicyChange"><el-option v-for="field in (jobForm.participants[0] ? jobForm.participants[0].fields : [])" :key="field" :label="field" :value="field" /></el-select></el-form-item></el-col>
-                  <el-col :xs="24" :sm="14"><el-form-item label="返回列 valueColumns"><el-select v-model="jobForm.enginePolicy.valueColumns" multiple style="width:100%" @change="onPolicyChange"><el-option v-for="field in (jobForm.participants[1] ? jobForm.participants[1].fields : [])" :key="field" :label="field" :value="field" /></el-select></el-form-item></el-col>
-                </template>
-                <template v-else-if="jobForm.templateId === 'he-paillier-2p-v1'">
-                  <el-col :xs="24" :sm="14"><el-form-item label="同态操作 operation"><el-select v-model="jobForm.enginePolicy.operation" style="width:100%" @change="onPolicyChange"><el-option label="密文加法" value="ADD" /><el-option label="明文乘法" value="PLAINTEXT_MULTIPLY" /><el-option label="点积" value="DOT_PRODUCT" /></el-select></el-form-item></el-col>
-                  <el-col :xs="24" :sm="10"><el-form-item label="定点数 scale"><el-input-number v-model="jobForm.enginePolicy.scale" :min="1" :max="1000000" controls-position="right" style="width:100%" @change="onPolicyChange" /></el-form-item></el-col>
-                </template>
-                <template v-else-if="isFederatedTemplate">
-                  <el-col :xs="24" :sm="8"><el-form-item label="标签列 labelColumn"><el-select v-model="jobForm.enginePolicy.labelColumn" style="width:100%" @change="onPolicyChange"><el-option v-for="field in policyFieldOptions" :key="field" :label="field" :value="field" /></el-select></el-form-item></el-col>
-                  <el-col :xs="24" :sm="16"><el-form-item label="特征列 featureColumns"><el-select v-model="jobForm.enginePolicy.featureColumns" multiple filterable style="width:100%" @change="onPolicyChange"><el-option v-for="field in policyFieldOptions" :key="field" :label="field" :value="field" /></el-select></el-form-item></el-col>
-                  <el-col :xs="12" :sm="8"><el-form-item label="轮数 epochs"><el-input-number v-model="jobForm.enginePolicy.epochs" :min="1" :max="1000" controls-position="right" style="width:100%" @change="onPolicyChange" /></el-form-item></el-col>
-                  <el-col :xs="12" :sm="8"><el-form-item label="学习率 learningRate"><el-input-number v-model="jobForm.enginePolicy.learningRate" :min="0.000001" :max="10" :step="0.01" controls-position="right" style="width:100%" @change="onPolicyChange" /></el-form-item></el-col>
-                  <el-col :xs="24" :sm="8"><el-form-item label="随机种子 seed"><el-input-number v-model="jobForm.enginePolicy.seed" :min="0" :max="2147483647" controls-position="right" style="width:100%" @change="onPolicyChange" /></el-form-item></el-col>
-                </template>
+              <div class="section-heading"><div><h3>模板参数</h3><span>只提交模板白名单参数</span></div></div>
+              <el-row :gutter="16">
+                <el-col v-if="jobForm.templateId === 'private-stats-3p-v1'" :sm="8"><el-form-item label="定点精度"><el-input-number v-model="jobForm.enginePolicy.scale" :min="1" controls-position="right" @change="invalidatePreflight" /></el-form-item></el-col>
+                <template v-if="jobForm.templateId.indexOf('psi-') === 0"><el-col :sm="12"><el-form-item label="对齐键"><el-select v-model="jobForm.enginePolicy.keyColumns" multiple style="width:100%" @change="invalidatePreflight"><el-option v-for="field in commonFields" :key="field" :label="field" :value="field" /></el-select></el-form-item></el-col><el-col :sm="12"><el-form-item label="输出方式"><el-select v-model="jobForm.enginePolicy.outputMode" style="width:100%" @change="invalidatePreflight"><el-option label="仅接收方" value="RECEIVER_ONLY" /><el-option label="全部参与方" value="ALL_PARTIES" /></el-select></el-form-item></el-col></template>
+                <template v-if="jobForm.templateId === 'he-paillier-2p-v1'"><el-col :sm="12"><el-form-item label="同态操作"><el-select v-model="jobForm.enginePolicy.operation" style="width:100%" @change="invalidatePreflight"><el-option label="密文加法" value="ADD" /><el-option label="明文乘法" value="PLAINTEXT_MULTIPLY" /><el-option label="点积" value="DOT_PRODUCT" /></el-select></el-form-item></el-col><el-col :sm="12"><el-form-item label="定点精度"><el-input-number v-model="jobForm.enginePolicy.scale" :min="1" controls-position="right" @change="invalidatePreflight" /></el-form-item></el-col></template>
+                <template v-if="isTrainingTemplate"><el-col :sm="8"><el-form-item label="训练轮次"><el-input-number v-model="jobForm.enginePolicy.epochs" :min="1" :max="5" @change="invalidatePreflight" /></el-form-item></el-col><el-col :sm="8"><el-form-item label="学习率"><el-input-number v-model="jobForm.enginePolicy.learningRate" :disabled="jobForm.templateId === 'hfl-fedavg-logreg-3p-v1'" :min="0.000001" :max="1" :step="0.01" @change="invalidatePreflight" /></el-form-item></el-col><el-col :sm="8"><el-form-item label="随机种子"><el-input-number v-model="jobForm.enginePolicy.seed" :disabled="jobForm.templateId === 'hfl-fedavg-logreg-3p-v1'" :min="0" @change="invalidatePreflight" /></el-form-item></el-col></template>
+                <el-col v-if="!hasEditablePolicy" :span="24"><el-alert title="该模板采用固定执行参数。" type="info" :closable="false" /></el-col>
               </el-row>
             </div>
-
-            <el-row :gutter="18" class="policy-row">
-              <el-col :xs="24" :md="12">
-                <el-form-item label="结果接收方（由模板和输出模式约束）" required>
-                  <el-checkbox-group v-model="jobForm.resultRecipients" disabled>
-                    <el-checkbox v-for="party in participantIds" :key="party" :label="party">参与方 {{ party }}</el-checkbox>
-                  </el-checkbox-group>
-                </el-form-item>
-              </el-col>
-              <el-col :xs="24" :md="12">
-                <el-form-item label="认证发起方"><el-input :value="`${createPrincipal}（预检和创建均使用该方的单次 Basic 凭据）`" disabled /></el-form-item>
-              </el-col>
-            </el-row>
-
-            <div class="form-actions">
-              <el-button type="primary" plain :loading="preflightLoading" :disabled="!canPreflight" @click="runPreflight">执行预检</el-button>
-              <el-button type="primary" :loading="creating" :disabled="!canCreate" @click="createJob">创建任务</el-button>
-              <span v-if="preflight" class="spec-digest">JobSpec 摘要：{{ preflight.specDigest || '—' }}</span>
-            </div>
+            <el-alert v-if="formError" :title="formError" type="error" :closable="false" show-icon class="feedback" />
+            <el-alert v-if="domainConflict" title="同一任务中的数据必须来自不同业务域。" type="error" :closable="false" show-icon class="feedback" />
+            <div class="form-actions"><el-button :loading="preflightLoading" :disabled="!canPreflight" @click="runPreflight">预检</el-button><el-button type="primary" :loading="creating" :disabled="!canCreate" @click="createJob">提交并等待持有者审批</el-button><span v-if="preflight && preflight.specDigest" class="muted mono">{{ preflight.specDigest }}</span></div>
           </el-form>
-
-          <el-alert v-if="formError" :title="formError" type="error" :closable="false" show-icon class="feedback" />
-          <div v-if="preflight" class="preflight-panel">
-            <el-alert :title="preflight.valid ? '预检校验完成，可以创建任务' : '预检发现待修正项'" :type="preflight.valid ? 'success' : 'error'" :closable="false" show-icon />
-            <ul v-if="arrayValue(preflight.errors).length" class="issue-list error-list"><li v-for="item in arrayValue(preflight.errors)" :key="issueKey(item)">{{ issueText(item) }}</li></ul>
-            <ul v-if="arrayValue(preflight.warnings).length" class="issue-list warning-list"><li v-for="item in arrayValue(preflight.warnings)" :key="issueKey(item)">{{ issueText(item) }}</li></ul>
-          </div>
         </el-tab-pane>
 
-        <el-tab-pane label="任务与证据" name="jobs">
-          <div class="jobs-toolbar">
-            <el-select v-model="actionPrincipal" size="small" class="principal-select" placeholder="当前认证方" @change="onActionPrincipalChange">
-              <el-option v-for="party in ['A', 'B', 'C']" :key="party" :label="`当前认证方 ${party}`" :value="party" />
-            </el-select>
-            <el-select v-model="statusFilter" clearable size="small" placeholder="全部状态" @change="loadJobs">
-              <el-option v-for="status in statuses" :key="status" :label="statusText(status)" :value="status" />
-            </el-select>
-            <el-button size="small" icon="el-icon-refresh" :loading="jobsLoading" @click="refreshJobs">刷新</el-button>
-            <span>任务运行只输出原始状态、结果与证据，最终结论由人工给出。</span>
-          </div>
-          <el-row :gutter="16">
-            <el-col :xs="24" :xl="10">
-              <el-table v-loading="jobsLoading" :data="jobs" border size="small" highlight-current-row empty-text="尚无隐私计算任务" @row-click="openJob">
-                <el-table-column prop="jobId" label="任务 ID" min-width="150" show-overflow-tooltip />
-                <el-table-column prop="templateId" label="模板" min-width="165" show-overflow-tooltip />
-                <el-table-column label="状态" width="115"><template slot-scope="s"><el-tag size="mini" :type="statusTag(s.row.status)">{{ statusText(s.row.status) }}</el-tag></template></el-table-column>
-                <el-table-column prop="attemptId" label="尝试" min-width="110" show-overflow-tooltip />
-                <el-table-column prop="createdAt" label="创建时间" min-width="160" />
-              </el-table>
-            </el-col>
-            <el-col :xs="24" :xl="14">
-              <div v-if="selectedJob" v-loading="detailLoading" class="job-detail">
-                <div class="detail-title">
-                  <div><h3>{{ selectedJob.jobId }}</h3><span>{{ selectedJob.templateId }} · {{ selectedJob.provider }}</span></div>
-                  <el-tag :type="statusTag(selectedJob.status)">{{ statusText(selectedJob.status) }}</el-tag>
-                </div>
-                <el-descriptions :column="2" size="small" border>
-                  <el-descriptions-item label="安全档位">{{ securityText(selectedJob.securityProfile) }}</el-descriptions-item>
-                  <el-descriptions-item label="尝试 ID">{{ selectedJob.attemptId }}</el-descriptions-item>
-                  <el-descriptions-item label="协议版本">{{ selectedJob.protocolVersion || '—' }}</el-descriptions-item>
-                  <el-descriptions-item label="超时">{{ selectedJob.timeoutSeconds }} 秒</el-descriptions-item>
-                  <el-descriptions-item label="JobSpec 摘要"><span class="digest">{{ selectedJob.specDigest || '—' }}</span></el-descriptions-item>
-                  <el-descriptions-item label="镜像摘要"><span class="digest">{{ selectedJob.imageDigest || '—' }}</span></el-descriptions-item>
-                  <el-descriptions-item label="失败原因" :span="2">{{ failureText(selectedJob) }}</el-descriptions-item>
-                </el-descriptions>
+        <el-tab-pane v-if="isDataOwner" label="待我审批" name="approvals">
+          <el-alert title="这里只展示由当前账号持有数据且尚未决策的请求。批准后不可撤销；拒绝必须填写理由。" type="info" :closable="false" show-icon />
+          <el-table v-loading="approvalsLoading" :data="pendingApprovals" border class="list-table" empty-text="暂无待审批任务" @row-click="openApproval">
+            <el-table-column label="任务" min-width="200"><template slot-scope="s"><strong class="link">{{ jobIdOf(s.row) }}</strong><div class="muted">{{ templateName(jobOf(s.row).templateId) }}</div></template></el-table-column>
+            <el-table-column label="发起者" min-width="140"><template slot-scope="s">{{ initiatorName(jobOf(s.row)) }}</template></el-table-column>
+            <el-table-column label="涉及数据" min-width="200"><template slot-scope="s">{{ approvalDatasetName(s.row) }}</template></el-table-column>
+            <el-table-column label="创建时间" min-width="170"><template slot-scope="s">{{ formatTime(jobOf(s.row).createdAt) }}</template></el-table-column>
+            <el-table-column label="操作" width="100"><template slot-scope="s"><el-button type="text" @click.stop="openApproval(s.row)">审阅</el-button></template></el-table-column>
+          </el-table>
+        </el-tab-pane>
 
-                <div class="detail-actions">
-                  <el-button v-if="canCancelSelected" size="small" type="danger" plain :loading="actionLoading === 'cancel'" @click="cancelSelectedJob">取消任务</el-button>
-                  <el-button v-if="canRetrySelected" size="small" type="warning" plain :loading="actionLoading === 'retry'" @click="retrySelectedJob">新尝试重试</el-button>
-                  <el-select v-model="artifactPrincipal" size="small" class="principal-select" placeholder="读取身份" @change="clearArtifactData">
-                    <el-option v-for="party in participantIdsForJob" :key="party" :label="`读取身份 ${party}`" :value="party" />
-                  </el-select>
-                  <el-button size="small" :disabled="!canReadResult" @click="loadArtifact('result', false)">查看结果</el-button>
-                  <el-button size="small" :disabled="!canReadResult" @click="loadArtifact('result', true)">下载结果</el-button>
-                  <el-button size="small" :disabled="!canReadEvidence" @click="loadArtifact('evidence', false)">查看证据</el-button>
-                  <el-button size="small" :disabled="!canReadEvidence" @click="loadArtifact('evidence', true)">下载证据</el-button>
-                </div>
-
-                <div class="approval-heading"><h4>参与方审批</h4><el-input v-model.trim="decisionReason" size="small" placeholder="审批理由；拒绝时必填" /></div>
-                <el-table :data="jobParticipants" border size="mini" empty-text="任务未返回参与方">
-                  <el-table-column prop="partyId" label="参与方" width="70" />
-                  <el-table-column prop="role" label="角色" min-width="120"><template slot-scope="s">{{ roleText(s.row.role) }}</template></el-table-column>
-                  <el-table-column label="数据" min-width="155"><template slot-scope="s">#{{ s.row.datasetId }} @ {{ s.row.datasetVersion }}</template></el-table-column>
-                  <el-table-column label="审批" width="110"><template slot-scope="s"><el-tag size="mini" :type="decisionTag(approvalState(s.row))">{{ approvalState(s.row) }}</el-tag></template></el-table-column>
-                  <el-table-column label="操作" width="145"><template slot-scope="s"><el-button type="text" :disabled="!canDecide(s.row)" :loading="actionLoading === `approve-${s.row.partyId}`" @click="decideParticipant('approve', s.row)">批准</el-button><el-button type="text" class="danger-text" :disabled="!canDecide(s.row)" :loading="actionLoading === `reject-${s.row.partyId}`" @click="decideParticipant('reject', s.row)">拒绝</el-button></template></el-table-column>
-                </el-table>
-
-                <h4>事件时间线</h4>
-                <el-table :data="events" border size="mini" max-height="330" empty-text="暂无事件">
-                  <el-table-column prop="createdAt" label="时间" min-width="160" />
-                  <el-table-column prop="attemptId" label="尝试" min-width="105" show-overflow-tooltip />
-                  <el-table-column prop="participantId" label="参与方" width="72" />
-                  <el-table-column prop="phase" label="阶段" width="105" />
-                  <el-table-column prop="status" label="状态" width="100" />
-                  <el-table-column prop="messageCode" label="消息" min-width="145" show-overflow-tooltip />
-                  <el-table-column prop="payloadBytes" label="字节" width="80" />
-                  <el-table-column prop="messageDigest" label="摘要" min-width="150" show-overflow-tooltip />
-                </el-table>
-
-                <el-collapse v-if="resultData || evidenceData" v-model="artifactPanels" class="artifact-panels">
-                  <el-collapse-item v-if="resultData" title="结果原文" name="result"><pre>{{ prettyJson(resultData) }}</pre></el-collapse-item>
-                  <el-collapse-item v-if="evidenceData" title="证据原文" name="evidence"><pre>{{ prettyJson(evidenceData) }}</pre></el-collapse-item>
-                </el-collapse>
-              </div>
-              <el-empty v-else description="从左侧选择任务以查看审批、事件、结果和证据" />
-            </el-col>
-          </el-row>
+        <el-tab-pane label="全部任务" name="jobs">
+          <div class="jobs-toolbar"><el-select v-model="statusFilter" clearable placeholder="全部状态" @change="loadJobs"><el-option v-for="status in statuses" :key="status" :value="status" :label="statusText(status)" /></el-select><span>仅展示我发起或持有数据的任务；管理员和审计员可查看全量元数据。</span></div>
+          <el-table v-loading="jobsLoading" :data="jobs" border empty-text="暂无可见任务" @row-click="openJob">
+            <el-table-column prop="jobId" label="任务 ID" min-width="210"><template slot-scope="s"><strong class="link mono">{{ s.row.jobId }}</strong></template></el-table-column>
+            <el-table-column label="模板" min-width="190"><template slot-scope="s">{{ templateName(s.row.templateId) }}</template></el-table-column>
+            <el-table-column label="发起者" min-width="130"><template slot-scope="s">{{ initiatorName(s.row) }}</template></el-table-column>
+            <el-table-column label="状态" width="140"><template slot-scope="s"><el-tag :type="statusTag(s.row.status)">{{ statusText(s.row.status) }}</el-tag></template></el-table-column>
+            <el-table-column label="创建时间" min-width="170"><template slot-scope="s">{{ formatTime(s.row.createdAt) }}</template></el-table-column>
+          </el-table>
         </el-tab-pane>
       </el-tabs>
+
+      <el-drawer title="隐私计算任务详情" :visible.sync="detailVisible" size="52%" append-to-body>
+        <div v-if="selectedJob" v-loading="detailLoading" class="detail-body">
+          <div class="detail-title"><div><h3>{{ selectedJob.jobId }}</h3><span>{{ templateName(selectedJob.templateId) }} · {{ initiatorName(selectedJob) }} 发起</span></div><el-tag :type="statusTag(selectedJob.status)">{{ statusText(selectedJob.status) }}</el-tag></div>
+          <el-alert :title="selectedTemplateForJob.leakageDisclosure || '请核对参与数据和字段后再做决定。'" type="warning" :closable="false" show-icon />
+          <h4>参与数据与审批</h4>
+          <el-table :data="jobInputs" border size="small"><el-table-column label="槽位" width="80"><template slot-scope="s">{{ s.row.slotId || s.row.partyId }}</template></el-table-column><el-table-column label="数据集" min-width="170"><template slot-scope="s">{{ s.row.datasetName || s.row.name || `#${s.row.datasetId}` }}<div class="muted">版本 {{ s.row.datasetVersion || s.row.version }}</div></template></el-table-column><el-table-column label="持有者 / 域" min-width="180"><template slot-scope="s">{{ s.row.ownerDisplayName || s.row.ownerUsername || s.row.ownerName || '—' }}<div class="muted">{{ s.row.ownerDomainName || s.row.ownerDomainCode || s.row.domainName || '—' }}</div></template></el-table-column><el-table-column label="字段" min-width="160"><template slot-scope="s">{{ arrayValue(s.row.fields).join('、') || '—' }}</template></el-table-column><el-table-column label="审批" width="110"><template slot-scope="s"><el-tag size="mini" :type="approvalTag(approvalState(s.row))">{{ approvalText(approvalState(s.row)) }}</el-tag></template></el-table-column></el-table>
+          <div v-if="approvalMode" class="decision-panel"><el-input v-model="decisionReason" type="textarea" :rows="3" placeholder="审批备注；拒绝时必填" /><div><el-button type="danger" :loading="actionLoading === 'reject'" :disabled="!decisionReason.trim()" @click="decide('reject')">拒绝</el-button><el-button type="primary" :loading="actionLoading === 'approve'" @click="decide('approve')">同意并授权计算</el-button></div></div>
+          <div v-else class="detail-actions"><el-button @click="loadArtifact('evidence', false)">查看证据</el-button><el-button @click="loadArtifact('evidence', true)">下载证据</el-button><el-button v-if="canReadResult" type="primary" @click="loadArtifact('result', false)">查看结果</el-button><el-button v-if="canReadResult" @click="loadArtifact('result', true)">下载结果</el-button><el-button v-if="canCancel" type="danger" plain @click="cancelSelectedJob">取消任务</el-button><el-button v-if="canRetry" @click="retrySelectedJob">重试</el-button></div>
+          <h4>阶段事件</h4><el-timeline><el-timeline-item v-for="event in events" :key="event.eventId || `${event.timestamp}-${event.phase}`" :timestamp="formatTime(event.timestamp || event.createdAt)" :type="event.status === 'FAILED' || event.status === 'REJECTED' ? 'danger' : 'primary'"><strong>{{ event.phase || event.type }}</strong> · {{ event.status }}<div class="muted">{{ event.message || event.reason }}</div></el-timeline-item></el-timeline>
+          <pre v-if="artifactData" class="artifact">{{ prettyJson(artifactData) }}</pre>
+        </div>
+      </el-drawer>
     </el-main>
   </el-container>
 </template>
 
 <script>
 import { fetchRegisteredDatasets } from '@/api/registrationApi'
-import { fetchAllPages } from '@/utils/dataset-catalog'
-import {
-  approvePrivacyJob,
-  cancelPrivacyJob,
-  createPrivacyJob,
-  fetchPrivacyCapabilities,
-  fetchPrivacyJob,
-  fetchPrivacyJobEvents,
-  fetchPrivacyJobEvidence,
-  fetchPrivacyJobResult,
-  fetchPrivacyJobs,
-  fetchPrivacyTemplates,
-  preflightPrivacyJob,
-  privacyRequestId,
-  rejectPrivacyJob,
-  retryPrivacyJob
-} from '@/api/privacyComputingApi'
+import { approvePrivacyJob, cancelPrivacyJob, createPrivacyJob, fetchPendingPrivacyApprovals, fetchPrivacyCapabilities, fetchPrivacyJob, fetchPrivacyJobEvidence, fetchPrivacyJobEvents, fetchPrivacyJobResult, fetchPrivacyJobs, fetchPrivacyTemplates, preflightPrivacyJob, privacyRequestId, rejectPrivacyJob, retryPrivacyJob } from '@/api/privacyComputingApi'
 
-const TERMINAL_STATUSES = ['SUCCEEDED', 'FAILED', 'ABORTED', 'CANCELLED']
-const TEMPLATE_ROLES = {
-  'secure-sum-3p-v1': ['PARTY', 'PARTY', 'PARTY'],
-  'private-stats-3p-v1': ['PARTY', 'PARTY', 'PARTY'],
-  'private-threshold-3p-v1': ['PARTY', 'PARTY', 'PARTY'],
-  'psi-2p-v1': ['RECEIVER', 'PROVIDER'],
-  'psi-3p-v1': ['PARTY', 'PARTY', 'PARTY'],
-  'pir-keyword-2p-v1': ['CLIENT', 'SERVER'],
-  'he-paillier-2p-v1': ['KEY_HOLDER', 'DATA_HOLDER'],
-  'hfl-fedavg-logreg-3p-v1': ['TRAINER', 'TRAINER', 'TRAINER'],
-  'vfl-secureboost-2p-v1': ['ACTIVE', 'PASSIVE']
+const TERMINAL = ['SUCCEEDED', 'FAILED', 'ABORTED', 'CANCELLED']
+const DEFAULT_FIELDS = {
+  'secure-sum-3p-v1': [['value'], ['value'], ['value']], 'private-stats-3p-v1': [['value'], ['value'], ['value']], 'private-threshold-3p-v1': [['value'], ['value'], ['value']],
+  'psi-2p-v1': [['id'], ['id']], 'psi-3p-v1': [['id'], ['id'], ['id']], 'pir-keyword-2p-v1': [['query'], ['key', 'value']], 'he-paillier-2p-v1': [['value'], ['value']],
+  'hfl-fedavg-logreg-3p-v1': [['x1', 'x2', 'label'], ['x1', 'x2', 'label'], ['x1', 'x2', 'label']], 'vfl-secureboost-2p-v1': [['id', 'x2', 'label'], ['id', 'x1']]
 }
-const TEMPLATE_FIELDS = {
-  'secure-sum-3p-v1': [['value'], ['value'], ['value']],
-  'private-stats-3p-v1': [['value'], ['value'], ['value']],
-  'private-threshold-3p-v1': [['value'], ['value'], ['value']],
-  'psi-2p-v1': [['id'], ['id']],
-  'psi-3p-v1': [['id'], ['id'], ['id']],
-  'pir-keyword-2p-v1': [['query'], ['key', 'value']],
-  'he-paillier-2p-v1': [['value'], ['value']],
-  'hfl-fedavg-logreg-3p-v1': [['features', 'label'], ['features', 'label'], ['features', 'label']],
-  'vfl-secureboost-2p-v1': [['id', 'label', 'features'], ['id', 'features']]
-}
+const listOf = value => Array.isArray(value) ? value : (value && Array.isArray(value.list) ? value.list : [])
 
 export default {
   name: 'PrivacyComputing',
   data() {
-    const session = this.$store && this.$store.state && this.$store.state.privacySession
-    const party = session ? session.activeParty : 'A'
     return {
-      activeTab: (this.$route && this.$route.meta && this.$route.meta.privacyTab) || 'capabilities',
-      capabilities: [],
-      templates: [],
-      datasets: [],
-      jobs: [],
-      events: [],
-      selectedJob: null,
-      catalogLoading: false,
-      jobsLoading: false,
-      detailLoading: false,
-      preflightLoading: false,
-      creating: false,
-      actionLoading: '',
-      statusFilter: '',
-      actionPrincipal: party,
-      artifactPrincipal: party,
-      createPrincipal: party,
-      partySecrets: session ? session.secrets : { A: '', B: '', C: '' },
-      decisionReason: '',
-      preflight: null,
-      preflightSpecJson: '',
-      formError: '',
-      resultData: null,
-      evidenceData: null,
-      artifactPanels: [],
-      refreshTimer: null,
-      jobForm: {
-        templateId: '',
-        securityProfile: '',
-        participants: [],
-        resultRecipients: ['A'],
-        timeoutSeconds: 1800,
-        enginePolicy: {}
-      },
-      statuses: ['AWAITING_APPROVAL', 'QUEUED', 'PREPARING', 'RUNNING', 'FINALIZING', 'SUCCEEDED', 'FAILED', 'ABORTED', 'CANCELLED'],
-      declaredLimits: [
-        { name: '恶意安全 PSI', reason: '首期 PSI 使用 SecretFlow 半诚实协议。' },
-        { name: '仅输出基数的 PSI-CA', reason: '首期不提供真正只泄露交集基数的模板。' },
-        { name: '掉线恢复', reason: 'Flower Provider 仅保留接口，任务要求参与方全部在线。' },
-        { name: '通用 FHE', reason: '仅提供 Paillier 加法、明文乘法和点积。' },
-        { name: 'TEE', reason: '当前集群没有可用 SGX 设备和资源。' },
-        { name: '抵御集群管理员', reason: 'A/B/C 位于同一集群，只提供逻辑隔离。' }
-      ]
+      activeTab: (this.$route && this.$route.meta && this.$route.meta.privacyTab) || 'capabilities', loading: false, catalogLoading: false, jobsLoading: false, approvalsLoading: false, detailLoading: false, preflightLoading: false, creating: false, actionLoading: '',
+      capabilities: [], templates: [], datasets: [], jobs: [], pendingApprovals: [], events: [], selectedJob: null, selectedApproval: null, detailVisible: false, decisionReason: '', artifactData: null, statusFilter: '', formError: '', preflight: null, preflightSpecJson: '',
+      statuses: ['AWAITING_APPROVAL', 'QUEUED', 'PREPARING', 'RUNNING', 'FINALIZING', 'SUCCEEDED', 'FAILED', 'ABORTED'],
+      jobForm: { templateId: '', inputs: [], timeoutSeconds: 1800, enginePolicy: {}}
     }
   },
   computed: {
-    sessionActiveParty() {
-      return (this.$store && this.$store.state && this.$store.state.privacySession && this.$store.state.privacySession.activeParty) || this.actionPrincipal
+    roles() { return this.$store.getters.roles || [] }, isDataOwner() { return this.roles.includes('DATA_OWNER') }, isAuditor() { return this.roles.includes('AUDITOR') },
+    pageTitle() { return { capabilities: '隐私计算能力说明', create: '发起多方隐私计算', approvals: '待我审批', jobs: this.$route.meta && this.$route.meta.evidenceMode ? '隐私计算日志' : '全部隐私任务' }[this.activeTab] || '隐私协同计算' },
+    pageDescription() { return { capabilities: '查看协议、安全档位、执行引擎和已知能力边界。', create: '选择模板及多个数据，系统向每个数据持有者发起授权审批。', approvals: '核对本人持有的数据、字段用途、协议和泄露说明后作出决定。', jobs: '跟踪审批、运行状态、结果权限和证据。' }[this.activeTab] },
+    selectedTemplate() { return this.templates.find(item => item.templateId === this.jobForm.templateId) || null },
+    selectedTemplateForJob() { return this.templates.find(item => this.selectedJob && item.templateId === this.selectedJob.templateId) || {} },
+    datasetGroups() {
+      const groups = {}
+      this.datasets.filter(item => item.ownerUserId && (item.ownerDomainId || item.ownerDomain)).forEach(item => { const key = `${this.datasetDomainId(item)}:${item.ownerUserId}`; if (!groups[key]) groups[key] = { key, label: `${this.datasetDomainName(item)} · ${this.datasetOwnerName(item)}`, datasets: [] }; groups[key].datasets.push(item) })
+      return Object.values(groups)
     },
-    evidenceMode() {
-      return Boolean(this.$route && this.$route.meta && this.$route.meta.evidenceMode)
-    },
-    pageTitle() {
-      return this.evidenceMode ? '隐私计算日志' : '隐私协同计算'
-    },
-    pageDescription() {
-      return this.evidenceMode
-        ? '按参与方身份查看隐私任务的阶段事件、结果摘要和证据原文，供人工 judge。'
-        : '在 A/B/C 三个逻辑域之间运行固定协议模板，并保留任务、结果和证据原文供人工 judge。'
-    },
-    selectedTemplate() {
-      return this.templates.find(item => item.templateId === this.jobForm.templateId) || null
-    },
-    participantIds() {
-      return this.jobForm.participants.map(item => item.partyId)
-    },
-    participantIdsForJob() {
-      const parties = this.jobParticipants.map(item => item.partyId).filter(Boolean)
-      return parties.length ? parties : ['A']
-    },
-    isFederatedTemplate() {
-      return this.jobForm.templateId.startsWith('hfl-') || this.jobForm.templateId.startsWith('vfl-')
-    },
-    policyFieldOptions() {
-      return [...new Set(this.jobForm.participants.reduce((values, participant) =>
-        values.concat(Array.isArray(participant.fields) ? participant.fields : []), []))]
-    },
-    psiKeyOptions() {
-      const bindings = this.jobForm.participants.map(item => this.arrayValue(item.fields))
-      if (!bindings.length) return []
-      return bindings[0].filter(field => bindings.every(items => items.includes(field)))
-    },
-    jobParticipants() {
-      if (!this.selectedJob || !Array.isArray(this.selectedJob.participants)) return []
-      const approvals = Array.isArray(this.selectedJob.approvals) ? this.selectedJob.approvals : []
-      return this.selectedJob.participants.map(participant => ({
-        ...participant,
-        currentApproval: approvals.find(item => item.participantId === participant.partyId) || null
-      }))
-    },
-    canPreflight() {
-      return Boolean(this.selectedTemplate && this.selectedTemplate.available && this.jobForm.resultRecipients.length &&
-        this.participantIds.includes(this.createPrincipal) && this.hasSecret(this.createPrincipal) && this.enginePolicyValid() &&
-        this.jobForm.participants.length === Number(this.selectedTemplate.participantCount) &&
-        this.jobForm.participants.every(item => item.datasetId && item.datasetVersion && item.displaySha256 && item.fields.length))
-    },
-    canCreate() {
-      return Boolean(this.preflight && this.preflight.valid && this.preflightSpecJson === JSON.stringify(this.buildJobSpec()))
-    },
-    canCancelSelected() {
-      return this.selectedJob && !TERMINAL_STATUSES.includes(this.selectedJob.status) &&
-        this.participantIdsForJob.includes(this.actionPrincipal) && this.hasSecret(this.actionPrincipal)
-    },
-    canRetrySelected() {
-      return this.selectedJob && ['FAILED', 'ABORTED', 'CANCELLED'].includes(this.selectedJob.status) &&
-        this.actionPrincipal === this.selectedJob.initiator && this.hasSecret(this.actionPrincipal)
-    },
-    canReadResult() {
-      return this.selectedJob && this.selectedJob.status === 'SUCCEEDED' &&
-        this.arrayValue(this.selectedJob.resultRecipients).includes(this.artifactPrincipal) && this.hasSecret(this.artifactPrincipal)
-    },
-    canReadEvidence() {
-      return this.selectedJob && this.participantIdsForJob.includes(this.artifactPrincipal) && this.hasSecret(this.artifactPrincipal)
-    }
+    domainConflict() { const ids = this.jobForm.inputs.map(item => item.domainId).filter(Boolean).map(String); return new Set(ids).size !== ids.length },
+    commonFields() { if (!this.jobForm.inputs.length) return []; return this.jobForm.inputs.map(input => this.inputFieldOptions(input)).reduce((all, fields) => all.filter(field => fields.includes(field)), this.inputFieldOptions(this.jobForm.inputs[0])) },
+    isTrainingTemplate() { return /^hfl-|^vfl-/.test(this.jobForm.templateId) },
+    hasEditablePolicy() { return ['private-stats-3p-v1', 'psi-2p-v1', 'psi-3p-v1', 'he-paillier-2p-v1'].includes(this.jobForm.templateId) || this.isTrainingTemplate },
+    canPreflight() { return Boolean(this.selectedTemplate && this.jobForm.inputs.length === this.templateSlots(this.selectedTemplate).length && this.jobForm.inputs.every(input => input.datasetId && input.datasetVersion && input.fields.length && input.domainId) && !this.domainConflict) },
+    canCreate() { return Boolean(this.canPreflight && this.preflight && this.preflight.valid !== false && this.preflightSpecJson === JSON.stringify(this.buildJobSpec())) },
+    jobInputs() { if (!this.selectedJob) return []; return listOf(this.selectedJob.inputSnapshots || this.selectedJob.inputs || this.selectedJob.participants) },
+    approvalMode() { return Boolean(this.selectedApproval && this.selectedJob && this.selectedJob.status === 'AWAITING_APPROVAL') },
+    canReadResult() { const id = this.selectedJob && (this.selectedJob.initiatorUserId || (this.selectedJob.initiator && this.selectedJob.initiator.id)); return Boolean(this.isDataOwner && !this.roles.includes('ADMIN') && !this.isAuditor && this.selectedJob && this.selectedJob.status === 'SUCCEEDED' && String(id) === String(this.$store.getters.userId)) },
+    canCancel() { return Boolean(this.selectedJob && !TERMINAL.includes(this.selectedJob.status) && String(this.selectedJob.initiatorUserId || '') === String(this.$store.getters.userId)) },
+    canRetry() { return Boolean(this.selectedJob && ['FAILED', 'ABORTED'].includes(this.selectedJob.status) && String(this.selectedJob.initiatorUserId || '') === String(this.$store.getters.userId)) }
   },
-  watch: {
-    $route(route) {
-      const tab = route && route.meta && route.meta.privacyTab
-      if (tab) this.activeTab = tab
-      const jobId = route && route.params && route.params.jobId
-      if (jobId && this.hasSecret(this.actionPrincipal)) this.openJob({ jobId }, true)
-    },
-    sessionActiveParty(partyId) {
-      if (!partyId || partyId === this.actionPrincipal) return
-      this.actionPrincipal = partyId
-      this.artifactPrincipal = partyId
-      this.createPrincipal = partyId
-      this.onCreatePrincipalChange()
-      this.onActionPrincipalChange()
-    }
-  },
-  async created() {
-    await Promise.all([this.loadCatalog(), this.loadDatasets()])
-    if (this.activeTab === 'jobs' && this.hasSecret(this.actionPrincipal)) {
-      await this.loadJobs({ silent: true })
-      if (this.$route && this.$route.params && this.$route.params.jobId) {
-        await this.openJob({ jobId: this.$route.params.jobId }, true)
-      }
-    }
-    this.refreshTimer = setInterval(() => this.refreshQuietly(), 8000)
-  },
-  beforeDestroy() {
-    clearInterval(this.refreshTimer)
-  },
+  watch: { '$route.meta.privacyTab'(value) { if (value) { this.activeTab = value; this.refreshActive() } } },
+  created() { this.loadCatalog(); if (this.activeTab === 'create') this.loadDatasets(); if (this.activeTab === 'approvals') this.loadPendingApprovals(); if (this.activeTab === 'jobs') this.loadJobs(); const id = this.$route.params && this.$route.params.jobId; if (id) this.openJob({ jobId: id }) },
   methods: {
-    arrayValue(value) { return Array.isArray(value) ? value : [] },
-    prettyJson(value) { return JSON.stringify(value, null, 2) },
-    issueText(item) { return typeof item === 'string' ? item : (item.message || item.reason || JSON.stringify(item)) },
-    issueKey(item) { return typeof item === 'string' ? item : `${item.code || ''}-${item.message || item.reason || JSON.stringify(item)}` },
-    availabilityTag(status) { return status === 'AVAILABLE' ? 'success' : (status === 'RESERVED' ? 'warning' : 'danger') },
-    availabilityText(status) { return { AVAILABLE: '可用', UNAVAILABLE: '不可用', RESERVED: '预留' }[status] || status || '未知' },
-    securityTag(profile) { return String(profile || '').includes('MALICIOUS') ? 'danger' : 'warning' },
-    securityText(profile) { return { MALICIOUS_3PC: '诚实多数三方恶意安全', MALICIOUS_3PC_HONEST_MAJORITY: '诚实多数三方恶意安全', SEMI_HONEST: '半诚实', SEMI_HONEST_PIR: '半诚实 PIR', SEMI_HONEST_HE: '半诚实 + HE', SEMI_HONEST_FL: '半诚实联邦学习', RESERVED: '预留' }[profile] || profile || '未声明' },
-    roleText(role) { return { PARTY: '协议参与方', RECEIVER: '交集接收方', PROVIDER: '数据提供方', CLIENT: '查询方', SERVER: '服务方', KEY_HOLDER: '密钥持有方', DATA_HOLDER: '数据持有方', TRAINER: '训练参与方', ACTIVE: '主动方', PASSIVE: '被动方' }[role] || role || '—' },
-    statusText(status) { return { AWAITING_APPROVAL: '等待审批', QUEUED: '已排队', PREPARING: '准备中', RUNNING: '运行中', FINALIZING: '收尾中', SUCCEEDED: '成功', FAILED: '失败', ABORTED: '已中止', CANCELLED: '已取消' }[status] || status || '未知' },
-    statusTag(status) { return { AWAITING_APPROVAL: 'warning', QUEUED: 'info', PREPARING: 'info', RUNNING: '', FINALIZING: '', SUCCEEDED: 'success', FAILED: 'danger', ABORTED: 'danger', CANCELLED: 'info' }[status] || 'info' },
-    decisionTag(status) { return status === 'APPROVED' ? 'success' : (status === 'REJECTED' ? 'danger' : 'warning') },
-    approvalState(participant) {
-      if (participant.currentApproval && participant.currentApproval.decision) return participant.currentApproval.decision
-      if (!this.selectedJob) return 'PENDING'
-      const events = this.events.filter(item => item.participantId === participant.partyId &&
-        item.attemptId === this.selectedJob.attemptId &&
-        (item.phase === 'APPROVAL' || /APPROV|REJECT/.test(`${item.status || ''}${item.messageCode || ''}`)))
-      const latest = events[events.length - 1]
-      const marker = latest ? `${latest.status || ''} ${latest.messageCode || ''}` : ''
-      if (/REJECT/.test(marker)) return 'REJECTED'
-      if (/APPROV/.test(marker)) return 'APPROVED'
-      return 'PENDING'
-    },
-    failureText(job) { return job.failureReason ? `${job.failureCode || 'FAILED'}：${job.failureReason}` : '—' },
-    hasSecret(partyId) { return Boolean(partyId && this.partySecrets[partyId]) },
-    credentialsFor(partyId) { return { partyId, secret: this.partySecrets[partyId] || '' } },
-    onTabClick(tab) {
-      if (!this.$router) return
-      const routes = { capabilities: '/collaboration/capabilities', create: '/collaboration/jobs/new', jobs: '/collaboration/jobs' }
-      const target = routes[tab && tab.name]
-      if (target && (!this.$route || this.$route.path !== target)) this.$router.push(target)
-    },
-    clearArtifactData() {
-      this.resultData = null
-      this.evidenceData = null
-      this.artifactPanels = []
-    },
-    onSecretChange(partyId) {
-      if (this.$store && this.$store.state && this.$store.state.privacySession) {
-        this.$store.commit('privacySession/SET_SECRET', { partyId, secret: this.partySecrets[partyId] })
-      }
-      if (partyId === this.artifactPrincipal) this.clearArtifactData()
-      if (partyId === this.actionPrincipal) {
-        this.jobs = []
-        this.selectedJob = null
-        this.events = []
-      }
-      if (partyId === this.createPrincipal) this.invalidatePreflight()
-    },
-    onCreatePrincipalChange() {
-      this.syncRecipientsFromPolicy()
-      this.invalidatePreflight()
-    },
-    async onActionPrincipalChange() {
-      if (this.$store && this.$store.state && this.$store.state.privacySession) {
-        this.$store.commit('privacySession/SET_ACTIVE_PARTY', this.actionPrincipal)
-      }
-      this.jobs = []
-      this.selectedJob = null
-      this.events = []
-      this.clearArtifactData()
-      this.artifactPrincipal = this.actionPrincipal
-      if (this.hasSecret(this.actionPrincipal)) await this.loadJobs()
-    },
-    async loadCatalog() {
-      this.catalogLoading = true
-      try {
-        const [capabilities, templates] = await Promise.all([fetchPrivacyCapabilities(), fetchPrivacyTemplates()])
-        this.capabilities = this.arrayValue(capabilities)
-        this.templates = this.arrayValue(templates)
-        if (!this.jobForm.templateId) {
-          const first = this.templates.find(item => item.available)
-          if (first) {
-            this.jobForm.templateId = first.templateId
-            this.applyTemplate(first.templateId)
-          }
-        }
-      } catch (error) {
-        this.$message.error(`隐私计算能力加载失败：${error.message}`)
-      } finally {
-        this.catalogLoading = false
-      }
-    },
-    async loadDatasets() {
-      try {
-        this.datasets = await fetchAllPages(params => fetchRegisteredDatasets({ ...params, status: 'ACTIVE' }, { silent: true }))
-      } catch (error) {
-        this.$message.error(`数据集加载失败：${error.message}`)
-      }
-    },
-    rolesForTemplate(template) {
-      const explicit = TEMPLATE_ROLES[template.templateId]
-      if (explicit) return explicit
-      return Array.from({ length: Number(template.participantCount) || 0 }, () => 'PARTY')
-    },
-    fieldsForTemplate(template, index) {
-      const fields = TEMPLATE_FIELDS[template.templateId]
-      return fields && fields[index] ? fields[index] : ['value']
-    },
-    defaultEnginePolicy(templateId) {
-      if (templateId === 'private-stats-3p-v1') return { scale: 1000 }
-      if (templateId === 'private-threshold-3p-v1') {
-        return { programId: 'topic4_private_threshold_100', threshold: 100, scale: 1 }
-      }
-      if (templateId === 'psi-2p-v1' || templateId === 'psi-3p-v1') {
-        return { keyColumns: ['id'], outputMode: 'RECEIVER_ONLY' }
-      }
-      if (templateId === 'pir-keyword-2p-v1') return { queryColumn: 'query', valueColumns: ['value'] }
-      if (templateId === 'he-paillier-2p-v1') return { operation: 'ADD', scale: 1000 }
-      if (templateId.startsWith('hfl-') || templateId.startsWith('vfl-')) {
-        return { labelColumn: 'label', featureColumns: ['features'], epochs: 10, learningRate: 0.1, seed: 20260919 }
-      }
-      return {}
-    },
-    applyTemplate(templateId) {
-      const template = this.templates.find(item => item.templateId === templateId)
-      if (!template) return
-      const previous = this.jobForm.participants.reduce((map, item) => ({ ...map, [item.partyId]: item }), {})
-      const roles = this.rolesForTemplate(template)
-      this.jobForm.securityProfile = template.securityProfile
-      this.jobForm.timeoutSeconds = Math.min(template.maxTimeoutSeconds || 1800, template.operation && template.operation.includes('FL') ? 3600 : 1800)
-      this.jobForm.participants = roles.map((role, index) => {
-        const partyId = String.fromCharCode(65 + index)
-        const old = previous[partyId] || {}
-        return {
-          partyId,
-          role,
-          datasetId: old.datasetId || null,
-          datasetVersion: old.datasetVersion || '',
-          displaySha256: '',
-          fields: []
-        }
-      })
-      if (!this.participantIds.includes(this.createPrincipal)) this.createPrincipal = this.participantIds[0] || 'A'
-      this.jobForm.enginePolicy = this.defaultEnginePolicy(templateId)
-      this.jobForm.participants.forEach(participant => {
-        if (participant.datasetId) this.syncParticipantDataset(participant, false)
-      })
-      this.syncRecipientsFromPolicy()
-      this.invalidatePreflight()
-    },
-    normalizeDigest(value) {
-      const normalized = String(value || '').trim().toLowerCase().replace(/^sha256:/, '')
-      return /^[0-9a-f]{64}$/.test(normalized) ? normalized : ''
-    },
-    datasetDigest(dataset) {
-      if (!dataset) return ''
-      const metadata = dataset.metadata || dataset.datasetMetadata || {}
-      const authority = this.normalizeDigest(dataset.authoritativeSha256 || dataset.authoritativeDigest ||
-        metadata.authoritativeSha256 ||
-        (String(metadata.digestAlgorithm || '').toUpperCase() === 'SHA-256' ? metadata.digestValue : '') ||
-        (String(dataset.digestAlgorithm || '').toUpperCase() === 'SHA-256' ? dataset.digestValue : ''))
-      if (authority) return authority
-      const replicas = dataset && Array.isArray(dataset.replicas) ? dataset.replicas : []
-      const replica = replicas.find(item =>
-        this.normalizeDigest(item.checksum) &&
-        String(item.checksumAlgorithm || '').toUpperCase().replace('-', '') === 'SHA256' &&
-        (item.effectiveAvailability === 'USABLE' || item.availability === 'USABLE'))
-      return replica ? this.normalizeDigest(replica.checksum) : ''
-    },
-    collectSchemaFields(node, parent, output) {
-      if (node == null) return
-      if (typeof node === 'string') {
-        try { this.collectSchemaFields(JSON.parse(node), parent, output) } catch (error) { if (error) return }
-      } else if (Array.isArray(node)) {
-        node.forEach(item => {
-          if (typeof item === 'string' && (parent === 'fields' || parent === 'columns')) output.add(item)
-          else this.collectSchemaFields(item, parent, output)
-        })
-      } else if (typeof node === 'object') {
-        if (typeof node.name === 'string') output.add(node.name)
-        Object.keys(node).forEach(key => {
-          if (parent === 'properties' || parent === 'tensors') output.add(key)
-          this.collectSchemaFields(node[key], key, output)
-        })
-      }
-    },
-    datasetFields(dataset) {
-      const output = new Set()
-      if (dataset) {
-        this.collectSchemaFields(dataset.schema || dataset.schemaJson ||
-          (dataset.metadata && (dataset.metadata.schema || dataset.metadata.schemaJson)), null, output)
-      }
-      return [...output].filter(field => /^[A-Za-z0-9_.-]{1,128}$/.test(field)).sort()
-    },
-    participantFieldOptions(participant) {
-      if (!participant) return []
-      const dataset = this.datasets.find(item => String(item.datasetId) === String(participant.datasetId))
-      return this.datasetFields(dataset)
-    },
-    syncParticipantDataset(participant, invalidate = true) {
-      const dataset = this.datasets.find(item => String(item.datasetId) === String(participant.datasetId))
-      participant.datasetVersion = dataset ? dataset.version : ''
-      participant.displaySha256 = this.datasetDigest(dataset)
-      const options = this.datasetFields(dataset)
-      const index = this.jobForm.participants.indexOf(participant)
-      const suggested = this.fieldsForTemplate(this.selectedTemplate || { templateId: this.jobForm.templateId }, index)
-      participant.fields = suggested.filter(field => options.includes(field))
-      if (!participant.fields.length && options.length) participant.fields = [options[0]]
-      this.normalizePolicyFields()
-      if (invalidate) this.invalidatePreflight()
-    },
-    normalizePolicyFields() {
-      const policy = this.jobForm.enginePolicy
-      const available = this.policyFieldOptions
-      const keyAvailable = this.jobForm.templateId.startsWith('psi-') ? this.psiKeyOptions : available
-      if (Array.isArray(policy.keyColumns)) policy.keyColumns = policy.keyColumns.filter(item => keyAvailable.includes(item))
-      if (policy.queryColumn && !available.includes(policy.queryColumn)) policy.queryColumn = ''
-      if (Array.isArray(policy.valueColumns)) policy.valueColumns = policy.valueColumns.filter(item => available.includes(item))
-      if (policy.labelColumn && !available.includes(policy.labelColumn)) policy.labelColumn = ''
-      if (Array.isArray(policy.featureColumns)) policy.featureColumns = policy.featureColumns.filter(item => available.includes(item))
-      if (policy.keyColumns && !policy.keyColumns.length && keyAvailable.length) policy.keyColumns = [keyAvailable[0]]
-      if (Object.prototype.hasOwnProperty.call(policy, 'queryColumn') && !policy.queryColumn && available.length) policy.queryColumn = available[0]
-      if (policy.valueColumns && !policy.valueColumns.length && available.length) policy.valueColumns = [available[0]]
-      if (Object.prototype.hasOwnProperty.call(policy, 'labelColumn') && !policy.labelColumn && available.length) policy.labelColumn = available.find(item => /label|target|class/i.test(item)) || available[0]
-      if (policy.featureColumns && !policy.featureColumns.length) policy.featureColumns = available.filter(item => item !== policy.labelColumn).slice(0, 20)
-    },
-    onFieldBindingChange() {
-      this.normalizePolicyFields()
-      this.invalidatePreflight()
-    },
-    onPolicyChange() { this.invalidatePreflight() },
-    onOutputModeChange() {
-      this.syncRecipientsFromPolicy()
-      this.invalidatePreflight()
-    },
-    syncRecipientsFromPolicy() {
-      const templateId = this.jobForm.templateId
-      if ((templateId === 'psi-2p-v1' || templateId === 'psi-3p-v1') &&
-        this.jobForm.enginePolicy.outputMode === 'ALL_PARTIES') {
-        this.jobForm.resultRecipients = [...this.participantIds]
-      } else if (templateId === 'psi-2p-v1' || templateId === 'pir-keyword-2p-v1') {
-        this.jobForm.resultRecipients = ['A']
-      } else this.jobForm.resultRecipients = [this.createPrincipal]
-    },
-    enginePolicyValid() {
-      const templateId = this.jobForm.templateId
-      const policy = this.jobForm.enginePolicy
-      if (templateId === 'secure-sum-3p-v1') return Object.keys(policy).length === 0
-      if (templateId === 'private-stats-3p-v1') return Number(policy.scale) > 0
-      if (templateId === 'private-threshold-3p-v1') {
-        return policy.programId === 'topic4_private_threshold_100' && policy.threshold === 100 && Number(policy.scale) > 0
-      }
-      if (templateId === 'psi-2p-v1' || templateId === 'psi-3p-v1') {
-        return Array.isArray(policy.keyColumns) && policy.keyColumns.length > 0 &&
-          policy.keyColumns.every(item => this.psiKeyOptions.includes(item)) &&
-          ['RECEIVER_ONLY', 'ALL_PARTIES'].includes(policy.outputMode)
-      }
-      if (templateId === 'pir-keyword-2p-v1') {
-        const queryFields = this.jobForm.participants[0] ? this.arrayValue(this.jobForm.participants[0].fields) : []
-        const valueFields = this.jobForm.participants[1] ? this.arrayValue(this.jobForm.participants[1].fields) : []
-        return Boolean(queryFields.includes(policy.queryColumn) && this.arrayValue(policy.valueColumns).length &&
-          policy.valueColumns.every(item => valueFields.includes(item)))
-      }
-      if (templateId === 'he-paillier-2p-v1') {
-        return ['ADD', 'PLAINTEXT_MULTIPLY', 'DOT_PRODUCT'].includes(policy.operation) && Number(policy.scale) > 0
-      }
-      if (templateId.startsWith('hfl-') || templateId.startsWith('vfl-')) {
-        return Boolean(policy.labelColumn && this.arrayValue(policy.featureColumns).length &&
-          Number(policy.epochs) > 0 && Number(policy.learningRate) > 0 && Number.isInteger(Number(policy.seed)))
-      }
-      return false
-    },
-    buildJobSpec() {
-      return {
-        templateId: this.jobForm.templateId,
-        securityProfile: this.jobForm.securityProfile,
-        participants: this.jobForm.participants.map(item => ({
-          partyId: item.partyId,
-          role: item.role,
-          datasetId: String(item.datasetId),
-          datasetVersion: item.datasetVersion,
-          fields: [...item.fields]
-        })),
-        resultRecipients: [...this.jobForm.resultRecipients],
-        timeoutSeconds: this.jobForm.timeoutSeconds,
-        enginePolicy: { ...this.jobForm.enginePolicy }
-      }
-    },
-    invalidatePreflight() {
-      this.preflight = null
-      this.preflightSpecJson = ''
-      this.formError = ''
-    },
-    async runPreflight() {
-      this.preflightLoading = true
-      this.formError = ''
-      const spec = this.buildJobSpec()
-      try {
-        this.preflight = await preflightPrivacyJob(spec, this.credentialsFor(this.createPrincipal))
-        this.preflightSpecJson = JSON.stringify(spec)
-      } catch (error) {
-        this.preflight = null
-        this.preflightSpecJson = ''
-        this.formError = `预检请求失败：${error.message}`
-      } finally {
-        this.preflightLoading = false
-      }
-    },
-    async createJob() {
-      if (!this.canCreate) return
-      this.creating = true
-      this.formError = ''
-      try {
-        const created = await createPrivacyJob(this.buildJobSpec(), privacyRequestId(), this.credentialsFor(this.createPrincipal))
-        this.$message.success('隐私计算任务已创建，等待参与方审批')
-        this.actionPrincipal = this.createPrincipal
-        await this.loadJobs()
-        const jobId = created.jobId || (created.job && created.job.jobId)
-        if (jobId) await this.openJob({ jobId })
-        if (jobId && this.$router) await this.$router.push(`/collaboration/jobs/${encodeURIComponent(jobId)}`)
-        else this.activeTab = 'jobs'
-      } catch (error) {
-        this.formError = `任务创建失败：${error.message}`
-      } finally {
-        this.creating = false
-      }
-    },
-    async loadJobs(options = {}) {
-      if (!this.hasSecret(this.actionPrincipal)) {
-        if (!options.silent) this.$message.warning(`请输入参与方 ${this.actionPrincipal} 的 secret`)
-        return
-      }
-      if (!options.silent) this.jobsLoading = true
-      try {
-        const result = await fetchPrivacyJobs(
-          { status: this.statusFilter || undefined, limit: 100 },
-          this.credentialsFor(this.actionPrincipal),
-          options.silent ? { silent: true } : {}
-        )
-        this.jobs = Array.isArray(result) ? result : this.arrayValue(result && result.list)
-      } catch (error) {
-        if (!options.silent) this.$message.error(`任务列表加载失败：${error.message}`)
-      } finally {
-        if (!options.silent) this.jobsLoading = false
-      }
-    },
-    async refreshJobs() {
-      await this.loadJobs()
-      if (this.selectedJob) await this.openJob(this.selectedJob)
-    },
-    async refreshQuietly() {
-      if (this.activeTab !== 'jobs' || !this.hasSecret(this.actionPrincipal)) return
-      await this.loadJobs({ silent: true })
-      if (this.selectedJob && !TERMINAL_STATUSES.includes(this.selectedJob.status)) await this.openJob(this.selectedJob, true)
-    },
-    async openJob(row, silent = false) {
-      const jobId = row && row.jobId
-      if (!jobId) return
-      if (!silent) this.detailLoading = true
-      try {
-        const [job, events] = await Promise.all([
-          fetchPrivacyJob(jobId, this.credentialsFor(this.actionPrincipal), silent ? { silent: true } : {}),
-          fetchPrivacyJobEvents(jobId, this.credentialsFor(this.actionPrincipal), silent ? { silent: true } : {})
-        ])
-        this.selectedJob = job
-        this.events = this.arrayValue(events)
-        this.clearArtifactData()
-        const parties = Array.isArray(job.resultRecipients) ? job.resultRecipients : []
-        this.artifactPrincipal = parties[0] || (this.jobParticipants[0] && this.jobParticipants[0].partyId) || 'A'
-      } catch (error) {
-        if (!silent) this.$message.error(`任务详情加载失败：${error.message}`)
-      } finally {
-        if (!silent) this.detailLoading = false
-      }
-    },
-    canDecide(participant) {
-      return this.selectedJob && this.selectedJob.status === 'AWAITING_APPROVAL' && this.hasSecret(participant.partyId) &&
-        !['APPROVED', 'REJECTED'].includes(this.approvalState(participant))
-    },
-    async decideParticipant(action, participant) {
-      if (!this.canDecide(participant)) return
-      if (action === 'reject' && !this.decisionReason) return this.$message.warning('拒绝任务时必须填写理由')
-      const key = `${action}-${participant.partyId}`
-      this.actionLoading = key
-      try {
-        const credentials = this.credentialsFor(participant.partyId)
-        if (action === 'approve') await approvePrivacyJob(this.selectedJob.jobId, participant.partyId, this.decisionReason, credentials)
-        else await rejectPrivacyJob(this.selectedJob.jobId, participant.partyId, this.decisionReason, credentials)
-        this.$message.success(`参与方 ${participant.partyId} 已${action === 'approve' ? '批准' : '拒绝'}任务`)
-        this.decisionReason = ''
-        this.actionPrincipal = participant.partyId
-        this.clearArtifactData()
-        await this.openJob(this.selectedJob)
-        await this.loadJobs({ silent: true })
-      } catch (error) {
-        this.$message.error(`审批失败：${error.message}`)
-      } finally {
-        this.actionLoading = ''
-      }
-    },
-    async cancelSelectedJob() {
-      try {
-        await this.$confirm('确认取消当前隐私计算任务？', '取消任务', { type: 'warning' })
-      } catch (action) {
-        return
-      }
-      this.actionLoading = 'cancel'
-      try {
-        await cancelPrivacyJob(this.selectedJob.jobId, this.decisionReason || '由隐私计算控制台取消', this.credentialsFor(this.actionPrincipal))
-        this.$message.success('取消请求已提交')
-        await this.refreshJobs()
-      } catch (error) {
-        this.$message.error(`取消失败：${error.message}`)
-      } finally {
-        this.actionLoading = ''
-      }
-    },
-    async retrySelectedJob() {
-      this.actionLoading = 'retry'
-      try {
-        await retryPrivacyJob(this.selectedJob.jobId, this.credentialsFor(this.actionPrincipal), privacyRequestId())
-        this.$message.success('已创建使用新密钥和随机材料的尝试')
-        await this.refreshJobs()
-      } catch (error) {
-        this.$message.error(`重试失败：${error.message}`)
-      } finally {
-        this.actionLoading = ''
-      }
-    },
-    async loadArtifact(kind, download) {
-      if (!this.selectedJob) return
-      try {
-        const credentials = this.credentialsFor(this.artifactPrincipal)
-        const data = kind === 'result'
-          ? await fetchPrivacyJobResult(this.selectedJob.jobId, credentials)
-          : await fetchPrivacyJobEvidence(this.selectedJob.jobId, credentials)
-        if (kind === 'result') this.resultData = data
-        else this.evidenceData = data
-        if (!this.artifactPanels.includes(kind)) this.artifactPanels.push(kind)
-        if (download) this.downloadJson(data, `${this.selectedJob.jobId}-${kind}.json`)
-      } catch (error) {
-        this.$message.error(`${kind === 'result' ? '结果' : '证据'}读取失败：${error.message}`)
-      }
-    },
-    downloadJson(data, fileName) {
-      const blob = new Blob([this.prettyJson(data)], { type: 'application/json;charset=utf-8' })
-      const url = URL.createObjectURL(blob)
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = fileName
-      document.body.appendChild(anchor)
-      anchor.click()
-      document.body.removeChild(anchor)
-      URL.revokeObjectURL(url)
-    }
+    arrayValue(value) { return Array.isArray(value) ? value : [] }, prettyJson(value) { return JSON.stringify(value, null, 2) },
+    securityText(value) { return ({ MALICIOUS_3PC: '恶意安全 3PC', MALICIOUS_3PC_HONEST_MAJORITY: '诚实多数恶意安全 3PC', SEMI_HONEST: '半诚实', ADDITIVE_HE: '加法同态', RESERVED: '预留' })[value] || value || '未声明' },
+    availabilityText(value) { return ({ AVAILABLE: '可用', EXPERIMENTAL: '实验', RESERVED: '预留', UNAVAILABLE: '不可用' })[value] || value || '未知' }, availabilityTag(value) { return value === 'AVAILABLE' ? 'success' : value === 'EXPERIMENTAL' ? 'warning' : 'info' },
+    roleText(value) { return ({ RECEIVER: '结果接收方', PROVIDER: '数据提供方', PARTY: '计算参与方', QUERY: '查询方', SERVER: '服务方', LABEL_OWNER: '标签持有方', FEATURE_OWNER: '特征持有方' })[value] || value || '参与方' },
+    statusText(value) { return ({ AWAITING_APPROVAL: '等待审批', QUEUED: '排队中', PREPARING: '准备中', RUNNING: '运行中', FINALIZING: '收尾中', SUCCEEDED: '已完成', FAILED: '基础设施失败', ABORTED: '已中止', CANCELLED: '已取消' })[value] || value }, statusTag(value) { return value === 'SUCCEEDED' ? 'success' : ['FAILED', 'ABORTED'].includes(value) ? 'danger' : value === 'AWAITING_APPROVAL' ? 'warning' : 'primary' },
+    approvalState(input) { const decision = input.decision || input.approvalStatus; if (decision) return decision; const id = input.ownerUserId || input.userId; const approval = listOf(this.selectedJob && this.selectedJob.approvals).find(item => String(item.userId || item.approverUserId) === String(id)); return approval ? approval.decision : 'PENDING' }, approvalText(value) { return ({ APPROVED: '已同意', REJECTED: '已拒绝', PENDING: '待审批', AUTO_APPROVED: '发起者自动同意' })[value] || value }, approvalTag(value) { return value === 'APPROVED' || value === 'AUTO_APPROVED' ? 'success' : value === 'REJECTED' ? 'danger' : 'warning' },
+    formatTime(value) { return value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '—' }, templateName(id) { const item = this.templates.find(template => template.templateId === id); return item ? item.displayName || id : id },
+    templateSlots(template) { if (Array.isArray(template && template.participantSlots) && template.participantSlots.length) return template.participantSlots; const count = Number(template && template.participantCount) || 0; return Array.from({ length: count }, (_, index) => ({ slotId: `P${index}`, role: index === 0 ? 'RECEIVER' : 'PROVIDER', label: index === 0 ? '结果接收方' : `数据提供方 ${index}` })) },
+    datasetDomainId(dataset) { return dataset.ownerDomainId || (dataset.ownerDomain && (dataset.ownerDomain.id || dataset.ownerDomain.domainId)) }, datasetDomainName(dataset) { return dataset.ownerDomainName || (dataset.ownerDomain && dataset.ownerDomain.name) || '未分配域' }, datasetOwnerName(dataset) { return dataset.ownerDisplayName || dataset.ownerUsername || (dataset.ownerUser && (dataset.ownerUser.displayName || dataset.ownerUser.username)) || '未分配持有者' },
+    datasetFields(dataset) { const schema = dataset && dataset.schema; if (!schema) return []; if (Array.isArray(schema)) return schema.map(item => typeof item === 'string' ? item : item.name).filter(Boolean); const fields = []; if (Array.isArray(schema.columns)) schema.columns.forEach(item => fields.push(typeof item === 'string' ? item : item.name)); if (schema.properties) fields.push(...Object.keys(schema.properties)); return [...new Set(fields.filter(Boolean))].sort() },
+    datasetDigest(dataset) { if (dataset.authoritativeSha256) return dataset.authoritativeSha256; const replica = (dataset.replicas || []).find(item => item.effectiveAvailability === 'USABLE' && item.checksumAlgorithm === 'SHA-256'); return replica ? replica.checksum : '' }, inputFieldOptions(input) { return this.datasetFields(this.datasets.find(item => String(item.datasetId) === String(input.datasetId))) },
+    defaultEnginePolicy(id) { if (id === 'private-stats-3p-v1') return { scale: 1000 }; if (id === 'private-threshold-3p-v1') return { programId: 'topic4_private_threshold_100', threshold: 100, scale: 1 }; if (id.indexOf('psi-') === 0) return { keyColumns: ['id'], outputMode: 'RECEIVER_ONLY' }; if (id === 'pir-keyword-2p-v1') return { queryColumn: 'query', valueColumns: ['value'] }; if (id === 'he-paillier-2p-v1') return { operation: 'ADD', scale: 1000 }; if (id === 'hfl-fedavg-logreg-3p-v1') return { labelColumn: 'label', featureColumns: ['x1', 'x2'], epochs: 1, learningRate: 0.05, seed: 20260919 }; if (id === 'vfl-secureboost-2p-v1') return { labelColumn: 'label', featureColumns: ['x2', 'x1'], epochs: 1, learningRate: 0.1, seed: 20260919 }; return {} },
+    applyTemplate(id) { const template = this.templates.find(item => item.templateId === id); const defaults = DEFAULT_FIELDS[id] || []; this.jobForm.inputs = this.templateSlots(template).map((slot, index) => ({ slotId: slot.slotId, role: slot.role, label: slot.label, datasetId: null, datasetVersion: '', fields: defaults[index] || [], ownerName: '', domainId: null, domainName: '', displaySha256: '' })); this.jobForm.timeoutSeconds = Math.min(template.maxTimeoutSeconds || 1800, /^hfl-|^vfl-/.test(id) ? 3600 : 1800); this.jobForm.enginePolicy = this.defaultEnginePolicy(id); this.invalidatePreflight() },
+    syncInputDataset(input) { const dataset = this.datasets.find(item => String(item.datasetId) === String(input.datasetId)); if (!dataset) return; input.datasetVersion = dataset.version; input.ownerName = this.datasetOwnerName(dataset); input.domainId = this.datasetDomainId(dataset); input.domainName = this.datasetDomainName(dataset); input.displaySha256 = this.datasetDigest(dataset); input.fields = input.fields.filter(field => this.datasetFields(dataset).includes(field)); if (!input.fields.length) input.fields = (DEFAULT_FIELDS[this.jobForm.templateId] || [])[this.jobForm.inputs.indexOf(input)] || []; input.fields = input.fields.filter(field => this.datasetFields(dataset).includes(field)); this.invalidatePreflight() },
+    buildJobSpec() { return { templateId: this.jobForm.templateId, inputs: this.jobForm.inputs.map(input => ({ slotId: input.slotId, datasetId: input.datasetId, datasetVersion: input.datasetVersion, fields: [...input.fields] })), timeoutSeconds: this.jobForm.timeoutSeconds, enginePolicy: { ...this.jobForm.enginePolicy }} }, invalidatePreflight() { this.preflight = null; this.preflightSpecJson = ''; this.formError = '' },
+    async loadCatalog() { this.catalogLoading = true; try { const [capabilities, templates] = await Promise.all([fetchPrivacyCapabilities(), fetchPrivacyTemplates()]); this.capabilities = listOf(capabilities); this.templates = listOf(templates); if (this.jobForm.templateId && !this.selectedTemplate) this.jobForm.templateId = '' } catch (error) { this.$message.error(`能力清单加载失败：${error.message}`) } finally { this.catalogLoading = false } },
+    async loadDatasets() { try { this.datasets = listOf(await fetchRegisteredDatasets({ page: 1, pageSize: 1000, status: 'ACTIVE' })) } catch (error) { this.$message.error(`数据目录加载失败：${error.message}`) } },
+    async runPreflight() { if (!this.canPreflight) return; this.preflightLoading = true; const spec = this.buildJobSpec(); try { this.preflight = await preflightPrivacyJob(spec); this.preflightSpecJson = JSON.stringify(spec); if (this.preflight.valid === false) this.formError = listOf(this.preflight.errors).join('；') || '预检未通过' } catch (error) { this.formError = `预检失败：${error.message}` } finally { this.preflightLoading = false } },
+    async createJob() { if (!this.canCreate) return; this.creating = true; try { const created = await createPrivacyJob(this.buildJobSpec(), privacyRequestId()); this.$message.success('任务已创建，正在等待数据持有者审批'); this.activeTab = 'jobs'; await this.loadJobs(); const job = created.job || created; if (job.jobId) await this.openJob(job) } catch (error) { this.formError = `任务创建失败：${error.message}` } finally { this.creating = false } },
+    async loadPendingApprovals(options = {}) { if (!this.isDataOwner) return; if (!options.silent) this.approvalsLoading = true; try { this.pendingApprovals = listOf(await fetchPendingPrivacyApprovals({}, options)) } catch (error) { if (!options.silent) this.$message.error(`待审批任务加载失败：${error.message}`) } finally { if (!options.silent) this.approvalsLoading = false } },
+    async loadJobs(options = {}) { if (!options.silent) this.jobsLoading = true; try { this.jobs = listOf(await fetchPrivacyJobs({ status: this.statusFilter || undefined, limit: 100 }, options)) } catch (error) { if (!options.silent) this.$message.error(`任务列表加载失败：${error.message}`) } finally { if (!options.silent) this.jobsLoading = false } },
+    jobOf(item) { return item.job || item }, jobIdOf(item) { return this.jobOf(item).jobId }, initiatorName(job) { return job.initiatorDisplayName || job.initiatorUsername || (typeof job.initiator === 'string' ? job.initiator : job.initiator && (job.initiator.displayName || job.initiator.username)) || '—' }, approvalDatasetName(item) { const direct = item.datasetName || (item.inputSnapshot && item.inputSnapshot.datasetName); if (direct) return direct; const participants = listOf(this.jobOf(item).participants); const owned = participants.find(input => String(input.ownerUserId) === String(this.$store.getters.userId)); const datasetId = item.datasetId || (item.inputSnapshot && item.inputSnapshot.datasetId) || (owned && owned.datasetId); return `数据集 #${datasetId || '—'}` },
+    async openApproval(item) { this.selectedApproval = item; await this.openJob(this.jobOf(item), true) },
+    async openJob(row, preserveApproval = false) { if (!row || !row.jobId) return; if (!preserveApproval) this.selectedApproval = null; this.detailVisible = true; this.detailLoading = true; this.artifactData = null; try { const [job, events] = await Promise.all([fetchPrivacyJob(row.jobId), fetchPrivacyJobEvents(row.jobId)]); this.selectedJob = job; this.events = listOf(events) } catch (error) { this.$message.error(`任务详情加载失败：${error.message}`) } finally { this.detailLoading = false } },
+    async decide(action) { if (!this.selectedJob) return; this.actionLoading = action; try { if (action === 'approve') await approvePrivacyJob(this.selectedJob.jobId, this.decisionReason.trim()); else await rejectPrivacyJob(this.selectedJob.jobId, this.decisionReason.trim()); this.$message.success(action === 'approve' ? '已同意数据授权' : '已拒绝任务'); this.detailVisible = false; this.selectedApproval = null; this.decisionReason = ''; await Promise.all([this.loadPendingApprovals({ silent: true }), this.loadJobs({ silent: true })]) } catch (error) { this.$message.error(`审批失败：${error.message}`) } finally { this.actionLoading = '' } },
+    async cancelSelectedJob() { try { await this.$confirm('确认取消当前任务？', '取消任务', { type: 'warning' }); await cancelPrivacyJob(this.selectedJob.jobId, '由发起者取消'); this.$message.success('取消请求已提交'); await this.openJob(this.selectedJob) } catch (error) { if (error !== 'cancel') this.$message.error(`取消失败：${error.message}`) } },
+    async retrySelectedJob() { try { await retryPrivacyJob(this.selectedJob.jobId, privacyRequestId()); this.$message.success('已创建新的尝试，需重新审批'); await this.openJob(this.selectedJob) } catch (error) { this.$message.error(`重试失败：${error.message}`) } },
+    async loadArtifact(kind, download) { try { const data = kind === 'result' ? await fetchPrivacyJobResult(this.selectedJob.jobId) : await fetchPrivacyJobEvidence(this.selectedJob.jobId); this.artifactData = data; if (download) this.downloadJson(data, `${this.selectedJob.jobId}-${kind}.json`) } catch (error) { this.$message.error(`${kind === 'result' ? '结果' : '证据'}读取失败：${error.message}`) } },
+    downloadJson(data, name) { const url = URL.createObjectURL(new Blob([this.prettyJson(data)], { type: 'application/json;charset=utf-8' })); const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url) },
+    onTabClick() { const path = { capabilities: '/collaboration/capabilities', create: '/collaboration/jobs/new', approvals: '/collaboration/approvals', jobs: '/collaboration/jobs' }[this.activeTab]; if (path && this.$route.path !== path) this.$router.push(path) },
+    async refreshActive() { this.loading = true; try { if (this.activeTab === 'capabilities') await this.loadCatalog(); else if (this.activeTab === 'create') await Promise.all([this.loadCatalog(), this.loadDatasets()]); else if (this.activeTab === 'approvals') await this.loadPendingApprovals(); else await this.loadJobs() } finally { this.loading = false } }
   }
 }
 </script>
 
 <style scoped>
-.privacy-page { min-height: calc(100vh - 90px); background: #f4f7fa; }
-.page-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 16px; }
-.page-heading h2 { margin: 0 0 7px; color: #1f3447; font-size: 24px; }
-.page-heading p { margin: 0; color: #667786; line-height: 1.65; }
-.auth-card { margin-top: 14px; padding: 16px 18px; border: 1px solid #dfe8ee; border-radius: 8px; background: #fff; box-shadow: 0 2px 9px rgba(32, 55, 76, .04); }
-.auth-copy { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
-.auth-copy h3 { margin: 0; color: #2b4254; }
-.auth-copy p { margin: 0; color: #7a8995; font-size: 13px; line-height: 1.5; }
-.workspace-card { margin-top: 16px; padding: 8px 22px 24px; background: #fff; border-radius: 8px; box-shadow: 0 2px 9px rgba(32, 55, 76, .06); }
-.section-heading { display: flex; align-items: center; justify-content: space-between; margin: 8px 0 14px; }
-.section-heading h3 { display: inline; margin: 0 12px 0 0; color: #263b4d; }
-.section-heading span { color: #84919c; font-size: 13px; }
-.template-heading { margin-top: 26px; }
-.cell-note { margin-top: 3px; color: #8b98a3; font-family: monospace; font-size: 12px; }
-.inline-tag { margin: 2px 4px 2px 0; }
-.digest { display: inline-block; max-width: 100%; color: #607080; font-family: monospace; font-size: 12px; overflow-wrap: anywhere; }
-.experimental { margin: 5px 0 0 5px; }
-.engine-warning { margin-bottom: 14px; }
-.limit-card { min-height: 92px; margin-bottom: 12px; padding: 14px 16px; border: 1px solid #ebeef2; border-radius: 6px; background: #fafbfc; }
-.limit-card strong { margin-left: 8px; color: #334a5d; }
-.limit-card p { margin: 10px 0 0; color: #73818d; font-size: 13px; line-height: 1.5; }
-.job-form { margin-top: 10px; }
-.participant-heading { margin-top: 22px; }
-.party-card { min-height: 350px; margin-bottom: 14px; padding: 15px; border: 1px solid #dfe7ed; border-radius: 7px; background: #fbfcfd; }
-.party-title { display: flex; align-items: center; margin-bottom: 14px; color: #344b5e; }
-.party-badge { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; margin-right: 9px; border-radius: 50%; color: #fff; background: #3b7ca7; font-weight: 700; }
-.digest-input ::v-deep input { font-family: monospace; font-size: 12px; }
-.field-warning { display: block; margin-top: 5px; color: #e6a23c; font-size: 12px; line-height: 1.4; }
-.policy-card { margin: 8px 0 18px; padding: 15px 16px 3px; border: 1px solid #dfe7ed; border-radius: 7px; background: #f8fafc; }
-.policy-row { margin-top: 8px; }
-.form-actions { display: flex; align-items: center; gap: 10px; padding-top: 6px; }
-.spec-digest { max-width: 55%; margin-left: 7px; color: #778590; font-family: monospace; font-size: 12px; overflow-wrap: anywhere; }
-.feedback, .preflight-panel { margin-top: 18px; }
-.issue-list { margin: 10px 0 0; padding: 10px 10px 10px 34px; border-radius: 5px; line-height: 1.7; }
-.error-list { color: #b83c3c; background: #fff1f0; }
-.warning-list { color: #91631a; background: #fff8e6; }
-.jobs-toolbar { display: flex; align-items: center; gap: 10px; margin: 7px 0 15px; }
-.jobs-toolbar span { color: #7e8b96; font-size: 13px; }
-.job-detail { min-height: 470px; padding: 17px; border: 1px solid #e1e7ec; border-radius: 7px; }
-.detail-title { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 15px; }
-.detail-title h3 { margin: 0 0 5px; color: #263d50; font-family: monospace; font-size: 17px; }
-.detail-title span { color: #84909a; font-size: 13px; }
-.detail-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
-.detail-actions .el-button + .el-button { margin-left: 0; }
-.principal-select { width: 126px; }
-.approval-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 0 9px; }
-.approval-heading h4, .job-detail > h4 { margin: 0; color: #344a5b; }
-.approval-heading .el-input { max-width: 310px; }
-.job-detail > h4 { margin: 20px 0 9px; }
-.danger-text { color: #f56c6c; }
-.artifact-panels { margin-top: 18px; }
-.artifact-panels pre { max-height: 360px; margin: 0; padding: 13px; overflow: auto; border-radius: 5px; color: #d9e4ec; background: #263640; font-family: monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
-@media (max-width: 768px) {
-  .page-heading, .section-heading, .approval-heading, .auth-copy { align-items: stretch; flex-direction: column; }
-  .jobs-toolbar { align-items: stretch; flex-direction: column; }
-  .spec-digest { max-width: 100%; }
-}
+.privacy-page{min-height:calc(100vh - 90px);background:#f4f7fa}.page-heading,.section-heading,.detail-title,.jobs-toolbar,.form-actions,.decision-panel{display:flex;align-items:center;justify-content:space-between;gap:14px}.page-heading{margin-bottom:16px}.page-heading h2{margin:0 0 7px;color:#1f3447}.page-heading p,.muted{margin:0;color:#7b8995;font-size:13px}.workspace-card{margin-top:16px;padding:8px 22px 24px;border-radius:8px;background:#fff;box-shadow:0 2px 9px rgba(32,55,76,.06)}.section-heading{margin:8px 0 14px}.section-heading h3{display:inline;margin:0 12px 0 0;color:#263b4d}.section-heading span{color:#84919c;font-size:13px}.spaced{margin-top:26px}.tag{margin:2px 4px 2px 0}.mono{font-family:monospace;overflow-wrap:anywhere}.job-form{margin-top:10px}.slot-card{min-height:390px;margin-bottom:14px;padding:16px;border:1px solid #dfe7ed;border-radius:7px;background:#fbfcfd}.slot-title{display:flex;align-items:center;margin-bottom:14px}.slot-badge{display:inline-flex;align-items:center;justify-content:center;min-width:38px;height:30px;margin-right:9px;padding:0 6px;border-radius:15px;color:#fff;background:#3b7ca7;font-weight:700}.snapshot{margin:-4px 0 14px;padding:10px 12px;border-radius:5px;background:#eef4f8;color:#405769;font-size:13px}.snapshot div{display:flex;margin:5px 0}.snapshot span{width:58px;color:#83919d}.snapshot code{max-width:calc(100% - 58px);overflow-wrap:anywhere}.option-owner{float:right;color:#84919c;font-size:12px}.policy-card{margin:8px 0 18px;padding:15px 16px 3px;border:1px solid #dfe7ed;border-radius:7px;background:#f8fafc}.feedback,.form-actions,.list-table{margin-top:16px}.jobs-toolbar{justify-content:flex-start;margin:7px 0 15px}.link{color:#28789f;cursor:pointer}.detail-body{padding:0 24px 30px}.detail-title h3{margin:0 0 6px;font-family:monospace}.detail-body h4{margin:22px 0 10px;color:#344a5b}.decision-panel{align-items:flex-end;margin-top:18px;padding:16px;border:1px solid #ead8a8;border-radius:6px;background:#fffaf0}.decision-panel .el-textarea{flex:1}.detail-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}.detail-actions .el-button+.el-button{margin-left:0}.artifact{max-height:360px;padding:14px;overflow:auto;border-radius:5px;color:#d9e4ec;background:#263640;font-size:12px;white-space:pre-wrap}.el-timeline{padding-left:5px}@media(max-width:768px){.page-heading,.section-heading,.detail-title,.jobs-toolbar,.form-actions,.decision-panel{align-items:stretch;flex-direction:column}}
 </style>

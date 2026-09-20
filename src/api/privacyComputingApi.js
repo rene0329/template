@@ -4,97 +4,61 @@ const ROOT = '/api/v1/privacy-computing'
 
 export const privacyRequestId = () => `privacy-${Date.now()}-${Math.random().toString(36).slice(2)}`
 
-const utf8Base64 = (value) => {
-  const bytes = encodeURIComponent(value).replace(/%([0-9A-F]{2})/g,
-    (match, hex) => String.fromCharCode(parseInt(hex, 16)))
-  return window.btoa(bytes)
-}
-
-const authorizationFor = (credentials = {}) =>
-  `Basic ${utf8Base64(`${credentials.partyId || ''}:${credentials.secret || ''}`)}`
-
-const redact = (value, sensitiveValues) => {
-  if (typeof value !== 'string') return value
-  return sensitiveValues.reduce((safe, item) => item ? safe.split(item).join('[REDACTED]') : safe, value)
-}
-
-const privacyRequest = (config, sensitiveValues = []) => request(config).catch(error => {
-  const safe = new Error(redact(error.message || '隐私计算请求失败', sensitiveValues))
-  const safeFields = ['status', 'code', 'errorCode', 'traceId']
-  safeFields.forEach(field => { safe[field] = redact(error[field], sensitiveValues) })
-  return Promise.reject(safe)
+export const fetchPrivacyCapabilities = (options = {}) => request({
+  url: `${ROOT}/capabilities`, method: 'get', skipAuth: true, ...options
 })
 
-const authenticatedRequest = (config, credentials = {}) => {
-  const authorization = authorizationFor(credentials)
-  const secret = String(credentials.secret || '')
-  return privacyRequest({
-    ...config,
-    headers: { ...(config.headers || {}), Authorization: authorization }
-  }, [authorization, authorization.slice(6), `${credentials.partyId || ''}:${secret}`, secret])
-}
-
-export const fetchPrivacyCapabilities = (options = {}) => privacyRequest({
-  url: `${ROOT}/capabilities`, method: 'get', ...options
+export const fetchPrivacyTemplates = (options = {}) => request({
+  url: `${ROOT}/templates`, method: 'get', skipAuth: true, ...options
 })
 
-export const fetchPrivacyTemplates = (options = {}) => privacyRequest({
-  url: `${ROOT}/templates`, method: 'get', ...options
-})
-
-export const preflightPrivacyJob = (data, credentials) => authenticatedRequest({
+export const preflightPrivacyJob = data => request({
   url: `${ROOT}/jobs/preflight`, method: 'post', data
-}, credentials)
+})
 
-export const createPrivacyJob = (data, idempotencyKey = privacyRequestId(), credentials) => authenticatedRequest({
-  url: `${ROOT}/jobs`,
-  method: 'post',
-  data,
-  headers: { 'Idempotency-Key': idempotencyKey }
-}, credentials)
+export const createPrivacyJob = (data, idempotencyKey = privacyRequestId()) => request({
+  url: `${ROOT}/jobs`, method: 'post', data, headers: { 'Idempotency-Key': idempotencyKey }
+})
 
-export const fetchPrivacyJobs = (params = {}, credentials, options = {}) => authenticatedRequest({
+export const fetchPrivacyJobs = (params = {}, options = {}) => request({
   url: `${ROOT}/jobs`, method: 'get', params, ...options
-}, credentials)
+})
 
-export const fetchPrivacyJob = (jobId, credentials, options = {}) => authenticatedRequest({
+export const fetchPendingPrivacyApprovals = (params = {}, options = {}) => request({
+  url: `${ROOT}/approvals/pending`, method: 'get', params, ...options
+})
+
+export const fetchPrivacyJob = (jobId, options = {}) => request({
   url: `${ROOT}/jobs/${encodeURIComponent(jobId)}`, method: 'get', ...options
-}, credentials)
+})
 
-export const fetchPrivacyJobEvents = (jobId, credentials, options = {}) => authenticatedRequest({
+export const fetchPrivacyJobEvents = (jobId, options = {}) => request({
   url: `${ROOT}/jobs/${encodeURIComponent(jobId)}/events`, method: 'get', ...options
-}, credentials)
+})
 
-export const fetchPrivacyJobResult = (jobId, credentials) => authenticatedRequest({
-  url: `${ROOT}/jobs/${encodeURIComponent(jobId)}/result`,
-  method: 'get'
-}, credentials)
+export const fetchPrivacyJobResult = jobId => request({
+  url: `${ROOT}/jobs/${encodeURIComponent(jobId)}/result`, method: 'get'
+})
 
-export const fetchPrivacyJobEvidence = (jobId, credentials) => authenticatedRequest({
-  url: `${ROOT}/jobs/${encodeURIComponent(jobId)}/evidence`,
-  method: 'get'
-}, credentials)
+export const fetchPrivacyJobEvidence = jobId => request({
+  url: `${ROOT}/jobs/${encodeURIComponent(jobId)}/evidence`, method: 'get'
+})
 
-const participantDecision = (jobId, action, participantId, reason, credentials) => authenticatedRequest({
+const participantDecision = (jobId, action, reason) => request({
   url: `${ROOT}/jobs/${encodeURIComponent(jobId)}/${action}`,
   method: 'post',
-  data: { participantId, ...(reason ? { reason } : {}) }
-}, credentials)
-
-export const approvePrivacyJob = (jobId, participantId, reason, credentials) =>
-  participantDecision(jobId, 'approve', participantId, reason, credentials)
-
-export const rejectPrivacyJob = (jobId, participantId, reason, credentials) =>
-  participantDecision(jobId, 'reject', participantId, reason, credentials)
-
-export const cancelPrivacyJob = (jobId, reason, credentials) => authenticatedRequest({
-  url: `${ROOT}/jobs/${encodeURIComponent(jobId)}/cancel`,
-  method: 'post',
   data: reason ? { reason } : {}
-}, credentials)
+})
 
-export const retryPrivacyJob = (jobId, credentials, idempotencyKey = privacyRequestId()) => authenticatedRequest({
+export const approvePrivacyJob = (jobId, reason) => participantDecision(jobId, 'approve', reason)
+export const rejectPrivacyJob = (jobId, reason) => participantDecision(jobId, 'reject', reason)
+
+export const cancelPrivacyJob = (jobId, reason) => request({
+  url: `${ROOT}/jobs/${encodeURIComponent(jobId)}/cancel`, method: 'post', data: reason ? { reason } : {}
+})
+
+export const retryPrivacyJob = (jobId, idempotencyKey = privacyRequestId()) => request({
   url: `${ROOT}/jobs/${encodeURIComponent(jobId)}/retry`,
   method: 'post',
   headers: { 'Idempotency-Key': idempotencyKey }
-}, credentials)
+})

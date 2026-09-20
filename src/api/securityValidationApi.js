@@ -10,7 +10,7 @@ export const authorizeDatasetAccess = (scope, credentials, context = {}) => requ
   method: 'post',
   data: scope,
   headers: {
-    Authorization: encodeBasic(credentials.username, credentials.password),
+    'X-Reviewer-Authorization': encodeBasic(credentials.username, credentials.password),
     'X-Request-Id': context.requestId,
     'X-Run-Id': context.runId
   }
@@ -21,7 +21,7 @@ export const verifyDatasetAccessToken = (scope, token, context = {}) => request(
   method: 'post',
   data: scope,
   headers: {
-    Authorization: `Bearer ${token}`,
+    'X-Dataset-Authorization': `Bearer ${token}`,
     'X-Request-Id': context.requestId,
     'X-Run-Id': context.runId
   }
@@ -33,23 +33,20 @@ export const fetchDatasetAccessAuditEvents = (params = {}) => request({
   params
 })
 
-export const startSecureAggregation = (requestId, credentials) => request({
+export const startSecureAggregation = requestId => request({
   url: '/api/v1/security/secure-aggregation/runs',
   method: 'post',
   headers: {
-    'Idempotency-Key': requestId,
-    Authorization: encodeBasic(credentials.username, credentials.password)
+    'Idempotency-Key': requestId
   }
 })
 
-export const fetchSecureAggregationRun = (runId, credentials) => request({
+export const fetchSecureAggregationRun = runId => request({
   url: `/api/v1/security/secure-aggregation/runs/${encodeURIComponent(runId)}`,
-  method: 'get',
-  headers: { Authorization: encodeBasic(credentials.username, credentials.password) }
+  method: 'get'
 })
 
-export const fetchSecureAggregationEvents = (runId, credentials) => request({
+export const fetchSecureAggregationEvents = runId => request({
   url: `/api/v1/security/secure-aggregation/runs/${encodeURIComponent(runId)}/events`,
-  method: 'get',
-  headers: { Authorization: encodeBasic(credentials.username, credentials.password) }
+  method: 'get'
 })

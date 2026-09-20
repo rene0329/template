@@ -7,7 +7,7 @@
         <p>从资源与数据准备开始，进入协同计算和任务运行，最后查看系统日志与原始证据。</p>
       </div>
       <div class="hero-actions">
-        <router-link to="/collaboration/jobs/new"><el-button type="primary">创建隐私任务</el-button></router-link>
+        <router-link v-if="isDataOwner" to="/collaboration/jobs/new"><el-button type="primary">发起隐私计算</el-button></router-link>
         <router-link to="/resources/datasets/register"><el-button>注册数据集</el-button></router-link>
       </div>
     </section>
@@ -38,20 +38,15 @@
 
       <article class="panel privacy-panel">
         <header>
-          <div><h2>隐私协同状态</h2><p>当前操作身份：参与方 {{ activeParty }}</p></div>
-          <el-tag :type="hasCredential ? 'success' : 'warning'">{{ hasCredential ? '已认证' : '待认证' }}</el-tag>
+          <div><h2>隐私协同状态</h2><p>{{ name }} · {{ roleNames }}<span v-if="domainName"> · {{ domainName }}</span></p></div>
+          <el-tag type="success">已登录</el-tag>
         </header>
-        <template v-if="hasCredential">
+        <template>
           <div class="privacy-stat"><span>等待审批</span><strong>{{ privacySummary.awaiting }}</strong></div>
           <div class="privacy-stat"><span>执行中</span><strong>{{ privacySummary.running }}</strong></div>
           <div class="privacy-stat"><span>已完成</span><strong>{{ privacySummary.succeeded }}</strong></div>
           <router-link to="/collaboration/jobs" class="panel-link">查看全部协同任务 <i class="el-icon-right" /></router-link>
         </template>
-        <div v-else class="credential-empty">
-          <i class="el-icon-lock" />
-          <strong>认证后查看任务状态</strong>
-          <p>使用顶栏“协同认证”录入 A、B 或 C 的临时凭据。</p>
-        </div>
       </article>
     </section>
 
@@ -89,9 +84,11 @@ export default {
     }
   },
   computed: {
-    activeParty() { return this.$store.state.privacySession.activeParty },
-    secret() { return this.$store.state.privacySession.secrets[this.activeParty] || '' },
-    hasCredential() { return Boolean(this.secret) },
+    name() { return this.$store.getters.name || this.$store.getters.username },
+    roles() { return this.$store.getters.roles || [] },
+    isDataOwner() { return this.roles.includes('DATA_OWNER') },
+    roleNames() { return this.roles.map(role => ({ ADMIN: '管理员', DATA_OWNER: '数据持有者', AUDITOR: '审计员' })[role] || role).join('、') },
+    domainName() { const domain = this.$store.getters.domain; return domain && (domain.name || domain.domainName) },
     metrics() {
       return [
         { key: 'nodes', label: '活动节点', value: this.overview.nodes, note: '已注册且可调度', icon: 'el-icon-cpu', tone: 'blue', loading: this.loading },
@@ -101,10 +98,6 @@ export default {
         { key: 'tasks', label: '普通任务', value: this.overview.tasks, note: '任务目录记录', icon: 'el-icon-s-operation', tone: 'cyan', loading: this.loading }
       ]
     }
-  },
-  watch: {
-    activeParty() { this.loadPrivacySummary() },
-    secret() { this.loadPrivacySummary() }
   },
   created() { this.loadOverview() },
   methods: {
@@ -133,9 +126,8 @@ export default {
     },
     async loadPrivacySummary() {
       this.privacySummary = { awaiting: 0, running: 0, succeeded: 0 }
-      if (!this.hasCredential) return
       try {
-        const jobs = await fetchPrivacyJobs({ limit: 100 }, { partyId: this.activeParty, secret: this.secret }, { silent: true })
+        const jobs = await fetchPrivacyJobs({ limit: 100 }, { silent: true })
         const rows = Array.isArray(jobs) ? jobs : ((jobs && jobs.list) || [])
         this.privacySummary.awaiting = rows.filter(item => item.status === 'AWAITING_APPROVAL').length
         this.privacySummary.running = rows.filter(item => ['QUEUED', 'PREPARING', 'RUNNING', 'FINALIZING'].includes(item.status)).length

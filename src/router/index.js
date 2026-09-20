@@ -528,9 +528,10 @@ export const constantRoutes = [
     alwaysShow: true,
     meta: { title: '协同计算', icon: 'lock', itemHeight: 48 },
     children: [
-      { path: 'capabilities', name: 'PrivacyCapabilities', component: () => import('@/views/ManagementCenter/PrivacyComputing/index'), meta: { title: '能力与模板', icon: 'documentation', itemHeight: 40, privacyTab: 'capabilities' }},
-      { path: 'jobs/new', name: 'PrivacyJobCreate', component: () => import('@/views/ManagementCenter/PrivacyComputing/index'), meta: { title: '创建隐私任务', icon: 'edit', itemHeight: 40, privacyTab: 'create' }},
-      { path: 'jobs', name: 'PrivacyJobs', component: () => import('@/views/ManagementCenter/PrivacyComputing/index'), meta: { title: '协同任务', icon: 'nested', itemHeight: 40, privacyTab: 'jobs' }},
+      { path: 'capabilities', name: 'PrivacyCapabilities', component: () => import('@/views/ManagementCenter/PrivacyComputing/index'), meta: { title: '能力说明', icon: 'documentation', itemHeight: 40, privacyTab: 'capabilities' }},
+      { path: 'jobs/new', name: 'PrivacyJobCreate', component: () => import('@/views/ManagementCenter/PrivacyComputing/index'), meta: { title: '发起计算', icon: 'edit', itemHeight: 40, privacyTab: 'create', roles: ['DATA_OWNER'] }},
+      { path: 'approvals', name: 'PrivacyApprovals', component: () => import('@/views/ManagementCenter/PrivacyComputing/index'), meta: { title: '待我审批', icon: 'message', itemHeight: 40, privacyTab: 'approvals', roles: ['DATA_OWNER'] }},
+      { path: 'jobs', name: 'PrivacyJobs', component: () => import('@/views/ManagementCenter/PrivacyComputing/index'), meta: { title: '全部任务', icon: 'nested', itemHeight: 40, privacyTab: 'jobs' }},
       { path: 'jobs/:jobId', name: 'PrivacyJobDetail', hidden: true, component: () => import('@/views/ManagementCenter/PrivacyComputing/index'), meta: { title: '任务详情', activeMenu: '/collaboration/jobs', privacyTab: 'jobs' }}
     ]
   },
@@ -559,6 +560,19 @@ export const constantRoutes = [
       { path: 'abnormal-access', name: 'SecurityValidation', component: () => import('@/views/ManagementCenter/SecurityValidation/index'), meta: { title: '异常访问日志', icon: 'form', itemHeight: 40 }},
       { path: 'scheduling', name: 'SchedulingLogs', component: () => import('@/views/ManagementCenter/SchedulingLogs/index'), meta: { title: '调度执行日志', icon: 'documentation', itemHeight: 40 }},
       { path: 'privacy', name: 'PrivacyLogs', component: () => import('@/views/ManagementCenter/PrivacyComputing/index'), meta: { title: '隐私计算日志', icon: 'lock', itemHeight: 40, privacyTab: 'jobs', evidenceMode: true }}
+    ]
+  },
+  {
+    path: '/admin',
+    component: Layout,
+    redirect: '/admin/domains',
+    name: 'SystemAdministration',
+    alwaysShow: true,
+    meta: { title: '系统管理', icon: 'people', itemHeight: 48, roles: ['ADMIN'] },
+    children: [
+      { path: 'domains', name: 'DomainAdministration', component: () => import('@/views/AdminCenter/index'), meta: { title: '域管理', icon: 'cluster', itemHeight: 40, adminTab: 'domains', roles: ['ADMIN'] }},
+      { path: 'users', name: 'UserAdministration', component: () => import('@/views/AdminCenter/index'), meta: { title: '用户管理', icon: 'people', itemHeight: 40, adminTab: 'users', roles: ['ADMIN'] }},
+      { path: 'dataset-owners', name: 'DatasetOwnerAdministration', component: () => import('@/views/AdminCenter/index'), meta: { title: '数据归属', icon: 'clipboard', itemHeight: 40, adminTab: 'datasets', roles: ['ADMIN'] }}
     ]
   },
   {

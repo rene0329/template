@@ -4,6 +4,7 @@ import axios from 'axios'
 import nprogress from 'nprogress'
 // 引入 进度条样式
 import 'nprogress/nprogress.css'
+import { getToken, removeToken } from '@/utils/auth'
 
 // 1. 利用axios对象的方法create方法去创建一个axios实例
 // request就是axios,只不过稍微配置一下
@@ -37,6 +38,11 @@ export function setBaseURL(url) {
 request.interceptors.request.use((config) => {
   // config 是一个配置对象，对象里有一个属性很重要，就是header请求头
   if (!config.silent) nprogress.start()
+  const token = getToken()
+  if (token && !config.skipAuth) {
+    config.headers = config.headers || {}
+    config.headers.Authorization = `Bearer ${token}`
+  }
   return config
 })
 
@@ -61,6 +67,13 @@ request.interceptors.response.use(
     if (error.response) {
       const normalized = apiError(error.response.data, error.response.status)
       normalized.response = error.response
+      if (error.response.status === 401) {
+        removeToken()
+        const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
+        if (!window.location.hash.startsWith('#/login')) {
+          window.location.hash = `#/login?redirect=${encodeURIComponent(current)}`
+        }
+      }
       return Promise.reject(normalized)
     }
     return Promise.reject(error)

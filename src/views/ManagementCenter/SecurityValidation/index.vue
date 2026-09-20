@@ -70,10 +70,9 @@
           <el-tab-pane label="MP-SPDZ 安全求和（兼容）" name="aggregation">
             <p class="hint">该旧入口由后端兼容映射到 <code>secure-sum-3p-v1</code>，使用固定 A/B/C 的诚实多数三方恶意安全协议。MP-SPDZ 用于协议功能验收和比较，不代表生产安全认证；是否满足验收仍由人工 judge。</p>
             <el-form label-width="120px" class="validation-form">
-              <el-form-item label="参与方 A 密钥"><el-input v-model="aggregation.secret" type="password" show-password autocomplete="new-password" placeholder="只保存在当前页面内存" /></el-form-item>
               <el-form-item>
-                <el-button type="primary" :loading="aggregation.running" :disabled="!aggregation.secret" @click="runAggregation">启动 MP-SPDZ 三方整数求和</el-button>
-                <el-button :disabled="!aggregation.result || !aggregation.secret" @click="loadAggregation">刷新本轮证据</el-button>
+                <el-button type="primary" :loading="aggregation.running" @click="runAggregation">启动 MP-SPDZ 三方整数求和</el-button>
+                <el-button :disabled="!aggregation.result" @click="loadAggregation">刷新本轮证据</el-button>
               </el-form-item>
             </el-form>
             <el-alert v-if="aggregation.message" :title="aggregation.message" :type="aggregation.error ? 'error' : 'success'" :closable="false" show-icon class="result-alert" />
@@ -122,7 +121,7 @@ export default {
       actions: ['READ', 'VERIFY'],
       integrity: { datasetId: null, running: false, result: null, message: '', error: false },
       access: { datasetId: null, action: 'READ', targetNode: '', path: '', username: '', password: '', running: false, loadingEvents: false, authorization: null, events: [], message: '', error: false },
-      aggregation: { secret: '', running: false, result: null, events: [], message: '', error: false }
+      aggregation: { running: false, result: null, events: [], message: '', error: false }
     }
   },
   computed: {
@@ -151,7 +150,6 @@ export default {
   },
   beforeDestroy() {
     this.access.password = ''
-    this.aggregation.secret = ''
   },
   methods: {
     scopeText(scope) { return scope ? `${scope.action} ${scope.datasetId}@${scope.datasetVersion} · ${scope.targetNode} · ${scope.path}` : '—' },
@@ -212,8 +210,7 @@ export default {
       this.aggregation.running = true
       this.aggregation.message = ''
       try {
-        const credentials = { username: 'A', password: this.aggregation.secret }
-        this.aggregation.result = await startSecureAggregation(`aggregate-${Date.now()}`, credentials)
+        this.aggregation.result = await startSecureAggregation(`aggregate-${Date.now()}`)
         await this.loadAggregation()
       } catch (error) {
         this.aggregation.error = true
@@ -223,8 +220,7 @@ export default {
     async loadAggregation() {
       if (!this.aggregation.result) return
       const runId = this.aggregation.result.runId
-      const credentials = { username: 'A', password: this.aggregation.secret }
-      const [result, events] = await Promise.all([fetchSecureAggregationRun(runId, credentials), fetchSecureAggregationEvents(runId, credentials)])
+      const [result, events] = await Promise.all([fetchSecureAggregationRun(runId), fetchSecureAggregationEvents(runId)])
       this.aggregation.result = result
       this.aggregation.events = events
       this.aggregation.error = result.status !== 'COMPLETED'

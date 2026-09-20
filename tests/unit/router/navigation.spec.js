@@ -7,7 +7,7 @@ const groups = constantRoutes.filter(route => !route.hidden)
 describe('business navigation', () => {
   it('shows the top-level groups in business-flow order', () => {
     expect(groups.map(route => route.children[0].name === 'Workspace' ? route.children[0].meta.title : route.meta.title)).toEqual([
-      '工作台', '资源与数据', '协同计算', '任务运行', '系统日志', '系统支持'
+      '工作台', '资源与数据', '协同计算', '任务运行', '系统日志', '系统管理', '系统支持'
     ])
     expect(groups.slice(1).every(route => route.alwaysShow)).toBe(true)
     expect(new Set(constantRoutes.map(route => route.path)).size).toBe(constantRoutes.length)
@@ -35,9 +35,10 @@ describe('business navigation', () => {
   it('exposes dedicated privacy routes, including task detail', () => {
     const collaboration = groups.find(route => route.name === 'CollaborationCenter')
     expect(collaboration.children.map(route => [route.path, route.name, route.meta.title])).toEqual([
-      ['capabilities', 'PrivacyCapabilities', '能力与模板'],
-      ['jobs/new', 'PrivacyJobCreate', '创建隐私任务'],
-      ['jobs', 'PrivacyJobs', '协同任务'],
+      ['capabilities', 'PrivacyCapabilities', '能力说明'],
+      ['jobs/new', 'PrivacyJobCreate', '发起计算'],
+      ['approvals', 'PrivacyApprovals', '待我审批'],
+      ['jobs', 'PrivacyJobs', '全部任务'],
       ['jobs/:jobId', 'PrivacyJobDetail', '任务详情']
     ])
     const detail = router.match('/collaboration/jobs/job-42')
@@ -49,7 +50,8 @@ describe('business navigation', () => {
   it.each([
     ['NodeRegistry', '/resources/nodes', '资源与数据', '节点资源'],
     ['DataManagement', '/resources/datasets/manage', '资源与数据', '数据集管理'],
-    ['PrivacyCapabilities', '/collaboration/capabilities', '协同计算', '能力与模板'],
+    ['PrivacyCapabilities', '/collaboration/capabilities', '协同计算', '能力说明'],
+    ['DomainAdministration', '/admin/domains', '系统管理', '域管理'],
     ['Analyze', '/operations/analysis', '任务运行', '性能分析'],
     ['SecurityValidation', '/logs/abnormal-access', '系统日志', '异常访问日志'],
     ['ExternalApi', '/support/external-api', '系统支持', '对外接口']
