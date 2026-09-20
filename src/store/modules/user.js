@@ -65,12 +65,13 @@ const actions = {
   },
 
   // user logout
-  logout({ commit, state }) {
+  logout({ commit, dispatch, state }) {
     return new Promise((resolve, reject) => {
       logout(state.token).then(() => {
         removeToken() // must remove  token  first
         resetRouter()
         commit('RESET_STATE')
+        dispatch('privacySession/clear', null, { root: true })
         resolve()
       }).catch(error => {
         reject(error)
@@ -79,10 +80,11 @@ const actions = {
   },
 
   // remove token
-  resetToken({ commit }) {
+  resetToken({ commit, dispatch }) {
     return new Promise(resolve => {
       removeToken() // must remove  token  first
       commit('RESET_STATE')
+      dispatch('privacySession/clear', null, { root: true })
       resolve()
     })
   }
@@ -94,4 +96,3 @@ export default {
   mutations,
   actions
 }
-

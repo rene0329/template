@@ -6,15 +6,10 @@ const table = require('./table')
 const management = process.env.VUE_APP_DEMO_MODE === 'true'
   ? require('./management')
   : []
-const registration = process.env.VUE_APP_DEMO_MODE === 'true'
-  ? require('./registration')
-  : []
-
 const mocks = [
   ...user,
   ...table,
-  ...management,
-  ...registration
+  ...management
 ]
 
 // for front mock

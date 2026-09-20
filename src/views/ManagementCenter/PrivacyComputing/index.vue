@@ -3,11 +3,11 @@
     <el-main>
       <section class="page-heading">
         <div>
-          <h2>隐私协同计算</h2>
-          <p>在 A/B/C 三个逻辑域之间运行固定协议模板，并保留任务、结果和证据原文供人工 judge。</p>
+          <h2>{{ pageTitle }}</h2>
+          <p>{{ pageDescription }}</p>
         </div>
-        <router-link to="/ManagementCenter/SecurityValidation">
-          <el-button icon="el-icon-back">旧安全验收页</el-button>
+        <router-link to="/logs/abnormal-access">
+          <el-button icon="el-icon-document">异常访问日志</el-button>
         </router-link>
       </section>
 
@@ -21,7 +21,7 @@
       <section class="auth-card">
         <div class="auth-copy">
           <h3>参与方单次认证</h3>
-          <p>凭据只保存在当前页面内存中，每个受保护请求单独发送 HTTP Basic；不会写入 storage、Vuex、URL、任务或下载文件。</p>
+          <p>凭据只保存在当前应用内存中，可通过顶栏“协同认证”统一管理；刷新或退出登录后清空，不会写入浏览器存储、URL、任务或下载文件。</p>
         </div>
         <el-row :gutter="12" class="secret-row">
           <el-col v-for="party in ['A', 'B', 'C']" :key="party" :xs="24" :sm="8">
@@ -37,7 +37,7 @@
         </el-row>
       </section>
 
-      <el-tabs v-model="activeTab" class="workspace-card">
+      <el-tabs v-model="activeTab" class="workspace-card" @tab-click="onTabClick">
         <el-tab-pane label="能力与模板" name="capabilities">
           <div class="section-heading">
             <div><h3>执行引擎</h3><span>版本、安全档位和可用状态均来自后端能力注册表</span></div>
@@ -331,8 +331,10 @@ const TEMPLATE_FIELDS = {
 export default {
   name: 'PrivacyComputing',
   data() {
+    const session = this.$store && this.$store.state && this.$store.state.privacySession
+    const party = session ? session.activeParty : 'A'
     return {
-      activeTab: 'capabilities',
+      activeTab: (this.$route && this.$route.meta && this.$route.meta.privacyTab) || 'capabilities',
       capabilities: [],
       templates: [],
       datasets: [],
@@ -346,10 +348,10 @@ export default {
       creating: false,
       actionLoading: '',
       statusFilter: '',
-      actionPrincipal: 'A',
-      artifactPrincipal: 'A',
-      createPrincipal: 'A',
-      partySecrets: { A: '', B: '', C: '' },
+      actionPrincipal: party,
+      artifactPrincipal: party,
+      createPrincipal: party,
+      partySecrets: session ? session.secrets : { A: '', B: '', C: '' },
       decisionReason: '',
       preflight: null,
       preflightSpecJson: '',
@@ -378,6 +380,20 @@ export default {
     }
   },
   computed: {
+    sessionActiveParty() {
+      return (this.$store && this.$store.state && this.$store.state.privacySession && this.$store.state.privacySession.activeParty) || this.actionPrincipal
+    },
+    evidenceMode() {
+      return Boolean(this.$route && this.$route.meta && this.$route.meta.evidenceMode)
+    },
+    pageTitle() {
+      return this.evidenceMode ? '隐私计算日志' : '隐私协同计算'
+    },
+    pageDescription() {
+      return this.evidenceMode
+        ? '按参与方身份查看隐私任务的阶段事件、结果摘要和证据原文，供人工 judge。'
+        : '在 A/B/C 三个逻辑域之间运行固定协议模板，并保留任务、结果和证据原文供人工 judge。'
+    },
     selectedTemplate() {
       return this.templates.find(item => item.templateId === this.jobForm.templateId) || null
     },
@@ -433,13 +449,34 @@ export default {
       return this.selectedJob && this.participantIdsForJob.includes(this.artifactPrincipal) && this.hasSecret(this.artifactPrincipal)
     }
   },
+  watch: {
+    $route(route) {
+      const tab = route && route.meta && route.meta.privacyTab
+      if (tab) this.activeTab = tab
+      const jobId = route && route.params && route.params.jobId
+      if (jobId && this.hasSecret(this.actionPrincipal)) this.openJob({ jobId }, true)
+    },
+    sessionActiveParty(partyId) {
+      if (!partyId || partyId === this.actionPrincipal) return
+      this.actionPrincipal = partyId
+      this.artifactPrincipal = partyId
+      this.createPrincipal = partyId
+      this.onCreatePrincipalChange()
+      this.onActionPrincipalChange()
+    }
+  },
   async created() {
     await Promise.all([this.loadCatalog(), this.loadDatasets()])
+    if (this.activeTab === 'jobs' && this.hasSecret(this.actionPrincipal)) {
+      await this.loadJobs({ silent: true })
+      if (this.$route && this.$route.params && this.$route.params.jobId) {
+        await this.openJob({ jobId: this.$route.params.jobId }, true)
+      }
+    }
     this.refreshTimer = setInterval(() => this.refreshQuietly(), 8000)
   },
   beforeDestroy() {
     clearInterval(this.refreshTimer)
-    this.partySecrets = { A: '', B: '', C: '' }
   },
   methods: {
     arrayValue(value) { return Array.isArray(value) ? value : [] },
@@ -469,12 +506,21 @@ export default {
     failureText(job) { return job.failureReason ? `${job.failureCode || 'FAILED'}：${job.failureReason}` : '—' },
     hasSecret(partyId) { return Boolean(partyId && this.partySecrets[partyId]) },
     credentialsFor(partyId) { return { partyId, secret: this.partySecrets[partyId] || '' } },
+    onTabClick(tab) {
+      if (!this.$router) return
+      const routes = { capabilities: '/collaboration/capabilities', create: '/collaboration/jobs/new', jobs: '/collaboration/jobs' }
+      const target = routes[tab && tab.name]
+      if (target && (!this.$route || this.$route.path !== target)) this.$router.push(target)
+    },
     clearArtifactData() {
       this.resultData = null
       this.evidenceData = null
       this.artifactPanels = []
     },
     onSecretChange(partyId) {
+      if (this.$store && this.$store.state && this.$store.state.privacySession) {
+        this.$store.commit('privacySession/SET_SECRET', { partyId, secret: this.partySecrets[partyId] })
+      }
       if (partyId === this.artifactPrincipal) this.clearArtifactData()
       if (partyId === this.actionPrincipal) {
         this.jobs = []
@@ -488,6 +534,9 @@ export default {
       this.invalidatePreflight()
     },
     async onActionPrincipalChange() {
+      if (this.$store && this.$store.state && this.$store.state.privacySession) {
+        this.$store.commit('privacySession/SET_ACTIVE_PARTY', this.actionPrincipal)
+      }
       this.jobs = []
       this.selectedJob = null
       this.events = []
@@ -741,7 +790,8 @@ export default {
         await this.loadJobs()
         const jobId = created.jobId || (created.job && created.job.jobId)
         if (jobId) await this.openJob({ jobId })
-        this.activeTab = 'jobs'
+        if (jobId && this.$router) await this.$router.push(`/collaboration/jobs/${encodeURIComponent(jobId)}`)
+        else this.activeTab = 'jobs'
       } catch (error) {
         this.formError = `任务创建失败：${error.message}`
       } finally {

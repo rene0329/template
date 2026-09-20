@@ -45,7 +45,7 @@ export const constantRoutes = [
 
   {
     path: "/",
-    redirect: "/ManagementCenter/Settings",
+    redirect: "/workspace",
     hidden: true,
   },
   // 开发中心模块
@@ -493,131 +493,107 @@ export const constantRoutes = [
   //   ]
   // },
 
-  // 四个一级模块；保留既有页面地址与资源注册配置。
+  // 当前产品导航按实际业务流程组织。历史 URL 在下方保留重定向。
   {
-    path: '/RegistrationCenter',
+    path: '/workspace',
     component: Layout,
-    redirect: '/RegistrationCenter/NodeRegistry',
-    name: 'RegistrationCenter',
+    children: [{
+      path: '',
+      name: 'Workspace',
+      component: () => import('@/views/Workspace/index'),
+      meta: { title: '工作台', icon: 'dashboard', itemHeight: 48 }
+    }]
+  },
+  {
+    path: '/resources',
+    component: Layout,
+    redirect: '/resources/nodes',
+    name: 'ResourceCenter',
     alwaysShow: true,
-    meta: { title: '资源注册中心', icon: 'clipboard', itemHeight: 48 },
+    meta: { title: '资源与数据', icon: 'clipboard', itemHeight: 48 },
     children: [
-      { path: 'NodeRegistry', name: 'NodeRegistry', component: () => import('@/views/RegistrationCenter/NodeRegistry/index'), meta: { title: '节点注册', icon: 'server', itemHeight: 40 }},
-      { path: 'DatasetRegistry', name: 'DatasetRegistry', component: process.env.VUE_APP_DEMO_MODE === 'true' ? () => import('@/views/RegistrationCenter/DatasetRegistry/MockPreview') : () => import('@/views/RegistrationCenter/DatasetRegistry/index'), meta: { title: '数据集注册', icon: 'documentation', itemHeight: 40 }},
-      { path: 'RuntimeImageRegistry', name: 'RuntimeImageRegistry', component: () => import('@/views/RegistrationCenter/RuntimeImageRegistry/index'), meta: { title: '运行镜像注册', icon: 'form', itemHeight: 40 }}
+      { path: 'nodes', name: 'NodeRegistry', component: () => import('@/views/RegistrationCenter/NodeRegistry/index'), meta: { title: '节点资源', icon: 'server', itemHeight: 40 }},
+      { path: 'network', name: 'Settings', component: () => import('@/views/ManagementCenter/Settings/index'), meta: { title: '网络配置', icon: 'edit', itemHeight: 40 }},
+      { path: 'topology', name: 'FrameNet', component: () => import('@/views/ManagementCenter/FrameNet/index'), meta: { title: '网络拓扑', icon: 'cluster', itemHeight: 40 }},
+      { path: 'datasets/register', name: 'DatasetRegistry', component: process.env.VUE_APP_DEMO_MODE === 'true' ? () => import('@/views/RegistrationCenter/DatasetRegistry/MockPreview') : () => import('@/views/RegistrationCenter/DatasetRegistry/index'), meta: { title: '数据集注册', icon: 'documentation', itemHeight: 40 }},
+      { path: 'datasets/manage', name: 'DataManagement', component: () => import('@/views/ManagementCenter/DataManagement/index'), meta: { title: '数据集管理', icon: 'clipboard', itemHeight: 40 }},
+      { path: 'runtime-images', name: 'RuntimeImageRegistry', component: () => import('@/views/RegistrationCenter/RuntimeImageRegistry/index'), meta: { title: '运行镜像', icon: 'form', itemHeight: 40 }}
     ]
   },
   {
-    path: "/ManagementCenter",
-    redirect: "/ManagementCenter/Settings",
-    hidden: true,
+    path: '/collaboration',
+    component: Layout,
+    redirect: '/collaboration/capabilities',
+    name: 'CollaborationCenter',
+    alwaysShow: true,
+    meta: { title: '协同计算', icon: 'lock', itemHeight: 48 },
+    children: [
+      { path: 'capabilities', name: 'PrivacyCapabilities', component: () => import('@/views/ManagementCenter/PrivacyComputing/index'), meta: { title: '能力与模板', icon: 'documentation', itemHeight: 40, privacyTab: 'capabilities' }},
+      { path: 'jobs/new', name: 'PrivacyJobCreate', component: () => import('@/views/ManagementCenter/PrivacyComputing/index'), meta: { title: '创建隐私任务', icon: 'edit', itemHeight: 40, privacyTab: 'create' }},
+      { path: 'jobs', name: 'PrivacyJobs', component: () => import('@/views/ManagementCenter/PrivacyComputing/index'), meta: { title: '协同任务', icon: 'nested', itemHeight: 40, privacyTab: 'jobs' }},
+      { path: 'jobs/:jobId', name: 'PrivacyJobDetail', hidden: true, component: () => import('@/views/ManagementCenter/PrivacyComputing/index'), meta: { title: '任务详情', activeMenu: '/collaboration/jobs', privacyTab: 'jobs' }}
+    ]
   },
   {
-    path: "/NetworkCenter",
+    path: '/operations',
     component: Layout,
-    redirect: "/ManagementCenter/Settings",
-    name: "NetworkCenter",
+    redirect: '/operations/data-selection',
+    name: 'OperationsCenter',
     alwaysShow: true,
-    meta: { title: "网络中心", icon: "cluster", itemHeight: 48 },
+    meta: { title: '任务运行', icon: 'nested', itemHeight: 48 },
     children: [
-      {
-        path: "/ManagementCenter/Settings",
-        name: "Settings",
-        component: () => import("@/views/ManagementCenter/Settings/index"),
-        meta: { title: "网络配置", icon: "edit", itemHeight: 40 },
-      },
-      {
-        path: "/ManagementCenter/FrameNet",
-        name: "FrameNet",
-        component: () => import("@/views/ManagementCenter/FrameNet/index"),
-        meta: { title: "网络结构", icon: 'cluster', itemHeight: 40 },
-      },
-    ],
+      { path: 'data-selection', name: 'SelectData', component: () => import('@/views/ManagementCenter/SelectData/index'), meta: { title: '数据选择', icon: 'nested', itemHeight: 40 }},
+      { path: 'tasks', name: 'TaskList', component: () => import('@/views/ManagementCenter/TaskList/index'), meta: { title: '任务列表', icon: 'documentation', itemHeight: 40 }},
+      { path: 'schedules', name: 'Schedule', component: () => import('@/views/ManagementCenter/Schedule/index'), meta: { title: '调度结果', icon: 'documentation', itemHeight: 40 }},
+      { path: 'analysis', name: 'Analyze', component: () => import('@/views/ManagementCenter/Analyze/index'), meta: { title: '性能分析', icon: 'form', itemHeight: 40 }}
+    ]
   },
   {
-    path: "/DataCenter",
+    path: '/logs',
     component: Layout,
-    redirect: "/ManagementCenter/DataManagement",
-    name: "DataCenter",
+    redirect: '/logs/abnormal-access',
+    name: 'SystemLogs',
     alwaysShow: true,
-    meta: { title: "数据管理", icon: "clipboard", itemHeight: 48 },
+    meta: { title: '系统日志', icon: 'documentation', itemHeight: 48 },
     children: [
-      {
-        path: "/ManagementCenter/DataManagement",
-        name: "DataManagement",
-        component: () => import("@/views/ManagementCenter/DataManagement/index"),
-        meta: { title: "数据集信息", icon: 'clipboard', itemHeight: 40 },
-      },
-      {
-        path: "SchedulingLogs",
-        name: "SchedulingLogs",
-        component: () => import("@/views/ManagementCenter/SchedulingLogs/index"),
-        meta: { title: "调度日志", icon: 'documentation', itemHeight: 40 },
-      },
-      {
-        path: "/ManagementCenter/PrivacyComputing",
-        name: "PrivacyComputing",
-        component: () => import("@/views/ManagementCenter/PrivacyComputing/index"),
-        meta: { title: "隐私协同计算", icon: 'lock', itemHeight: 40 },
-      },
-      {
-        path: "/ManagementCenter/SecurityValidation",
-        name: "SecurityValidation",
-        component: () => import("@/views/ManagementCenter/SecurityValidation/index"),
-        meta: { title: "安全验收", icon: 'form', itemHeight: 40 },
-      },
-    ],
+      { path: 'abnormal-access', name: 'SecurityValidation', component: () => import('@/views/ManagementCenter/SecurityValidation/index'), meta: { title: '异常访问日志', icon: 'form', itemHeight: 40 }},
+      { path: 'scheduling', name: 'SchedulingLogs', component: () => import('@/views/ManagementCenter/SchedulingLogs/index'), meta: { title: '调度执行日志', icon: 'documentation', itemHeight: 40 }},
+      { path: 'privacy', name: 'PrivacyLogs', component: () => import('@/views/ManagementCenter/PrivacyComputing/index'), meta: { title: '隐私计算日志', icon: 'lock', itemHeight: 40, privacyTab: 'jobs', evidenceMode: true }}
+    ]
   },
   {
-    path: "/TaskCenter",
+    path: '/support',
     component: Layout,
-    redirect: "/ManagementCenter/SelectData",
-    name: "TaskCenter",
+    redirect: '/support/external-api',
+    name: 'SystemSupport',
     alwaysShow: true,
-    meta: { title: "任务管理", icon: "nested", itemHeight: 48 },
+    meta: { title: '系统支持', icon: 'documentation', itemHeight: 48 },
     children: [
-      {
-        path: "/ManagementCenter/SelectData",
-        name: "SelectData",
-        component: () => import("@/views/ManagementCenter/SelectData/index"),
-        meta: { title: "数据选择", icon: 'nested', itemHeight: 40 },
-      },
-      {
-        path: "/ManagementCenter/TaskList",
-        name: "TaskList",
-        component: () => import("@/views/ManagementCenter/TaskList/index"),
-        meta: { title: "任务列表", icon: 'documentation', itemHeight: 40 },
-      },
-      {
-        path: "/ManagementCenter/Schedule",
-        name: "Schedule",
-        component: () => import("@/views/ManagementCenter/Schedule/index"),
-        meta: { title: "调度展示", icon: 'documentation', itemHeight: 40 },
-      },
-      {
-        path: "/ManagementCenter/Analyze",
-        name: "Analyze",
-        component: () => import("@/views/ManagementCenter/Analyze/index"),
-        meta: { title: "性能分析", icon: 'form', itemHeight: 40 },
-      },
-    ],
+      { path: 'external-api', name: 'ExternalApi', component: () => import('@/views/HelpCenter/ExternalApi/index'), meta: { title: '对外接口', icon: 'documentation', itemHeight: 40 }}
+    ]
   },
-  {
-    path: "/HelpCenter",
-    component: Layout,
-    redirect: "/HelpCenter/ExternalApi",
-    name: "HelpCenter",
-    alwaysShow: true,
-    meta: { title: "帮助中心", icon: "documentation", itemHeight: 48 },
-    children: [
-      {
-        path: "ExternalApi",
-        name: "ExternalApi",
-        component: () => import("@/views/HelpCenter/ExternalApi/index"),
-        meta: { title: "对外接口", icon: "documentation", itemHeight: 40 },
-      },
-    ],
-  },
+
+  // 兼容已有书签和外部链接；规范页面只使用上面的业务路由。
+  { path: '/RegistrationCenter', redirect: '/resources/nodes', hidden: true },
+  { path: '/RegistrationCenter/NodeRegistry', redirect: to => ({ path: '/resources/nodes', query: to.query, hash: to.hash }), hidden: true },
+  { path: '/RegistrationCenter/DatasetRegistry', redirect: to => ({ path: '/resources/datasets/register', query: to.query, hash: to.hash }), hidden: true },
+  { path: '/RegistrationCenter/RuntimeImageRegistry', redirect: to => ({ path: '/resources/runtime-images', query: to.query, hash: to.hash }), hidden: true },
+  { path: '/ManagementCenter', redirect: '/resources/network', hidden: true },
+  { path: '/NetworkCenter', redirect: '/resources/network', hidden: true },
+  { path: '/DataCenter', redirect: '/resources/datasets/manage', hidden: true },
+  { path: '/TaskCenter', redirect: '/operations/data-selection', hidden: true },
+  { path: '/HelpCenter', redirect: '/support/external-api', hidden: true },
+  { path: '/HelpCenter/ExternalApi', redirect: to => ({ path: '/support/external-api', query: to.query, hash: to.hash }), hidden: true },
+  { path: '/ManagementCenter/Settings', redirect: to => ({ path: '/resources/network', query: to.query, hash: to.hash }), hidden: true },
+  { path: '/ManagementCenter/FrameNet', redirect: to => ({ path: '/resources/topology', query: to.query, hash: to.hash }), hidden: true },
+  { path: '/ManagementCenter/DataManagement', redirect: to => ({ path: '/resources/datasets/manage', query: to.query, hash: to.hash }), hidden: true },
+  { path: '/DataCenter/SchedulingLogs', redirect: to => ({ path: '/logs/scheduling', query: to.query, hash: to.hash }), hidden: true },
+  { path: '/ManagementCenter/PrivacyComputing', redirect: to => ({ path: '/collaboration/capabilities', query: to.query, hash: to.hash }), hidden: true },
+  { path: '/ManagementCenter/SecurityValidation', redirect: to => ({ path: '/logs/abnormal-access', query: to.query, hash: to.hash }), hidden: true },
+  { path: '/ManagementCenter/SelectData', redirect: to => ({ path: '/operations/data-selection', query: to.query, hash: to.hash }), hidden: true },
+  { path: '/ManagementCenter/TaskList', redirect: to => ({ path: '/operations/tasks', query: to.query, hash: to.hash }), hidden: true },
+  { path: '/ManagementCenter/Schedule', redirect: to => ({ path: '/operations/schedules', query: to.query, hash: to.hash }), hidden: true },
+  { path: '/ManagementCenter/Analyze', redirect: to => ({ path: '/operations/analysis', query: to.query, hash: to.hash }), hidden: true },
 
 
   // 404 page must be placed at the end !!!

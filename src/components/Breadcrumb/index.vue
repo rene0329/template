@@ -30,22 +30,22 @@ export default {
     getBreadcrumb() {
       // only show routes with meta.title
       let matched = this.$route.matched.filter(item => item.meta && item.meta.title)
-      // Keep Dashboard as the first entry for every non-dashboard route.
-      if (!this.isDashboard(matched[0])) {
+      // Keep the workspace as the first entry for every business route.
+      if (!this.isWorkspace(matched[0])) {
         matched = [{
-          path: '/dashboard',
-          name: 'Dashboard',
-          meta: { title: 'Dashboard' }
+          path: '/workspace',
+          name: 'Workspace',
+          meta: { title: '工作台' }
         }].concat(matched)
       }
       this.levelList = matched.filter(item => item.meta && item.meta.title && item.meta.breadcrumb !== false)
     },
-    isDashboard(route) {
+    isWorkspace(route) {
       const name = route && route.name
       if (!name) {
         return false
       }
-      return name.trim().toLocaleLowerCase() === 'Dashboard'.toLocaleLowerCase()
+      return name.trim().toLocaleLowerCase() === 'Workspace'.toLocaleLowerCase()
     },
     pathCompile(path) {
       // To solve this problem https://github.com/PanJiaChen/vue-element-admin/issues/561

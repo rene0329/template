@@ -2,6 +2,7 @@
   <header class="global-header">
     <div class="title">虚拟数据中心原位调度子系统</div>
     <div class="meta">
+      <privacy-session-panel />
       <el-button class="server-button" type="text" @click="openBackendSettings">
         <i class="el-icon-setting" /> 服务器
       </el-button>
@@ -15,9 +16,10 @@
 <script>
 import { mapGetters } from 'vuex'
 import BackendSettings from '@/components/BackendSettings'
+import PrivacySessionPanel from '@/components/PrivacySessionPanel'
 export default {
   name: 'GlobalHeader',
-  components: { BackendSettings },
+  components: { BackendSettings, PrivacySessionPanel },
   computed: {
     ...mapGetters(['avatar', 'name'])
   },
