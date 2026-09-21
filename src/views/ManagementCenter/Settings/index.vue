@@ -21,16 +21,17 @@
                 class="my-table"
                 :data="currentPageData"
                 style="width: 100%; min-width: 960px;"
-                :default-sort="{prop: 'nodeId', order: 'upward'}"
+                :default-sort="{prop: 'nodeId', order: 'ascending'}"
                 highlight-current-row
                 :row-class-name="nodeRowClassName"
                 @row-click="selectDatasetNode"
+                @sort-change="handleSortChange"
               >
                 <el-table-column
                   prop="nodeId"
                   label="编号"
                   :min-width="120"
-                  sortable
+                  sortable="custom"
                   align="center"
                 />
                 <el-table-column prop="nodeName" label="节点名称" :min-width="150" align="center">
@@ -41,7 +42,7 @@
                 <el-table-column
                   prop="internalIp"
                   label="IP地址"
-                  sortable
+                  sortable="custom"
                   :min-width="150"
                   align="center"
                 />
@@ -212,7 +213,7 @@ import * as echarts from 'echarts'
 import LiveRefreshStatus from '@/components/LiveRefreshStatus'
 import { keepStableCollection } from '@/utils/live-refresh'
 import { fetchRegisteredNodes, fetchRegisteredDatasets, updateRegisteredNode } from '@/api/registrationApi'
-import { fetchAllPages, datasetsForNode, formatBytes } from '@/utils/dataset-catalog'
+import { clampPage, fetchAllPages, datasetsForNode, formatBytes, paginateRows, sortRows } from '@/utils/dataset-catalog'
 import {
   fetchNodeMetrics
 } from '@/api/managementCenterApi'
@@ -243,6 +244,7 @@ export default {
       refreshTimer: null,
       lastUpdatedAt: '',
       total: 0,
+      sort: { prop: 'nodeId', order: 'ascending' },
       formInline: {
         name: ''
       },
@@ -261,7 +263,7 @@ export default {
       return this.selected ? (this.selected.nodeName || this.selected.node_name || '') : ''
     },
     currentPageData() {
-      return this.TaskData
+      return paginateRows(sortRows(this.TaskData, this.sort), this.currentPage, this.pageSize)
     },
     selectedDatasetNode() {
       return this.TaskData.find(node => String(node.nodeId) === this.selectedNodeId) || null
@@ -306,12 +308,13 @@ export default {
       if (!silent) this.loading = true
       try {
         const options = silent ? { silent: true } : {}
-        const nodePage = await fetchRegisteredNodes({ page: this.currentPage, pageSize: this.pageSize, query: this.formInline.name }, options)
+        const nodes = await fetchAllPages(fetchRegisteredNodes, options, { query: this.formInline.name })
         if (version !== this.requestVersion) return
-        this.TaskData = keepStableCollection(this.TaskData, nodePage.list.map(node => ({
+        this.TaskData = keepStableCollection(this.TaskData, nodes.map(node => ({
           ...node, nodeName: node.k8sNodeName, cluster: node.clusterId, type: node.role.toLowerCase().replace(/_/g, '-')
         })))
-        this.total = nodePage.total
+        this.total = nodes.length
+        this.currentPage = clampPage(this.currentPage, this.pageSize, this.total)
         if (!this.TaskData.some(node => String(node.nodeId) === this.selectedNodeId)) {
           const preferred = this.TaskData.find(node => this.datasetCountForNode(node) > 0)
           this.selectedNodeId = preferred ? String(preferred.nodeId) : (this.TaskData[0] ? String(this.TaskData[0].nodeId) : '')
@@ -345,11 +348,13 @@ export default {
     handleSizeChange(val) {
       this.pageSize = val
       this.currentPage = 1
-      this.fetchData()
     },
     handleCurrentChange(val) {
       this.currentPage = val
-      this.fetchData()
+    },
+    handleSortChange({ prop, order }) {
+      this.sort = { prop: prop || '', order: order || '' }
+      this.currentPage = 1
     },
     selectDatasetNode(node) {
       this.selectedNodeId = String(node.nodeId)

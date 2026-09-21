@@ -25,12 +25,14 @@
                 class="my-table"
                 :data="currentPageData"
                 style="width: 100%;"
+                :default-sort="{prop: 'taskId', order: 'ascending'}"
+                @sort-change="handleSortChange"
               >
                 <el-table-column
                   prop="taskId"
                   label="任务ID"
                   :min-width="180"
-                  sortable
+                  sortable="custom"
                   align="center"
                 />
                 <el-table-column
@@ -43,8 +45,7 @@
                     <span style="white-space: pre-wrap; text-align: left; display: inline-block;">{{ scope.row.schedule }}</span>
                   </template>
                 </el-table-column>
-              
-                
+
                 <!--el-table-column
                   prop="task_app_id"
                   label="应用绑定"
@@ -54,24 +55,23 @@
                   prop="createTime"
                   label="创建时间"
                   width="200"
-                  sortable
+                  sortable="custom"
                 />
-             
+
               </el-table>
             </div>
           </div>
         </div>
 
-        
         <div class="page-footer">
           <div class="pagination-container">
             <span class="pagination-total">共 {{ filteredDataCount }} 条</span>
             <span class="pagination-sizes-label">每页</span>
             <el-select v-model="pageSize" size="mini" class="pagination-sizes-select" @change="handleSizeChange">
-              <el-option :value="5" label="5"></el-option>
-              <el-option :value="10" label="10"></el-option>
-              <el-option :value="20" label="20"></el-option>
-              <el-option :value="50" label="50"></el-option>
+              <el-option :value="5" label="5" />
+              <el-option :value="10" label="10" />
+              <el-option :value="20" label="20" />
+              <el-option :value="50" label="50" />
             </el-select>
             <span class="pagination-sizes-label">条</span>
             <el-pagination
@@ -91,7 +91,7 @@
 
 <script>
 import { fetchScheduleList } from '@/api/managementCenterApi'
-import * as echarts from 'echarts'
+import { clampPage, fetchAllPages, paginateRows, sortRows } from '@/utils/dataset-catalog'
 
 export default {
   name: 'NodeList',
@@ -99,29 +99,15 @@ export default {
     return {
       currentPage: 1,
       pageSize: 5,
-      dialogVisibleYaml: false,
-      yamlKey: 0,
-      dialogVisibleLogs: false,
-      dialogVisibleDetail: false,
-      logsKey: 0,
-      selected: null,
-      systemName: '调度展示',
-      headerRightText: '欢迎使用',
       loading: false,
       total: 0,
+      sort: { prop: 'taskId', order: 'ascending' },
       // 用于表单搜索
       formInline: {
         name: ''
       },
       // 从服务器获取的数据
-      TaskData: [],
-      // 用于传递参数
-      node_name: '',
-      selectedTask: {}, // 存储选中的任务数据
-      editing: false,   // 是否处于编辑模式
-      rules: {
-        // 表单校验规则
-      }
+      TaskData: []
     }
   },
   computed: {
@@ -129,22 +115,25 @@ export default {
       return this.total
     },
     currentPageData() {
-      return this.TaskData
+      return paginateRows(sortRows(this.TaskData, this.sort), this.currentPage, this.pageSize)
     }
   },
   created() {
     this.fetchData()
   },
 
-  mounted() {
-  },
   methods: {
     async fetchData() {
       this.loading = true
       try {
-        const res = await fetchScheduleList(this.currentPage, this.pageSize, this.formInline.name)
-        this.TaskData = res.list || []
-        this.total = res.total || this.TaskData.length
+        const tasks = await fetchAllPages(
+          ({ page, pageSize, query }) => fetchScheduleList(page, pageSize, query),
+          {},
+          { query: this.formInline.name }
+        )
+        this.TaskData = tasks
+        this.total = tasks.length
+        this.currentPage = clampPage(this.currentPage, this.pageSize, this.total)
       } catch (err) {
         console.error('获取调度列表失败:', err)
         this.$message.error('获取调度列表失败')
@@ -161,105 +150,17 @@ export default {
       this.currentPage = 1
       this.fetchData()
     },
-    onRefresh() {
-      this.fetchData()
-    },
     handleSizeChange(val) {
       this.pageSize = val
       this.currentPage = 1
-      this.fetchData()
     },
     handleCurrentChange(val) {
       this.currentPage = val
-      this.fetchData()
     },
-    handleEdit(index, row) {
-      console.log(index, row)
-      this.dialogVisibleYaml = true
-      this.yamlKey = this.yamlKey + 1
-      this.task_name = row.task_name
-    },
-    closeDialogYaml() {
-      this.dialogVisibleYaml = false
-    },
-    checkFuncLogs(index, row) {
-      console.log(index, row)
-      this.dialogVisibleLogs = true
-      this.logsKey = this.logsKey + 1
-      this.task_name = row.task_name
-    },
-    closeDialogLogs() {
-      this.dialogVisibleLogs = false
-    },
-    openTaskDialog(task) {
-      this.selectedTask = { ...task }; // 复制任务数据以防止修改时影响原数据
-      this.dialogVisibleDetail = true;
-    },
-    closeTaskDialog() {
-      this.dialogVisibleDetail = false;
-      this.editing = false; // 退出编辑模式
-    },
-    saveChanges() {
-      this.editing = false; // 退出编辑模式
-      console.log(this.selectedTask)
-      // 转化为后端需要的数据格式
-      this.selectedTask.task_create_time = this.selectedTask.task_create_time.replace('T', ' ')
-      // 调用上传数据的方法
-      update_task(this.selectedTask)
-        .then(res => {
-          console.log(res)
-          this.$message({
-            message: '修改成功',
-            type: 'success'
-          })
-        })
-        .catch(err => {
-          console.log(err)
-          this.$message({
-            message: '修改失败',
-            type: 'error'
-          })
-        })
-    },
-    deleteTask() {
-      // 执行删除任务操作
-      delete_task(this.selectedTask)
-        .then(res => {
-          console.log(res)
-          this.$message({
-            message: '删除成功',
-            type: 'success'
-          })
-        })
-        .catch(err => {
-          console.log(err)
-          this.$message({
-            message: '删除失败',
-            type: 'error'
-          })
-        })
-    },
-    deletescopeTask(task) {
-      // 执行删除任务操作
-      this.selectedTask = { ...task }
-      delete_task(this.selectedTask)
-        .then(res => {
-          console.log(res)
-          this.$message({
-            message: '删除成功',
-            type: 'success'
-          })
-        })
-        .catch(err => {
-          console.log(err)
-          this.$message({
-            message: '删除失败',
-            type: 'error'
-          })
-        })
-    },
-
-    
+    handleSortChange({ prop, order }) {
+      this.sort = { prop: prop || '', order: order || '' }
+      this.currentPage = 1
+    }
   }
 
 }
@@ -282,21 +183,21 @@ export default {
   padding: 0 24px;
   box-sizing: border-box;
 }
-.brand { 
-  font-size: 16px; 
-  font-weight: 600; 
+.brand {
+  font-size: 16px;
+  font-weight: 600;
 }
-.header-meta { 
-  display: flex; 
-  align-items: center; 
-  gap: 8px; 
-  font-size: 14px; 
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
 }
-.header-avatar { 
-  margin-right: 4px; 
+.header-avatar {
+  margin-right: 4px;
 }
-.header-user { 
-  font-size: 14px; 
+.header-user {
+  font-size: 14px;
 }
 .breadcrumb-bar {
   height: 40px;
@@ -354,10 +255,10 @@ export default {
   line-height: 32px;
   padding: 0 16px;
 }
-.content-row { 
-  display: flex; 
-  flex-wrap: wrap; 
-  gap: 16px; 
+.content-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 .table-card {
   flex: 1 1 100%;
@@ -368,13 +269,13 @@ export default {
   box-sizing: border-box;
   box-shadow: none;
 }
-.table-wrapper { 
-  width: 100%; 
-  overflow-x: auto; 
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
 }
-.page-footer { 
-  padding: 16px 0; 
-  box-sizing: border-box; 
+.page-footer {
+  padding: 16px 0;
+  box-sizing: border-box;
 }
 .copyright-bar {
   height: 30px;
@@ -386,7 +287,6 @@ export default {
   background: transparent;
   flex-shrink: 0;
 }
-
 
 :deep(.my-table .el-table__header-wrapper th.el-table__cell) {
   height: 54px;

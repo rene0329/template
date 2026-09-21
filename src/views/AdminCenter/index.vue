@@ -62,6 +62,7 @@
 <script>
 import { fetchRegisteredDatasets } from '@/api/registrationApi'
 import { assignDatasetOwner, createDomain, createUser, fetchDomains, fetchUsers, resetUserPassword, updateDomain, updateUser } from '@/api/adminApi'
+import { fetchAllPages } from '@/utils/dataset-catalog'
 
 const listOf = value => Array.isArray(value) ? value : (value && Array.isArray(value.list) ? value.list : [])
 
@@ -108,7 +109,7 @@ export default {
     },
     async loadDatasets(nested = false) {
       if (!nested) this.loading = true
-      try { this.datasets = listOf(await fetchRegisteredDatasets({ page: 1, pageSize: 1000, query: this.datasetQuery })) } catch (error) { this.$message.error(`数据集加载失败：${error.message}`) } finally { if (!nested) this.loading = false }
+      try { this.datasets = await fetchAllPages(fetchRegisteredDatasets, {}, { query: this.datasetQuery }) } catch (error) { this.$message.error(`数据集加载失败：${error.message}`) } finally { if (!nested) this.loading = false }
     },
     onTabClick() {
       const path = { domains: '/admin/domains', users: '/admin/users', datasets: '/admin/dataset-owners' }[this.activeTab]

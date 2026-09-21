@@ -81,7 +81,7 @@ it('uses the registration catalog including inactive datasets and counts logical
   const disabled = { datasetId: 8, name: 'upload-empty', status: 'DISABLED', replicas: [] }
   fetchRegisteredDatasets.mockResolvedValue({ list: [dataset, disabled], total: 2 })
   await vm.fetchData()
-  expect(fetchRegisteredDatasets).toHaveBeenCalledWith({ page: 1, pageSize: 10, query: 'upload' }, {})
+  expect(fetchRegisteredDatasets).toHaveBeenCalledWith({ page: 1, pageSize: 100, query: 'upload' }, {})
   expect(vm.TaskData.map(row => row.datasetId)).toEqual([9, 8])
   expect(vm.TaskData[0].dataSize).toBe(16909290)
   expect(vm.TaskData[1].status).toBe('DISABLED')
@@ -98,7 +98,7 @@ it('reflects registry status changes in the list and open detail and removes del
   fetchRegisteredDatasets.mockResolvedValueOnce({ list: [{ ...dataset, status: 'DISABLED' }], total: 1 })
   await vm.fetchData(true)
   expect(vm.selectedTask.status).toBe('DISABLED')
-  expect(fetchRegisteredDatasets).toHaveBeenLastCalledWith({ page: 1, pageSize: 10, query: '' }, { silent: true })
+  expect(fetchRegisteredDatasets).toHaveBeenLastCalledWith({ page: 1, pageSize: 100, query: '' }, { silent: true })
   fetchRegisteredDatasets.mockResolvedValueOnce({ list: [], total: 0 })
   await vm.fetchData(true)
   expect(vm.TaskData).toEqual([])
@@ -236,8 +236,7 @@ it('does not block the dataset list on name lookups and retains known names if r
 it('moves back to the last valid page when registry deletion empties the current page', async() => {
   const vm = context()
   vm.currentPage = 2
-  fetchRegisteredDatasets.mockResolvedValueOnce({ list: [], total: 1 })
-    .mockResolvedValueOnce({ list: [dataset], total: 1 })
+  fetchRegisteredDatasets.mockResolvedValueOnce({ list: [dataset], total: 1 })
   await vm.fetchData(true)
   expect(vm.currentPage).toBe(1)
   expect(vm.TaskData[0].datasetId).toBe(9)

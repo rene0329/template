@@ -1,17 +1,45 @@
 // Registered dataset IDs are logical IDs. Never substitute a legacy dataId.
-export async function fetchAllPages(fetchPage, options = {}) {
+export async function fetchAllPages(fetchPage, options = {}, params = {}) {
   const items = []
   let page = 1
   let total = Infinity
   while (items.length < total) {
-    const result = await fetchPage({ page, pageSize: 100 }, options)
-    if (!Array.isArray(result.list) || !Number.isFinite(result.total)) throw new Error('数据集分页响应无效')
+    const result = await fetchPage({ ...params, page, pageSize: 100 }, options)
+    if (!Array.isArray(result.list) || !Number.isFinite(result.total)) throw new Error('分页响应无效')
     total = result.total
-    if (!result.list.length && items.length < total) throw new Error('数据集列表发生变化，请刷新重试')
+    if (!result.list.length && items.length < total) throw new Error('列表发生变化，请刷新重试')
     items.push(...result.list)
     page++
   }
   return items
+}
+
+export function sortRows(rows, { prop, order } = {}) {
+  const source = Array.isArray(rows) ? rows : []
+  if (!prop || !['ascending', 'descending'].includes(order)) return source.slice()
+  const direction = order === 'descending' ? -1 : 1
+  return source.map((row, index) => ({ row, index })).sort((left, right) => {
+    const a = left.row == null ? null : left.row[prop]
+    const b = right.row == null ? null : right.row[prop]
+    if (a == null || a === '') return b == null || b === '' ? left.index - right.index : 1
+    if (b == null || b === '') return -1
+    const numberA = Number(a)
+    const numberB = Number(b)
+    let compared
+    if (Number.isFinite(numberA) && Number.isFinite(numberB)) compared = numberA - numberB
+    else compared = String(a).localeCompare(String(b), 'zh-CN', { numeric: true, sensitivity: 'base' })
+    return compared === 0 ? left.index - right.index : compared * direction
+  }).map(item => item.row)
+}
+
+export function paginateRows(rows, page, pageSize) {
+  const start = Math.max(0, (Number(page) - 1) * Number(pageSize))
+  return (Array.isArray(rows) ? rows : []).slice(start, start + Number(pageSize))
+}
+
+export function clampPage(page, pageSize, total) {
+  const lastPage = Math.max(1, Math.ceil(Number(total) / Number(pageSize)))
+  return Math.min(Math.max(1, Number(page) || 1), lastPage)
 }
 
 export function datasetRow(dataset, replicas = dataset.replicas || []) {

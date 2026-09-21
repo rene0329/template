@@ -21,13 +21,14 @@
                 class="my-table"
                 :data="currentPageData"
                 style="width: 100%;"
-                :default-sort="{prop: 'taskId', order: 'upward'}"
+                :default-sort="{prop: 'taskId', order: 'ascending'}"
+                @sort-change="handleSortChange"
               >
                 <el-table-column
                   prop="taskId"
                   label="任务ID"
                   :min-width="140"
-                  sortable
+                  sortable="custom"
                   align="center"
                 />
                 <el-table-column
@@ -39,7 +40,7 @@
                 <el-table-column
                   prop="createTime"
                   label="创建时间"
-                  sortable
+                  sortable="custom"
                   :min-width="140"
                   align="center"
                 />
@@ -64,10 +65,10 @@
             <span class="pagination-total">共 {{ filteredDataCount }} 条</span>
             <span class="pagination-sizes-label">每页</span>
             <el-select v-model="pageSize" size="mini" class="pagination-sizes-select" @change="handleSizeChange">
-              <el-option :value="5" label="5"></el-option>
-              <el-option :value="10" label="10"></el-option>
-              <el-option :value="20" label="20"></el-option>
-              <el-option :value="50" label="50"></el-option>
+              <el-option :value="5" label="5" />
+              <el-option :value="10" label="10" />
+              <el-option :value="20" label="20" />
+              <el-option :value="50" label="50" />
             </el-select>
             <span class="pagination-sizes-label">条</span>
             <el-pagination
@@ -89,6 +90,7 @@
 import { fetchTaskList, updateTask, deleteTask } from '@/api/managementCenterApi'
 import LiveRefreshStatus from '@/components/LiveRefreshStatus'
 import { keepStableCollection } from '@/utils/live-refresh'
+import { clampPage, fetchAllPages, paginateRows, sortRows } from '@/utils/dataset-catalog'
 
 export default {
   name: 'NodeList',
@@ -108,6 +110,7 @@ export default {
       headerRightText: '欢迎使用',
       loading: false,
       total: 0,
+      sort: { prop: 'taskId', order: 'ascending' },
       pollingTimer: null,
       refreshing: false,
       requestVersion: 0,
@@ -121,7 +124,7 @@ export default {
       // 用于传递参数
       node_name: '',
       selectedTask: {}, // 存储选中的任务数据
-      editing: false,   // 是否处于编辑模式
+      editing: false, // 是否处于编辑模式
       rules: {
         // 表单校验规则
       }
@@ -132,7 +135,7 @@ export default {
       return this.total
     },
     currentPageData() {
-      return this.TaskData
+      return paginateRows(sortRows(this.TaskData, this.sort), this.currentPage, this.pageSize)
     }
   },
   created() {
@@ -154,10 +157,15 @@ export default {
       if (!silent) this.loading = true
       try {
         const options = silent ? { silent: true } : {}
-        const res = await fetchTaskList(this.currentPage, this.pageSize, this.formInline.name, options)
+        const tasks = await fetchAllPages(
+          ({ page, pageSize, query }, requestOptions) => fetchTaskList(page, pageSize, query, requestOptions),
+          options,
+          { query: this.formInline.name }
+        )
         if (version !== this.requestVersion) return
-        this.TaskData = keepStableCollection(this.TaskData, res.list)
-        this.total = res.total || this.TaskData.length
+        this.TaskData = keepStableCollection(this.TaskData, tasks)
+        this.total = tasks.length
+        this.currentPage = clampPage(this.currentPage, this.pageSize, this.total)
         this.lastUpdatedAt = new Date().toLocaleTimeString('zh-CN', { hour12: false })
       } catch (err) {
         if (version !== this.requestVersion) return
@@ -206,11 +214,13 @@ export default {
     handleSizeChange(val) {
       this.pageSize = val
       this.currentPage = 1
-      this.fetchData()
     },
     handleCurrentChange(val) {
       this.currentPage = val
-      this.fetchData()
+    },
+    handleSortChange({ prop, order }) {
+      this.sort = { prop: prop || '', order: order || '' }
+      this.currentPage = 1
     },
     handleEdit(index, row) {
       console.log(index, row)
@@ -367,13 +377,13 @@ export default {
   box-shadow: none;
   box-sizing: border-box;
 }
-.table-wrapper { 
-  width: 100%; 
-  overflow-x: auto; 
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
 }
-.page-footer { 
-  padding: 16px 0; 
-  box-sizing: border-box; 
+.page-footer {
+  padding: 16px 0;
+  box-sizing: border-box;
 }
 .copyright-bar {
   height: 30px;

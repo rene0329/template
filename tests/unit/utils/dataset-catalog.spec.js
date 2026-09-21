@@ -1,4 +1,4 @@
-import { fetchAllPages, datasetRow, datasetsForNode, formatBytes } from '@/utils/dataset-catalog'
+import { clampPage, fetchAllPages, datasetRow, datasetsForNode, formatBytes, paginateRows, sortRows } from '@/utils/dataset-catalog'
 
 describe('registered dataset contract', () => {
   it('reads every page without exceeding 100', async() => {
@@ -10,6 +10,34 @@ describe('registered dataset contract', () => {
     expect(fetchPage.mock.calls.map(call => call[0])).toEqual([
       { page: 1, pageSize: 100 }, { page: 2, pageSize: 100 }, { page: 3, pageSize: 100 }
     ])
+  })
+
+  it('keeps filters while respecting the server page-size limit', async() => {
+    const fetchPage = jest.fn(({ page }) => Promise.resolve({
+      list: page === 1 ? [{ id: 1 }] : [], total: 1
+    }))
+
+    await fetchAllPages(fetchPage, { silent: true }, { status: 'ACTIVE' })
+
+    expect(fetchPage).toHaveBeenCalledWith(
+      { status: 'ACTIVE', page: 1, pageSize: 100 },
+      { silent: true }
+    )
+  })
+
+  it('sorts the complete collection before selecting a page', () => {
+    const rows = [{ id: 1, heat: 20 }, { id: 2, heat: 90 }, { id: 3, heat: 50 }]
+
+    const sorted = sortRows(rows, { prop: 'heat', order: 'descending' })
+
+    expect(paginateRows(sorted, 1, 2).map(item => item.id)).toEqual([2, 3])
+    expect(paginateRows(sorted, 2, 2).map(item => item.id)).toEqual([1])
+    expect(rows.map(item => item.id)).toEqual([1, 2, 3])
+  })
+
+  it('moves an invalid current page to the last available page', () => {
+    expect(clampPage(5, 10, 11)).toBe(2)
+    expect(clampPage(2, 10, 0)).toBe(1)
   })
 
   it('reports a partial failure instead of returning a truncated catalog', async() => {

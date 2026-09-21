@@ -31,10 +31,10 @@
         <div class="content-row">
           <div class="table-card">
             <div class="table-wrapper">
-              <el-table v-loading="loading" class="my-table" :data="TaskData" row-key="datasetId" style="width: 100%;">
+              <el-table v-loading="loading" class="my-table" :data="currentPageData" row-key="datasetId" style="width: 100%;" @sort-change="handleSortChange">
                 <el-table-column prop="datasetId" label="ID" width="70" align="center" />
                 <el-table-column prop="name" label="数据名称" min-width="160" show-overflow-tooltip />
-                <el-table-column prop="dataHeat" label="热度" width="100" align="center" sortable>
+                <el-table-column prop="dataHeat" label="热度" width="100" align="center" sortable="custom">
                   <template slot-scope="scope">{{ formatHeat(scope.row.dataHeat) }}</template>
                 </el-table-column>
                 <el-table-column prop="datasetCode" label="编码" min-width="160" show-overflow-tooltip />
@@ -117,7 +117,7 @@ import ManualScheduleDialog from './ManualScheduleDialog'
 import StoragePlanDialog from './StoragePlanDialog'
 import AccessTestDialog from './AccessTestDialog'
 import { keepStableCollection } from '@/utils/live-refresh'
-import { datasetRow, fetchAllPages, formatBytes, formatHeat } from '@/utils/dataset-catalog'
+import { clampPage, datasetRow, fetchAllPages, formatBytes, formatHeat, paginateRows, sortRows } from '@/utils/dataset-catalog'
 import { fetchRegisteredDatasets, fetchRegisteredNodes } from '@/api/registrationApi'
 import { fetchStoragePolicy, refreshDatasetHeat } from '@/api/datasetStorageApi'
 
@@ -139,6 +139,7 @@ export default {
       storagePolicy: {},
       heatLoading: false,
       total: 0,
+      sort: { prop: '', order: '' },
       formInline: { name: '' },
       TaskData: [],
       selectedTask: {},
@@ -149,6 +150,9 @@ export default {
     }
   },
   computed: {
+    currentPageData() {
+      return paginateRows(sortRows(this.TaskData, this.sort), this.currentPage, this.pageSize)
+    },
     detailReplicas() {
       return this.nonMissingReplicas(this.selectedTask)
     }
@@ -204,22 +208,16 @@ export default {
       if (!silent) this.loadNodeNames()
       try {
         const options = silent ? { silent: true } : {}
-        const [res, policy] = await Promise.all([
-          fetchRegisteredDatasets({ page: this.currentPage, pageSize: this.pageSize, query: this.formInline.name }, options),
+        const [datasets, policy] = await Promise.all([
+          fetchAllPages(fetchRegisteredDatasets, options, { query: this.formInline.name }),
           fetchStoragePolicy({ silent: true }).catch(error => ({ error }))
         ])
         if (version !== this.requestVersion) return
         this.storagePolicy = policy.error ? {} : policy
         this.policyError = policy.error ? `批量存储暂不可用：${policy.error.message}` : ''
-        // 注册中心删除记录后，当前页可能已超出最后一页。
-        const lastPage = Math.max(1, Math.ceil(res.total / this.pageSize))
-        if (this.currentPage > lastPage) {
-          this.currentPage = lastPage
-          this.refreshing = false
-          return this.fetchData(silent)
-        }
-        this.TaskData = keepStableCollection(this.TaskData, res.list.map(dataset => datasetRow(dataset)))
-        this.total = res.total
+        this.TaskData = keepStableCollection(this.TaskData, datasets.map(dataset => datasetRow(dataset)))
+        this.total = datasets.length
+        this.currentPage = clampPage(this.currentPage, this.pageSize, this.total)
         if (this.dialogVisibleDetail) {
           const selected = this.TaskData.find(dataset => dataset.datasetId === this.selectedTask.datasetId)
           if (selected) this.selectedTask = selected
@@ -250,11 +248,13 @@ export default {
     handleSizeChange(val) {
       this.pageSize = val
       this.currentPage = 1
-      this.fetchData()
     },
     handleCurrentChange(val) {
       this.currentPage = val
-      this.fetchData()
+    },
+    handleSortChange({ prop, order }) {
+      this.sort = { prop: prop || '', order: order || '' }
+      this.currentPage = 1
     },
     openTaskDialog(dataset) {
       this.selectedTask = dataset

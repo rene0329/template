@@ -30,6 +30,7 @@
                 :default-sort="{prop: 'datasetId', order: 'ascending'}"
                 row-key="datasetId"
                 @selection-change="handleSelectionChange"
+                @sort-change="handleSortChange"
               >
                 <el-table-column
                   type="selection"
@@ -41,7 +42,7 @@
                   prop="datasetId"
                   label="数据集 ID"
                   :min-width="70"
-                  sortable
+                  sortable="custom"
                   align="center"
                 />
                 <el-table-column
@@ -100,7 +101,7 @@
                 <el-table-column
                   prop="dataDescription"
                   label="数据集描述"
-                  sortable
+                  sortable="custom"
                   :min-width="220"
                   show-overflow-tooltip
                 />
@@ -136,7 +137,7 @@
 
 <script>
 import { fetchRegisteredDatasets, preflightRegisteredTask, createRegisteredTask, requestId } from '@/api/registrationApi'
-import { datasetRow, formatBytes } from '@/utils/dataset-catalog'
+import { clampPage, datasetRow, fetchAllPages, formatBytes, paginateRows, sortRows } from '@/utils/dataset-catalog'
 import LiveRefreshStatus from '@/components/LiveRefreshStatus'
 import { keepStableCollection } from '@/utils/live-refresh'
 
@@ -166,6 +167,7 @@ export default {
       refreshTimer: null,
       lastUpdatedAt: '',
       total: 0,
+      sort: { prop: 'datasetId', order: 'ascending' },
       // 用于表单搜索
       formInline: {
         name: ''
@@ -183,7 +185,7 @@ export default {
   },
   computed: {
     currentPageData() {
-      return this.TaskData
+      return paginateRows(sortRows(this.TaskData, this.sort), this.currentPage, this.pageSize)
     }
   },
   created() {
@@ -205,10 +207,11 @@ export default {
       if (!silent) this.loading = true
       try {
         const options = silent ? { silent: true } : {}
-        const res = await fetchRegisteredDatasets({ page: this.currentPage, pageSize: this.pageSize, query: this.formInline.name }, options)
+        const datasets = await fetchAllPages(fetchRegisteredDatasets, options, { query: this.formInline.name })
         if (version !== this.requestVersion) return
-        this.TaskData = keepStableCollection(this.TaskData, res.list.map(dataset => datasetRow(dataset)))
-        this.total = res.total
+        this.TaskData = keepStableCollection(this.TaskData, datasets.map(dataset => datasetRow(dataset)))
+        this.total = datasets.length
+        this.currentPage = clampPage(this.currentPage, this.pageSize, this.total)
         this.lastUpdatedAt = new Date().toLocaleTimeString('zh-CN', { hour12: false })
         this.loadError = ''
       } catch (err) {
@@ -238,11 +241,13 @@ export default {
     handleSizeChange(val) {
       this.pageSize = val
       this.currentPage = 1
-      this.fetchData()
     },
     handleCurrentChange(val) {
       this.currentPage = val
-      this.fetchData()
+    },
+    handleSortChange({ prop, order }) {
+      this.sort = { prop: prop || '', order: order || '' }
+      this.currentPage = 1
     },
     handleEdit(index, row) {
       console.log(index, row)
