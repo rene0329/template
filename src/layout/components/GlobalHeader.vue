@@ -61,6 +61,11 @@ export default {
       const domain = user.domainName || user.domainCode || '无业务域'
       return `${user.displayName || user.username}（${user.username} · ${domain}）`
     },
+    goToWorkspace() {
+      if (this.$route.path !== '/workspace') {
+        this.$router.push('/workspace', () => {}, () => {})
+      }
+    },
     async openUserSwitcher() {
       try {
         const rows = await fetchUsers()
@@ -77,7 +82,7 @@ export default {
       try {
         await this.$store.dispatch('user/switchUser', this.targetUserId)
         this.switchDialogVisible = false
-        await this.$router.push('/workspace').catch(() => {})
+        this.goToWorkspace()
         this.$message.success('已切换为普通用户只读视角')
       } catch (error) {
         this.$message.error(`切换失败：${error.message || error}`)
@@ -89,7 +94,7 @@ export default {
       this.returning = true
       try {
         await this.$store.dispatch('user/exitUserSwitch')
-        await this.$router.push('/workspace').catch(() => {})
+        this.goToWorkspace()
         this.$message.success('已返回管理员身份')
       } catch (error) {
         this.$message.error(`返回管理员失败：${error.message || error}`)
