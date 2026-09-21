@@ -8,7 +8,7 @@
       <el-button v-if="isAdmin" class="switch-button" type="text" @click="openUserSwitcher">
         <i class="el-icon-user" /> 切换用户
       </el-button>
-      <el-tag v-if="impersonated" size="mini" effect="dark" type="warning">管理员只读视角</el-tag>
+      <el-tag v-if="impersonated" size="mini" effect="dark" type="warning">管理员切换身份</el-tag>
       <el-button v-if="impersonated" class="switch-button" type="text" :loading="returning" @click="returnToAdmin">
         <i class="el-icon-back" /> 返回 {{ actorUsername || '管理员' }}
       </el-button>
@@ -19,8 +19,8 @@
       <el-button class="logout-button" type="text" @click="logout"><i class="el-icon-switch-button" /> 退出</el-button>
     </div>
     <backend-settings ref="backendSettings" />
-    <el-dialog title="切换普通用户视角" :visible.sync="switchDialogVisible" width="520px" append-to-body>
-      <el-alert title="切换后仅可查看该用户页面，不能审批、修改数据或读取隐私计算明文结果。" type="warning" :closable="false" show-icon />
+    <el-dialog title="切换普通用户身份" :visible.sync="switchDialogVisible" width="520px" append-to-body>
+      <el-alert title="切换后将以该用户的身份和权限执行任务，切换与返回操作会记录到系统日志。" type="warning" :closable="false" show-icon />
       <el-form label-width="90px" class="switch-form">
         <el-form-item label="目标用户" required>
           <el-select v-model="targetUserId" filterable placeholder="选择已启用的普通用户" style="width:100%">
@@ -30,7 +30,7 @@
       </el-form>
       <span slot="footer">
         <el-button @click="switchDialogVisible=false">取消</el-button>
-        <el-button type="primary" :disabled="!targetUserId" :loading="switching" @click="switchUser">切换视角</el-button>
+        <el-button type="primary" :disabled="!targetUserId" :loading="switching" @click="switchUser">切换身份</el-button>
       </span>
     </el-dialog>
   </header>
@@ -83,7 +83,7 @@ export default {
         await this.$store.dispatch('user/switchUser', this.targetUserId)
         this.switchDialogVisible = false
         this.goToWorkspace()
-        this.$message.success('已切换为普通用户只读视角')
+        this.$message.success('已切换为该普通用户身份')
       } catch (error) {
         this.$message.error(`切换失败：${error.message || error}`)
       } finally {
