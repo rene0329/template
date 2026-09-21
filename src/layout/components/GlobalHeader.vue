@@ -66,6 +66,10 @@ export default {
         this.$router.push('/workspace', () => {}, () => {})
       }
     },
+    showIdentitySuccess(message) {
+      if (typeof this.$message.closeAll === 'function') this.$message.closeAll()
+      this.$message({ message, type: 'success', duration: 2500, showClose: true })
+    },
     async openUserSwitcher() {
       try {
         const rows = await fetchUsers()
@@ -83,7 +87,7 @@ export default {
         await this.$store.dispatch('user/switchUser', this.targetUserId)
         this.switchDialogVisible = false
         this.goToWorkspace()
-        this.$message.success('已切换为该普通用户身份')
+        this.showIdentitySuccess('已切换为该普通用户身份')
       } catch (error) {
         this.$message.error(`切换失败：${error.message || error}`)
       } finally {
@@ -95,7 +99,7 @@ export default {
       try {
         await this.$store.dispatch('user/exitUserSwitch')
         this.goToWorkspace()
-        this.$message.success('已返回管理员身份')
+        this.showIdentitySuccess('已返回管理员身份')
       } catch (error) {
         this.$message.error(`返回管理员失败：${error.message || error}`)
       } finally {

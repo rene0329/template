@@ -19,4 +19,19 @@ describe('GlobalHeader route navigation', () => {
     GlobalHeader.methods.goToWorkspace.call(context)
     expect(push).not.toHaveBeenCalled()
   })
+
+  it('closes stale identity messages and gives success messages a finite duration', () => {
+    const message = jest.fn()
+    message.closeAll = jest.fn()
+
+    GlobalHeader.methods.showIdentitySuccess.call({ $message: message }, '已返回管理员身份')
+
+    expect(message.closeAll).toHaveBeenCalled()
+    expect(message).toHaveBeenCalledWith({
+      message: '已返回管理员身份',
+      type: 'success',
+      duration: 2500,
+      showClose: true
+    })
+  })
 })
