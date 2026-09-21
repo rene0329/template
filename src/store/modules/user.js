@@ -1,4 +1,4 @@
-import { login, getInfo } from '@/api/user'
+import { login, getInfo, impersonateUser, exitImpersonation } from '@/api/user'
 import { getToken, setToken, removeToken } from '@/utils/auth'
 import { resetRouter } from '@/router'
 
@@ -10,7 +10,10 @@ const getDefaultState = () => {
     name: '',
     avatar: '',
     roles: [],
-    domain: null
+    domain: null,
+    impersonated: false,
+    actorUserId: null,
+    actorUsername: ''
   }
 }
 
@@ -36,6 +39,9 @@ const mutations = {
     state.avatar = profile.avatar
     state.roles = profile.roles
     state.domain = profile.domain
+    state.impersonated = profile.impersonated
+    state.actorUserId = profile.actorUserId
+    state.actorUsername = profile.actorUsername
   }
 }
 
@@ -71,12 +77,37 @@ const actions = {
           name: data.displayName || data.name || data.username || '',
           avatar: data.avatar || '',
           roles,
-          domain
+          domain,
+          impersonated: Boolean(data.impersonated),
+          actorUserId: data.actorUserId || null,
+          actorUsername: data.actorUsername || ''
         })
         resolve(data)
       }).catch(error => {
         reject(error)
       })
+    })
+  },
+
+  switchUser({ commit, dispatch }, userId) {
+    return impersonateUser(userId).then(response => {
+      const token = response && (response.token || response.accessToken)
+      if (!token) throw new Error('切换用户响应中缺少访问令牌')
+      commit('SET_TOKEN', token)
+      setToken(token)
+      resetRouter()
+      return dispatch('getInfo')
+    })
+  },
+
+  exitUserSwitch({ commit, dispatch }) {
+    return exitImpersonation().then(response => {
+      const token = response && (response.token || response.accessToken)
+      if (!token) throw new Error('返回管理员响应中缺少访问令牌')
+      commit('SET_TOKEN', token)
+      setToken(token)
+      resetRouter()
+      return dispatch('getInfo')
     })
   },
 

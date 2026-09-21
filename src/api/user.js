@@ -12,3 +12,11 @@ export function login(data) {
 export function getInfo() {
   return request({ url: '/api/v1/auth/me', method: 'get' })
 }
+
+export function impersonateUser(userId) {
+  return request({ url: '/api/v1/auth/impersonation', method: 'post', data: { userId }})
+}
+
+export function exitImpersonation() {
+  return request({ url: '/api/v1/auth/impersonation/exit', method: 'post' })
+}
