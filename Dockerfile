@@ -7,7 +7,7 @@ WORKDIR /app
 ENV NODE_OPTIONS=--openssl-legacy-provider
 
 # 前端地址会编译进静态资源；可在 docker build 时通过 --build-arg 覆盖。
-ARG VUE_APP_PRACTICE_API=http://10.212.14.88:31081
+ARG VUE_APP_PRACTICE_API=http://10.15.16.40:30482
 ENV VUE_APP_PRACTICE_API=${VUE_APP_PRACTICE_API}
 ENV VUE_APP_DEMO_MODE=false
 

@@ -56,7 +56,7 @@ pnpm electron:make
 在仓库的 `Settings → Secrets and variables → Actions → Variables` 中创建：
 
 ```text
-DEFAULT_BACKEND_URL=http://10.212.14.88:31081
+DEFAULT_BACKEND_URL=http://10.15.16.40:30482
 ```
 
 该变量只决定安装包首次启动时的默认地址，不是秘密。用户仍可在应用内修改地址。

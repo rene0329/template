@@ -9,7 +9,7 @@
   >
     <el-form ref="configForm" :model="form" :rules="rules" label-width="100px">
       <el-form-item label="后端地址" prop="backendUrl">
-        <el-input v-model.trim="form.backendUrl" placeholder="例如：http://10.212.14.88:31081" />
+        <el-input v-model.trim="form.backendUrl" placeholder="例如：http://10.15.16.40:30482" />
       </el-form-item>
       <el-form-item label="健康检查" prop="healthPath">
         <el-input v-model.trim="form.healthPath" placeholder="/health" />
