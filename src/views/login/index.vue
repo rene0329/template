@@ -44,7 +44,7 @@
       <el-button :loading="loading" type="primary" style="width:100%;margin-bottom:30px;" @click.native.prevent="handleLogin">登录</el-button>
 
       <div class="tips">
-        <p>使用系统管理员分配的账号登录。数据持有者可发起计算并审批本人持有的数据。</p>
+        <p>使用系统管理员分配的账号登录。域用户可直接使用本域节点上的数据集，其他数据集需申请临时访问令牌。</p>
       </div>
 
       <div class="server-settings">

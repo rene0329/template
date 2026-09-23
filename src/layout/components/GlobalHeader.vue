@@ -55,7 +55,7 @@ export default {
       this.$refs.backendSettings.open()
     },
     roleText(role) {
-      return { ADMIN: '管理员', DATA_OWNER: '数据持有者', AUDITOR: '审计员' }[role] || role
+      return { ADMIN: '管理员', DATA_OWNER: '域用户', AUDITOR: '审计员' }[role] || role
     },
     userLabel(user) {
       const domain = user.domainName || user.domainCode || '无业务域'

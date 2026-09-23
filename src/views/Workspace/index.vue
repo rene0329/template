@@ -104,7 +104,7 @@ export default {
     name() { return this.$store.getters.name || this.$store.getters.username },
     roles() { return this.$store.getters.roles || [] },
     isDataOwner() { return this.roles.includes('DATA_OWNER') },
-    roleNames() { return this.roles.map(role => ({ ADMIN: '管理员', DATA_OWNER: '数据持有者', AUDITOR: '审计员' })[role] || role).join('、') },
+    roleNames() { return this.roles.map(role => ({ ADMIN: '管理员', DATA_OWNER: '域用户', AUDITOR: '审计员' })[role] || role).join('、') },
     domainName() { const domain = this.$store.getters.domain; return domain && (domain.name || domain.domainName) },
     metrics() {
       return [

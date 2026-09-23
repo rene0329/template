@@ -21,7 +21,7 @@
         </el-tab-pane>
 
         <el-tab-pane label="用户管理" name="users">
-          <div class="toolbar"><span>数据持有者必须绑定一个启用的业务域</span><el-button type="primary" icon="el-icon-plus" @click="openUser()">新增用户</el-button></div>
+          <div class="toolbar"><span>域用户必须绑定一个启用的业务域</span><el-button type="primary" icon="el-icon-plus" @click="openUser()">新增用户</el-button></div>
           <el-table v-loading="loading" :data="users" border>
             <el-table-column prop="username" label="用户名" min-width="140" />
             <el-table-column label="姓名" min-width="140"><template slot-scope="s">{{ s.row.displayName || s.row.name || '—' }}</template></el-table-column>
@@ -47,7 +47,7 @@
       </el-dialog>
 
       <el-dialog :title="userForm.id ? '编辑用户' : '新增用户'" :visible.sync="userDialog" width="560px">
-        <el-form label-width="90px"><el-form-item label="用户名" required><el-input v-model.trim="userForm.username" :disabled="!!userForm.id" /></el-form-item><el-form-item label="姓名" required><el-input v-model.trim="userForm.displayName" /></el-form-item><el-form-item v-if="!userForm.id" label="初始密码" required><el-input v-model="userForm.password" type="password" show-password /></el-form-item><el-form-item label="角色" required><el-select v-model="userForm.roles" multiple style="width:100%"><el-option label="管理员" value="ADMIN" /><el-option label="数据持有者" value="DATA_OWNER" /><el-option label="审计员" value="AUDITOR" /></el-select></el-form-item><el-form-item v-if="userForm.roles.includes('DATA_OWNER')" label="业务域" required><el-select v-model="userForm.domainId" style="width:100%"><el-option v-for="item in enabledDomains" :key="item.id || item.domainId" :label="item.name" :value="item.id || item.domainId" /></el-select></el-form-item></el-form>
+        <el-form label-width="90px"><el-form-item label="用户名" required><el-input v-model.trim="userForm.username" :disabled="!!userForm.id" /></el-form-item><el-form-item label="姓名" required><el-input v-model.trim="userForm.displayName" /></el-form-item><el-form-item v-if="!userForm.id" label="初始密码" required><el-input v-model="userForm.password" type="password" show-password /></el-form-item><el-form-item label="角色" required><el-select v-model="userForm.roles" multiple style="width:100%"><el-option label="管理员" value="ADMIN" /><el-option label="域用户" value="DATA_OWNER" /><el-option label="审计员" value="AUDITOR" /></el-select></el-form-item><el-form-item v-if="userForm.roles.includes('DATA_OWNER')" label="业务域" required><el-select v-model="userForm.domainId" style="width:100%"><el-option v-for="item in enabledDomains" :key="item.id || item.domainId" :label="item.name" :value="item.id || item.domainId" /></el-select></el-form-item></el-form>
         <span slot="footer"><el-button @click="userDialog=false">取消</el-button><el-button type="primary" :loading="saving" :disabled="!canSaveUser" @click="saveUser">保存</el-button></span>
       </el-dialog>
 
@@ -102,7 +102,7 @@ export default {
   methods: {
     isEnabled(item) { return item.enabled !== false && item.status !== 'DISABLED' && item.status !== 'INACTIVE' },
     roleValues(user) { return (user.roles || []).map(role => typeof role === 'string' ? role : role.code) },
-    roleText(role) { return { ADMIN: '管理员', DATA_OWNER: '数据持有者', AUDITOR: '审计员' }[role] || role },
+    roleText(role) { return { ADMIN: '管理员', DATA_OWNER: '域用户', AUDITOR: '审计员' }[role] || role },
     userDomainId(user) { return user.domainId || (user.domain && (user.domain.id || user.domain.domainId)) },
     userDomainName(user) { return user.domainName || (user.domain && user.domain.name) || '—' },
     domainSite(domain) { return siteOf(domain.siteCode) || '—' },
