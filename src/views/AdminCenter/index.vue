@@ -8,11 +8,13 @@
 
       <el-tabs v-model="activeTab" class="content-card">
         <el-tab-pane label="域管理" name="domains">
-          <div class="toolbar"><span>业务域数量不受 A/B/C 执行槽限制</span><el-button type="primary" icon="el-icon-plus" @click="openDomain()">新增业务域</el-button></div>
+          <div class="toolbar"><span>受限域账号只能直接使用存放在本域节点上的数据集，其他数据集需申请临时访问令牌；业务域数量不受 A/B/C 执行槽限制</span><el-button type="primary" icon="el-icon-plus" @click="openDomain()">新增业务域</el-button></div>
           <el-table v-loading="loading" :data="domains" border>
-            <el-table-column prop="code" label="域编码" min-width="160" />
-            <el-table-column prop="name" label="域名称" min-width="180" />
-            <el-table-column prop="description" label="说明" min-width="240" show-overflow-tooltip />
+            <el-table-column prop="code" label="域编码" min-width="140" />
+            <el-table-column prop="name" label="域名称" min-width="160" />
+            <el-table-column label="对应站点" width="110"><template slot-scope="s">{{ domainSite(s.row) }}</template></el-table-column>
+            <el-table-column label="包含节点" min-width="220"><template slot-scope="s">{{ domainNodeNames(s.row) }}</template></el-table-column>
+            <el-table-column prop="description" label="说明" min-width="200" show-overflow-tooltip />
             <el-table-column label="状态" width="100"><template slot-scope="s"><el-tag :type="isEnabled(s.row) ? 'success' : 'info'">{{ isEnabled(s.row) ? '启用' : '停用' }}</el-tag></template></el-table-column>
             <el-table-column label="操作" width="170"><template slot-scope="s"><el-button type="text" @click="openDomain(s.row)">编辑</el-button><el-button type="text" @click="toggleDomain(s.row)">{{ isEnabled(s.row) ? '停用' : '启用' }}</el-button></template></el-table-column>
           </el-table>
@@ -31,7 +33,7 @@
         </el-tab-pane>
 
         <el-tab-pane label="数据归属" name="datasets">
-          <div class="toolbar"><span>未分配持有者的数据不能用于隐私计算</span><el-input v-model="datasetQuery" clearable placeholder="搜索数据集" class="search" @keyup.enter.native="loadDatasets" /><el-button @click="loadDatasets">查询</el-button></div>
+          <div class="toolbar"><span>业务域由数据集当前存放的节点决定，随数据迁移变化；持有者用于隐私计算，未分配持有者的数据不能用于隐私计算</span><el-input v-model="datasetQuery" clearable placeholder="搜索数据集" class="search" @keyup.enter.native="loadDatasets()" /><el-button @click="loadDatasets()">查询</el-button></div>
           <el-table v-loading="loading" :data="datasets" border>
             <el-table-column prop="datasetId" label="ID" width="80" />
             <el-table-column label="数据集" min-width="210"><template slot-scope="s"><strong>{{ s.row.name || s.row.datasetCode }}</strong><div class="muted">{{ s.row.datasetCode }} · {{ s.row.version }}</div></template></el-table-column>
@@ -43,7 +45,15 @@
       </el-tabs>
 
       <el-dialog :title="domainForm.id ? '编辑业务域' : '新增业务域'" :visible.sync="domainDialog" width="520px">
-        <el-form label-width="90px"><el-form-item label="域编码" required><el-input v-model.trim="domainForm.code" :disabled="!!domainForm.id" /></el-form-item><el-form-item label="域名称" required><el-input v-model.trim="domainForm.name" /></el-form-item><el-form-item label="说明"><el-input v-model="domainForm.description" type="textarea" /></el-form-item></el-form>
+        <el-form label-width="90px">
+          <el-form-item label="域编码" required><el-input v-model.trim="domainForm.code" :disabled="!!domainForm.id" /></el-form-item>
+          <el-form-item label="域名称" required><el-input v-model.trim="domainForm.name" /></el-form-item>
+          <el-form-item label="对应站点">
+            <el-select v-model="domainForm.siteCode" clearable placeholder="不对应站点" style="width:100%"><el-option v-for="item in siteOptions" :key="item.value" :label="item.label" :value="item.value" /></el-select>
+            <div class="muted site-hint">该站点的全部节点属于本域，存放在这些节点上的数据集归属本域</div>
+          </el-form-item>
+          <el-form-item label="说明"><el-input v-model="domainForm.description" type="textarea" /></el-form-item>
+        </el-form>
         <span slot="footer"><el-button @click="domainDialog=false">取消</el-button><el-button type="primary" :loading="saving" :disabled="!domainForm.code || !domainForm.name" @click="saveDomain">保存</el-button></span>
       </el-dialog>
 
@@ -60,20 +70,29 @@
 </template>
 
 <script>
-import { fetchRegisteredDatasets } from '@/api/registrationApi'
+import { fetchRegisteredDatasets, fetchRegisteredNodes } from '@/api/registrationApi'
+import { fetchDatasetAccess } from '@/api/accessControlApi'
 import { assignDatasetOwner, createDomain, createUser, fetchDomains, fetchUsers, resetUserPassword, updateDomain, updateUser } from '@/api/adminApi'
 import { fetchAllPages } from '@/utils/dataset-catalog'
 
 const ADMIN_TABS = ['domains', 'users', 'datasets']
+const DOMAIN_ERRORS = { DOMAIN_SITE_TAKEN: '该站点已对应其他业务域' }
 const listOf = value => Array.isArray(value) ? value : (value && Array.isArray(value.list) ? value.list : [])
+const siteOf = value => value == null ? '' : String(value).trim()
+const namesOf = values => (Array.isArray(values) ? values : []).filter(name => name != null && String(name).trim() !== '')
+const joinNames = names => names.length ? names.join('、') : '—'
+const nodeName = node => node.displayName || node.k8sNodeName || node.nodeName || `节点 #${node.nodeId}`
+// 业务域由数据集当前副本所在节点的站点决定，按数据集访问接口返回的 domainNames 展示。
+const locationDomains = access => (access && Array.isArray(access.items) ? access.items : [])
+  .reduce((domains, item) => { domains[item.datasetId] = namesOf(item.domainNames); return domains }, {})
 
 export default {
   name: 'AdminCenter',
   data() {
     return {
       activeTab: this.$route && ADMIN_TABS.includes(this.$route.query.tab) ? this.$route.query.tab : 'domains',
-      loading: false, saving: false, domains: [], users: [], datasets: [], datasetQuery: '',
-      domainDialog: false, domainForm: { id: null, code: '', name: '', description: '' },
+      loading: false, saving: false, domains: [], users: [], nodes: [], datasets: [], datasetDomains: {}, datasetQuery: '',
+      domainDialog: false, domainForm: { id: null, code: '', name: '', description: '', siteCode: null },
       userDialog: false, userForm: { id: null, username: '', displayName: '', password: '', roles: [], domainId: null },
       passwordDialog: false, passwordUser: {}, newPassword: '',
       ownerDialog: false, ownerDataset: {}, ownerUserId: null
@@ -81,6 +100,20 @@ export default {
   },
   computed: {
     enabledDomains() { return this.domains.filter(this.isEnabled) },
+    // 站点 -> 该站点的已注册节点名称
+    siteNodeNames() {
+      return this.nodes.reduce((sites, node) => {
+        const site = siteOf(node.siteCode)
+        if (site) sites[site] = (sites[site] || []).concat(nodeName(node))
+        return sites
+      }, {})
+    },
+    siteOptions() {
+      const sites = Object.keys(this.siteNodeNames).sort()
+      const current = siteOf(this.domainForm.siteCode)
+      if (current && !sites.includes(current)) sites.push(current)
+      return sites.map(site => ({ value: site, label: `${site}（${(this.siteNodeNames[site] || []).join('、') || '暂无节点'}）` }))
+    },
     canSaveUser() { return Boolean(this.userForm.username && this.userForm.displayName && this.userForm.roles.length && (this.userForm.id || this.userForm.password.length >= 10) && (!this.userForm.roles.includes('DATA_OWNER') || this.userForm.domainId)) },
     ownerGroups() {
       return this.enabledDomains.map(domain => ({
@@ -97,23 +130,32 @@ export default {
     roleText(role) { return { ADMIN: '管理员', DATA_OWNER: '数据持有者', AUDITOR: '审计员' }[role] || role },
     userDomainId(user) { return user.domainId || (user.domain && (user.domain.id || user.domain.domainId)) },
     userDomainName(user) { return user.domainName || (user.domain && user.domain.name) || '—' },
-    datasetDomainName(dataset) { return dataset.ownerDomainName || (dataset.ownerDomain && dataset.ownerDomain.name) || '未分配' },
+    domainSite(domain) { return siteOf(domain.siteCode) || '—' },
+    domainNodeNames(domain) { const site = siteOf(domain.siteCode); return joinNames(site ? this.siteNodeNames[site] || [] : []) },
+    datasetDomainName(dataset) { return joinNames(this.datasetDomains[dataset.datasetId] || []) },
     async loadAll() {
       this.loading = true
       try {
-        const [domains, users] = await Promise.all([fetchDomains(), fetchUsers()])
+        const [domains, users, nodes] = await Promise.all([fetchDomains(), fetchUsers(), fetchAllPages(fetchRegisteredNodes)])
         this.domains = listOf(domains)
         this.users = listOf(users)
+        this.nodes = nodes
         await this.loadDatasets(true)
       } catch (error) { this.$message.error(`管理数据加载失败：${error.message}`) } finally { this.loading = false }
     },
     async loadDatasets(nested = false) {
       if (!nested) this.loading = true
-      try { this.datasets = await fetchAllPages(fetchRegisteredDatasets, {}, { query: this.datasetQuery }) } catch (error) { this.$message.error(`数据集加载失败：${error.message}`) } finally { if (!nested) this.loading = false }
+      try {
+        const [datasets, access] = await Promise.all([fetchAllPages(fetchRegisteredDatasets, {}, { query: this.datasetQuery }), fetchDatasetAccess()])
+        this.datasetDomains = locationDomains(access)
+        this.datasets = datasets
+      } catch (error) { this.$message.error(`数据集加载失败：${error.message}`) } finally { if (!nested) this.loading = false }
     },
-    openDomain(row = {}) { this.domainForm = { id: row.id || row.domainId || null, code: row.code || row.domainCode || '', name: row.name || '', description: row.description || '' }; this.domainDialog = true },
-    async saveDomain() { this.saving = true; try { const payload = { code: this.domainForm.code, name: this.domainForm.name, description: this.domainForm.description }; if (this.domainForm.id) await updateDomain(this.domainForm.id, payload); else await createDomain(payload); this.domainDialog = false; this.$message.success('业务域已保存'); await this.loadAll() } catch (error) { this.$message.error(`保存失败：${error.message}`) } finally { this.saving = false } },
-    async toggleDomain(row) { try { await updateDomain(row.id || row.domainId, { enabled: !this.isEnabled(row) }); this.$message.success('业务域状态已更新'); await this.loadAll() } catch (error) { this.$message.error(`状态更新失败：${error.message}`) } },
+    openDomain(row = {}) { this.domainForm = { id: row.id || row.domainId || null, code: row.code || row.domainCode || '', name: row.name || '', description: row.description || '', siteCode: siteOf(row.siteCode) || null }; this.domainDialog = true },
+    // 清空站点时 el-select 回填空字符串，统一以 null 提交表示解除对应。
+    async saveDomain() { this.saving = true; try { const payload = { code: this.domainForm.code, name: this.domainForm.name, description: this.domainForm.description, siteCode: siteOf(this.domainForm.siteCode) || null }; if (this.domainForm.id) await updateDomain(this.domainForm.id, payload); else await createDomain(payload); this.domainDialog = false; this.$message.success('业务域已保存'); await this.loadAll() } catch (error) { this.$message.error(`保存失败：${DOMAIN_ERRORS[error.errorCode] || error.message}`) } finally { this.saving = false } },
+    // 启停时带上当前站点，避免后端把缺省的 siteCode 当作解除对应。
+    async toggleDomain(row) { try { await updateDomain(row.id || row.domainId, { enabled: !this.isEnabled(row), siteCode: siteOf(row.siteCode) || null }); this.$message.success('业务域状态已更新'); await this.loadAll() } catch (error) { this.$message.error(`状态更新失败：${error.message}`) } },
     openUser(row = {}) { this.userForm = { id: row.id || row.userId || null, username: row.username || '', displayName: row.displayName || row.name || '', password: '', roles: this.roleValues(row), domainId: this.userDomainId(row) || null }; this.userDialog = true },
     async saveUser() { this.saving = true; try { const payload = { username: this.userForm.username, displayName: this.userForm.displayName, roles: this.userForm.roles, domainId: this.userForm.roles.includes('DATA_OWNER') ? this.userForm.domainId : null }; if (this.userForm.id) await updateUser(this.userForm.id, payload); else await createUser({ ...payload, password: this.userForm.password }); this.userDialog = false; this.$message.success('用户已保存'); await this.loadAll() } catch (error) { this.$message.error(`保存失败：${error.message}`) } finally { this.saving = false } },
     async toggleUser(row) { try { await updateUser(row.id || row.userId, { enabled: !this.isEnabled(row) }); this.$message.success('用户状态已更新'); await this.loadAll() } catch (error) { this.$message.error(`状态更新失败：${error.message}`) } },
@@ -130,6 +172,6 @@ export default {
 .page-heading, .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .page-heading { margin-bottom: 16px; }.page-heading h2 { margin: 0 0 7px; color: #1f3447; }.page-heading p, .toolbar span, .muted { margin: 0; color: #7b8995; font-size: 13px; }
 .content-card { padding: 8px 22px 24px; border-radius: 8px; background: #fff; box-shadow: 0 2px 9px rgba(32,55,76,.06); }
-.toolbar { margin: 8px 0 16px; }.toolbar .search { width: 280px; margin-left: auto; }.tag { margin-right: 4px; }.dialog-input { margin-top: 18px; }.dataset-title { font-weight: 600; color: #334a5d; }
+.toolbar { margin: 8px 0 16px; }.toolbar .search { width: 280px; margin-left: auto; }.tag { margin-right: 4px; }.dialog-input { margin-top: 18px; }.dataset-title { font-weight: 600; color: #334a5d; }.site-hint { margin-top: 4px; line-height: 20px; }
 @media(max-width:768px){.page-heading,.toolbar{align-items:stretch;flex-direction:column}.toolbar .search{width:100%;margin-left:0}}
 </style>

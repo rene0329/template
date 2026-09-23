@@ -65,6 +65,9 @@
 <script>
 import { discoverDatasets, fetchDatasetCandidates, fetchRegisteredDatasets, fetchRegisteredNodes, registerDataset, uploadAndRegisterDataset, verifyDataset, activateDataset, disableDataset, unregisterDataset, createRegisteredTask, preflightRegisteredTask } from '@/api/registrationApi'
 import { fetchAllPages } from '@/utils/dataset-catalog'
+// 默认名称与编码只去掉最后一段扩展名（real-cifar-10-1.0.npz -> real-cifar-10-1.0）；纯数字后缀视为版本号保留。
+const fileStem = fileName => String(fileName || '').trim().replace(/\.[a-z0-9]*[a-z][a-z0-9]*$/i, '')
+const datasetCodeOf = stem => stem.replace(/[^a-zA-Z0-9._-]/g, '-')
 export default {
   name: 'DatasetRegistry',
   data: () => ({
@@ -80,7 +83,7 @@ export default {
     verifyDataset, activateDataset, disableDataset,
     async load() { this.loading = true; try { const api = this.tab === 'candidates' ? fetchDatasetCandidates : fetchRegisteredDatasets; const r = await api({ page: this.page, pageSize: 20, query: this.query }); this.rows = r.list || []; this.total = r.total || 0 } catch (e) { this.$message.error(e.message || '加载失败') } finally { this.loading = false } },
     async discover() { try { await discoverDatasets(); this.$message.success('扫描已触发'); await this.load() } catch (e) { this.$message.error(e.message || '扫描失败') } },
-    openRegister(row) { const base = (row.fileName || 'dataset').replace(/[^a-zA-Z0-9._-]/g, '-'); this.form = { candidateId: row.candidateId, datasetCode: base, name: row.fileName || base, version: '1.0', dataType: row.fileType || 'unknown', description: '' }; this.dialog = true },
+    openRegister(row) { const stem = fileStem(row.fileName) || 'dataset'; this.form = { candidateId: row.candidateId, datasetCode: datasetCodeOf(stem), name: stem, version: '1.0', dataType: row.fileType || 'unknown', description: '' }; this.dialog = true },
     async submit() { try { await registerDataset(this.form); this.dialog = false; this.$message.success('数据集已注册'); await this.load() } catch (e) { this.$message.error(e.message || '注册失败') } },
     async openUpload() {
       try {
@@ -97,9 +100,9 @@ export default {
     handleUploadFile(file, fileList) {
       this.uploadFile = file.raw
       this.uploadFileList = fileList.slice(-1)
-      const base = (file.name || 'dataset').replace(/\.npz$/i, '').replace(/[^a-zA-Z0-9._-]/g, '-') || 'dataset'
-      if (!this.uploadForm.datasetCode) this.uploadForm.datasetCode = base
-      if (!this.uploadForm.name) this.uploadForm.name = base
+      const stem = fileStem(file.name) || 'dataset'
+      if (!this.uploadForm.datasetCode) this.uploadForm.datasetCode = datasetCodeOf(stem)
+      if (!this.uploadForm.name) this.uploadForm.name = stem
     },
     removeUploadFile() { this.uploadFile = null; this.uploadFileList = [] },
     async submitUpload() {

@@ -9,7 +9,7 @@ const START = Date.parse('2026-09-24T02:00:00.000Z')
 const iso = ms => new Date(ms).toISOString()
 const dataset = (id, fields = {}) => ({
   datasetId: id, name: `数据集 ${id}`, datasetCode: `ds-${id}`, version: 'v1', status: 'ACTIVE',
-  ownerDomainId: 2, ownerDomainName: 'B 域', accessible: false, basis: null,
+  domainIds: [2], domainNames: ['B 域'], accessible: false, basis: null,
   grantId: null, grantExpiresAt: null, grantReason: null, ...fields
 })
 const payload = (items, serverTime = START, ttlMinutes = 30) => ({ serverTime: iso(serverTime), ttlMinutes, items })
@@ -43,7 +43,7 @@ it('explains why each dataset is available and shows grant time left in server t
   const grantExpiresAt = START + 5000 + (23 * 60 + 30) * 1000
   fetchDatasetAccess.mockResolvedValue(payload([
     dataset(1, { accessible: true, basis: 'ADMIN' }),
-    dataset(2, { accessible: true, basis: 'OWN_DOMAIN', ownerDomainName: 'A 域' }),
+    dataset(2, { accessible: true, basis: 'OWN_DOMAIN', domainIds: [1], domainNames: ['A 域'] }),
     dataset(3, { accessible: true, basis: 'GRANT', grantId: 'g-3', grantExpiresAt: iso(grantExpiresAt) }),
     dataset(4)
   ], START + 5000))
@@ -64,16 +64,34 @@ it('explains why each dataset is available and shows grant time left in server t
   expect(vm.accessibleCount).toBe(3)
 })
 
-it('searches all datasets by name, code, version and owner domain', () => {
+it('searches all datasets by name, code, version and location domains', () => {
   const vm = context()
-  vm.items = [dataset(1, { ownerDomainName: 'A 域' }), dataset(2, { datasetCode: 'census', version: 'v2' })]
+  vm.items = [
+    dataset(1, { domainIds: [1], domainNames: ['上海域（A）'] }),
+    dataset(2, { datasetCode: 'census', version: 'v2' }),
+    dataset(3, { domainIds: [3, 5], domainNames: ['北京域（C）', '中心域'] }),
+    dataset(4, { domainIds: [], domainNames: [] })
+  ]
   vm.query = ' CENSUS '
   expect(vm.rows.map(row => row.datasetId)).toEqual([2])
-  vm.query = 'a 域'
+  vm.query = '上海域'
   expect(vm.rows.map(row => row.datasetId)).toEqual([1])
+  vm.query = '中心域'
+  expect(vm.rows.map(row => row.datasetId)).toEqual([3])
+  vm.query = 'b 域'
+  expect(vm.rows.map(row => row.datasetId)).toEqual([2])
   vm.query = 'missing'
   expect(vm.rows).toEqual([])
   expect(vm.emptyText).toBe('没有匹配的数据集')
+})
+
+it('shows every location domain of a dataset and a dash when it is on no domain node', () => {
+  const vm = context()
+  expect(vm.domainName(dataset(1))).toBe('B 域')
+  expect(vm.domainName(dataset(2, { domainIds: [1, 5], domainNames: ['上海域（A）', '中心域'] }))).toBe('上海域（A）、中心域')
+  expect(vm.domainName(dataset(3, { domainIds: [], domainNames: [] }))).toBe('—')
+  expect(vm.domainName(dataset(4, { domainIds: undefined, domainNames: undefined }))).toBe('—')
+  expect(vm.domainName({ datasetId: 5, ownerDomainId: 2, ownerDomainName: 'B 域' })).toBe('—')
 })
 
 it('requires an application reason of at most 500 characters before requesting a grant', async() => {
@@ -167,11 +185,11 @@ it('counts a grant down, flips it to unavailable at expiry and refetches without
   expect(fetchDatasetAccess).toHaveBeenCalledTimes(3)
 })
 
-it('renders the apply button only on unavailable rows', async() => {
+it('renders location domains and the apply button only on unavailable rows', async() => {
   jest.useFakeTimers()
   fetchDatasetAccess.mockResolvedValue(payload([
-    dataset(1, { accessible: true, basis: 'OWN_DOMAIN' }),
-    dataset(2, { accessible: true, basis: 'GRANT', grantExpiresAt: iso(START + 10 * 60000) }),
+    dataset(1, { accessible: true, basis: 'OWN_DOMAIN', domainIds: [1, 5], domainNames: ['上海域（A）', '中心域'] }),
+    dataset(2, { accessible: true, basis: 'GRANT', grantExpiresAt: iso(START + 10 * 60000), domainIds: [], domainNames: [] }),
     dataset(3)
   ]))
   const localVue = createLocalVue()
@@ -204,6 +222,8 @@ it('renders the apply button only on unavailable rows', async() => {
   })
   await flush()
 
+  const domains = wrapper.findAll('[data-label="所属域"] .cell')
+  expect(domains.wrappers.map(cell => cell.text())).toEqual(['上海域（A）、中心域', '—', 'B 域'])
   const status = wrapper.findAll('[data-label="状态"] .cell')
   expect(status.wrappers.map(cell => cell.find('.tag').text())).toEqual(['可用', '可用', '不可用'])
   expect(status.at(0).text()).toContain('本域数据')
@@ -216,5 +236,6 @@ it('renders the apply button only on unavailable rows', async() => {
   expect(wrapper.vm.apply.dataset.datasetId).toBe(3)
   await flush()
   expect(wrapper.find('.dialog').text()).toContain('数据集 3')
+  expect(wrapper.find('.dialog').text()).toContain('B 域')
   wrapper.destroy()
 })

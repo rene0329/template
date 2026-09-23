@@ -4,7 +4,7 @@
       <section class="page-heading">
         <div>
           <h2>访问控制</h2>
-          <p>本域数据可直接使用；其他域的数据集需填写申请说明，申请临时访问令牌<span v-if="ttlMinutes">（有效期 {{ ttlMinutes }} 分钟）</span>，到期后自动失效。</p>
+          <p>数据集的所属域由其当前存放的节点决定。存放在本域节点上的数据集可直接使用；其他数据集需填写申请说明，申请临时访问令牌<span v-if="ttlMinutes">（有效期 {{ ttlMinutes }} 分钟）</span>，到期后自动失效。</p>
         </div>
         <el-button icon="el-icon-refresh" :loading="loading" @click="load()">刷新</el-button>
       </section>
@@ -21,7 +21,7 @@
           </el-table-column>
           <el-table-column prop="datasetCode" label="编码" min-width="150" show-overflow-tooltip />
           <el-table-column prop="version" label="版本" width="90" />
-          <el-table-column label="所属域" min-width="130"><template slot-scope="s">{{ domainName(s.row) }}</template></el-table-column>
+          <el-table-column label="所属域" min-width="150"><template slot-scope="s">{{ domainName(s.row) }}</template></el-table-column>
           <el-table-column label="状态" min-width="250">
             <template slot-scope="s">
               <div class="status-cell"><el-tag :type="s.row.access.type" size="small">{{ s.row.access.label }}</el-tag><span>{{ s.row.access.detail }}</span></div>
@@ -77,6 +77,10 @@ const parseInstant = value => {
   return Date.parse(/(Z|[+-]\d{2}:?\d{2})$/i.test(text) ? text : `${text}Z`)
 }
 
+// 数据集随副本所在节点归属一个或多个业务域；不在任何域节点上时为空。
+const domainNamesOf = row => (Array.isArray(row.domainNames) ? row.domainNames : [])
+  .filter(name => name != null && String(name).trim() !== '')
+
 export default {
   name: 'AccessControl',
   data() {
@@ -100,7 +104,7 @@ export default {
   computed: {
     rows() {
       const keyword = this.query.trim().toLowerCase()
-      const matches = row => [row.name, row.datasetCode, row.version, row.ownerDomainName, row.datasetId]
+      const matches = row => [row.name, row.datasetCode, row.version, row.datasetId, ...domainNamesOf(row)]
         .some(value => value != null && String(value).toLowerCase().includes(keyword))
       return this.items
         .filter(row => !keyword || matches(row))
@@ -129,7 +133,7 @@ export default {
   },
   methods: {
     datasetName(row) { return row.name || row.datasetCode || `#${row.datasetId}` },
-    domainName(row) { return row.ownerDomainName || (row.ownerDomainId != null ? `域 #${row.ownerDomainId}` : '未分配') },
+    domainName(row) { return domainNamesOf(row).join('、') || '—' },
     serverNow() { return this.now + this.clockOffset },
     grantRemainingMs(row) { return parseInstant(row.grantExpiresAt) - this.serverNow() },
     grantExpired(row) { return row.basis === 'GRANT' && this.grantRemainingMs(row) <= 0 },

@@ -84,6 +84,42 @@ it('reports a later-page failure without opening a partially loaded upload dialo
   expect(vm.$message.error).toHaveBeenCalledWith('加载节点失败')
 })
 
+describe('default dataset name and code', () => {
+  it.each([
+    ['real-cifar-10-1.0.npz', 'real-cifar-10-1.0', 'real-cifar-10-1.0'],
+    ['ciao.npz', 'ciao', 'ciao'],
+    ['sales.2024.CSV', 'sales.2024', 'sales.2024'],
+    ['archive.tar.gz', 'archive.tar', 'archive.tar'],
+    ['snapshot-1.0', 'snapshot-1.0', 'snapshot-1.0'],
+    ['患者 records.csv', '患者 records', '---records'],
+    ['.npz', 'dataset', 'dataset'],
+    [undefined, 'dataset', 'dataset']
+  ])('registers candidate %s as name %s and code %s', (fileName, name, datasetCode) => {
+    const vm = context()
+    DatasetRegistry.methods.openRegister.call(vm, { candidateId: 5, fileName, fileType: 'NPZ' })
+    expect(vm.form).toEqual({ candidateId: 5, datasetCode, name, version: '1.0', dataType: 'NPZ', description: '' })
+    expect(vm.dialog).toBe(true)
+  })
+
+  it('fills the upload name and code without the file extension and keeps typed values', () => {
+    const vm = context()
+    const raw = { name: 'real-cifar-10-1.0.npz' }
+    DatasetRegistry.methods.handleUploadFile.call(vm, { name: 'real-cifar-10-1.0.npz', raw }, [{ name: 'old.npz' }, { name: 'real-cifar-10-1.0.npz' }])
+    expect(vm.uploadFile).toBe(raw)
+    expect(vm.uploadFileList).toEqual([{ name: 'real-cifar-10-1.0.npz' }])
+    expect(vm.uploadForm).toMatchObject({ datasetCode: 'real-cifar-10-1.0', name: 'real-cifar-10-1.0' })
+
+    vm.uploadForm.name = '自定义名称'
+    DatasetRegistry.methods.handleUploadFile.call(vm, { name: 'ciao.npz', raw: {}}, [{ name: 'ciao.npz' }])
+    expect(vm.uploadForm).toMatchObject({ datasetCode: 'real-cifar-10-1.0', name: '自定义名称' })
+
+    vm.uploadForm.datasetCode = ''
+    vm.uploadForm.name = ''
+    DatasetRegistry.methods.handleUploadFile.call(vm, { name: '患者 records.NPZ', raw: {}}, [{ name: '患者 records.NPZ' }])
+    expect(vm.uploadForm).toMatchObject({ datasetCode: '---records', name: '患者 records' })
+  })
+})
+
 describe('dataset deletion', () => {
   const row = { datasetId: 42, name: '测试数据', version: '1.0' }
 
