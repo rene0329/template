@@ -26,7 +26,7 @@ it('does not display an earlier lookup if the topology IP changes', () => {
 })
 
 it('keeps unmeasured link metrics empty instead of showing zero', () => {
-  const edges = FrameNet.methods.normalizeEdges.call(FrameNet.methods, [
+  const edges = FrameNet.methods.normalizeEdges([
     { source: 'master-40', target: 'cluster-sz-1', latency: null, bandwidth: null, status: 'UNKNOWN' },
     { source: 'master-40', target: 'master-141', latency: 0.067, bandwidth: 42, status: 'active' }
   ])
