@@ -10,6 +10,12 @@ const mutation = (url, method = 'post', data, idempotencyKey = requestId()) => r
 
 export const discoverNodes = (clusterIds = []) => mutation('/api/v1/node-discovery-runs', 'post', { clusterIds })
 export const fetchNodeCandidates = (params) => request({ url: '/api/v1/node-candidates', method: 'get', params })
+export const purgeExpiredNodeCandidates = (retentionDays) => request({
+  url: '/api/v1/node-candidates/expired',
+  method: 'delete',
+  params: retentionDays ? { retentionDays } : undefined,
+  headers: { 'Idempotency-Key': requestId() }
+})
 export const fetchRegisteredNodes = (params, options = {}) => request({ url: '/api/v1/nodes', method: 'get', params, ...options })
 export const updateRegisteredNode = (id, data) => mutation(`/api/v1/nodes/${id}`, 'patch', data)
 export const registerNode = (data) => mutation('/api/v1/nodes', 'post', data)

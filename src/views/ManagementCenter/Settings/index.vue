@@ -441,7 +441,7 @@ export default {
         if (res) {
           const cpu = res.maxCpu > 0 && res.currentCpu != null ? Number((res.currentCpu / res.maxCpu * 100).toFixed(2)) : null
           const mem = res.maxMemory > 0 && res.currentMemory != null ? Number((res.currentMemory / res.maxMemory * 100).toFixed(2)) : null
-          const disk = null
+          const disk = res.maxDisk > 0 && res.currentDisk != null ? Number((res.currentDisk / res.maxDisk * 100).toFixed(2)) : null
           this.selected = {
             ...row,
             ...res,

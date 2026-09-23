@@ -11,6 +11,9 @@
       </div>
       <el-tabs v-model="tab" @tab-click="load">
         <el-tab-pane label="待注册候选" name="candidates">
+          <div class="candidates-toolbar">
+            <el-button size="small" type="danger" plain :loading="purging" @click="purgeExpired">清理过期候选</el-button>
+          </div>
           <el-table v-loading="loading" :data="rows">
             <el-table-column prop="clusterId" label="集群" min-width="130" />
             <el-table-column prop="k8sNodeName" label="K8s 节点" min-width="160" />
@@ -57,15 +60,39 @@
   </div>
 </template>
 <script>
-import { discoverNodes, fetchNodeCandidates, fetchRegisteredNodes, registerNode, verifyNode, enableNode, disableNode, unregisterNode } from '@/api/registrationApi'
+import { discoverNodes, fetchNodeCandidates, fetchRegisteredNodes, registerNode, verifyNode, enableNode, disableNode, unregisterNode, purgeExpiredNodeCandidates } from '@/api/registrationApi'
 export default {
   name: 'NodeRegistry',
-  data: () => ({ tab: 'candidates', query: '', page: 1, total: 0, rows: [], loading: false, discovering: false, saving: false, dialog: false, form: { candidateId: null, displayName: '', role: 'COMPUTE', enabled: false }}),
+  data: () => ({ tab: 'candidates', query: '', page: 1, total: 0, rows: [], loading: false, discovering: false, purging: false, saving: false, dialog: false, form: { candidateId: null, displayName: '', role: 'COMPUTE', enabled: false }}),
   created() { this.load() },
   methods: {
     verifyNode, enableNode, disableNode,
     async load() { this.loading = true; try { const api = this.tab === 'candidates' ? fetchNodeCandidates : fetchRegisteredNodes; const r = await api({ page: this.page, pageSize: 20, query: this.query }); this.rows = r.list || []; this.total = r.total || 0 } catch (e) { this.$message.error(e.message || '加载失败') } finally { this.loading = false } },
     async discover() { this.discovering = true; try { await discoverNodes(); this.$message.success('节点发现完成'); await this.load() } catch (e) { this.$message.error(e.message || '发现失败') } finally { this.discovering = false } },
+    async purgeExpired() {
+      try {
+        await this.$prompt('清理超过多少天未被发现的待注册候选（不影响已注册节点）？', '清理过期候选', {
+          inputValue: '7',
+          inputPattern: /^[1-9]\d*$/,
+          inputErrorMessage: '请输入正整数天数',
+          confirmButtonText: '清理'
+        }).then(({ value }) => this.doPurge(Number(value)))
+      } catch (e) {
+        if (e !== 'cancel' && e !== 'close') this.$message.error(e.message || '清理失败')
+      }
+    },
+    async doPurge(retentionDays) {
+      this.purging = true
+      try {
+        const r = await purgeExpiredNodeCandidates(retentionDays)
+        this.$message.success(`已清理 ${r.processedCount || 0} 个过期候选`)
+        await this.load()
+      } catch (e) {
+        this.$message.error(e.message || '清理失败')
+      } finally {
+        this.purging = false
+      }
+    },
     normalizeRole(role) {
       const normalized = String(role || '').trim().toUpperCase().replace(/-/g, '_')
       if (normalized === 'STORAGE' || normalized === 'COMPUTE_STORAGE') return normalized
@@ -88,4 +115,4 @@ export default {
   }
 }
 </script>
-<style scoped>.registry-page{padding:20px}.toolbar{display:flex;align-items:center;justify-content:space-between;font-weight:600}.search{width:220px;margin-right:8px}.el-pagination{margin-top:18px;text-align:right}.danger-action{color:#f56c6c}</style>
+<style scoped>.registry-page{padding:20px}.toolbar{display:flex;align-items:center;justify-content:space-between;font-weight:600}.search{width:220px;margin-right:8px}.el-pagination{margin-top:18px;text-align:right}.danger-action{color:#f56c6c}.candidates-toolbar{display:flex;justify-content:flex-end;margin-bottom:10px}</style>
