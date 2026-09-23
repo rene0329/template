@@ -1,6 +1,9 @@
 import SelectData from '@/views/ManagementCenter/SelectData/index.vue'
 import request from '@/api/axiosConfig'
 
+// node_modules are not transformed, so the stylesheet axiosConfig imports must be stubbed.
+jest.mock('nprogress/nprogress.css', () => ({}))
+
 // No API mocks here: the 403 travels through the real axios instance and its interceptors,
 // so this checks where the backend's errorCode ends up on the rejected error object.
 function context() {
