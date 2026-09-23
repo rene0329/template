@@ -75,11 +75,23 @@
           <div class="replica-toolbar">
             <el-button size="mini" :loading="reverifyLoading" @click="onReverify">重新校验</el-button>
             <el-button size="mini" @click="openAddReplica">从候选添加副本</el-button>
-            <el-button size="mini" type="danger" plain :loading="removeReplicaLoading"
-                       :disabled="!selectedReplicaIds.length" @click="onRemoveReplicas">删除选定副本</el-button>
+            <el-button
+              size="mini"
+              type="danger"
+              plain
+              :loading="removeReplicaLoading"
+              :disabled="!selectedReplicaIds.length"
+              @click="onRemoveReplicas"
+            >删除选定副本</el-button>
           </div>
-          <el-table ref="replicaTable" :data="selectedTask.replicas || []" row-key="replicaId" empty-text="暂无副本"
-                    :row-class-name="replicaRowClass" @selection-change="onReplicaSelectionChange">
+          <el-table
+            ref="replicaTable"
+            :data="selectedTask.replicas || []"
+            row-key="replicaId"
+            empty-text="暂无副本"
+            :row-class-name="replicaRowClass"
+            @selection-change="onReplicaSelectionChange"
+          >
             <el-table-column type="selection" width="45" :selectable="() => !removeReplicaLoading" />
             <el-table-column prop="replicaId" label="副本 ID" width="90" />
             <el-table-column label="节点名称" min-width="150" show-overflow-tooltip>
