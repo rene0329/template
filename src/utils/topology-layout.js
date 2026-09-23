@@ -9,8 +9,9 @@ const MEMBER_RADIUS = { x: 320, y: 115 }
 const CENTER_OFFSET = { x: 230, y: 120 }
 
 // Lay out the actual graph the way the design sketch draws it: the best-connected
-// node and the site meshed with it sit in the middle, every other site branches out
-// on its own diagonal arm with its members fanned away from its gateway.
+// node and its site sit in the middle, every other site branches out on its own
+// diagonal arm, on the side of the node it links to, with its members fanned away
+// from its gateway. Sites come from node.site, or from the links when it is missing.
 // Stable ordering keeps metric polling from moving nodes around.
 export function layoutTopology(nodes, edges) {
   const neighbors = new Map(nodes.map(node => [node.id, new Set()]))
@@ -23,26 +24,37 @@ export function layoutTopology(nodes, edges) {
   const ids = [...neighbors.keys()].sort(order)
   if (!ids.length) return []
 
-  // Sites are whatever stays connected once the hub is taken out.
   const hub = ids[0]
-  const seen = new Set([hub])
-  const groups = []
-  ids.forEach(id => {
-    if (seen.has(id)) return
-    const group = [id]
-    seen.add(id)
-    for (let index = 0; index < group.length; index++) {
-      [...neighbors.get(group[index])].sort(order).forEach(peer => {
-        if (seen.has(peer)) return
-        seen.add(peer)
-        group.push(peer)
-      })
-    }
-    groups.push(group.sort(order))
-  })
   const bySize = (a, b) => b.length - a.length || order(a[0], b[0])
-  const center = groups.filter(group => group.every(id => neighbors.get(hub).has(id))).sort(bySize)[0] || []
-  const arms = groups.filter(group => group !== center).sort(bySize)
+  let center = []
+  let arms = []
+  if (nodes.every(node => node.site)) {
+    const siteOf = new Map(nodes.map(node => [node.id, String(node.site)]))
+    const sites = new Map()
+    ids.filter(id => id !== hub).forEach(id => sites.set(siteOf.get(id), [...(sites.get(siteOf.get(id)) || []), id]))
+    center = sites.get(siteOf.get(hub)) || []
+    sites.delete(siteOf.get(hub))
+    arms = [...sites.values()].sort(bySize)
+  } else {
+    // Without sites, a site is whatever stays connected once the hub is taken out.
+    const seen = new Set([hub])
+    const groups = []
+    ids.forEach(id => {
+      if (seen.has(id)) return
+      const group = [id]
+      seen.add(id)
+      for (let index = 0; index < group.length; index++) {
+        [...neighbors.get(group[index])].sort(order).forEach(peer => {
+          if (seen.has(peer)) return
+          seen.add(peer)
+          group.push(peer)
+        })
+      }
+      groups.push(group.sort(order))
+    })
+    center = groups.filter(group => group.every(id => neighbors.get(hub).has(id))).sort(bySize)[0] || []
+    arms = groups.filter(group => group !== center).sort(bySize)
+  }
 
   const positions = new Map([[hub, { x: 0, y: 0 }]])
   const radians = angle => angle * Math.PI / 180
@@ -65,28 +77,59 @@ export function layoutTopology(nodes, edges) {
   }
 
   // Even arm counts sit on the diagonals, odd counts start to the right, so no arm
-  // points straight down into the hub's site. Heavy arms are paired on opposite sides.
+  // points straight down into the hub's site.
   const slots = arms.map((arm, index) => (arms.length % 2 ? 0 : -90 + 180 / arms.length) - index * 360 / arms.length)
   const free = slots.map((slot, index) => index)
   const scale = Math.max(1, arms.length / 6)
   const armRadius = { x: ARM_RADIUS.x * scale, y: ARM_RADIUS.y * scale }
-  let previous = 0
-  arms.forEach((arm, armIndex) => {
-    const opposite = (previous + Math.floor(slots.length / 2)) % slots.length
-    const slot = armIndex % 2 && free.includes(opposite) ? opposite : free[0]
+  const slotOf = new Map()
+  const take = (arm, slot) => {
     free.splice(free.indexOf(slot), 1)
-    previous = slot
-    const angle = slots[slot]
-    const gateway = arm.find(id => neighbors.get(id).has(hub)) ||
-      arm.find(id => center.some(member => neighbors.get(id).has(member))) || arm[0]
+    slotOf.set(arm, slot)
+  }
+  const links = new Map(arms.map(arm => {
+    const viaHub = arm.find(id => neighbors.get(id).has(hub))
+    const viaSite = arm.find(id => center.some(member => neighbors.get(id).has(member)))
+    const anchor = viaHub || !viaSite ? hub : center.find(member => neighbors.get(viaSite).has(member))
+    return [arm, { gateway: viaHub || viaSite || arm[0], anchor }]
+  }))
+  // An arm hanging off a member of the hub's site takes the slot on that member's side.
+  arms.filter(arm => links.get(arm).anchor !== hub).forEach(arm => {
+    const target = positions.get(links.get(arm).anchor)
+    const alignment = slot => {
+      const x = Math.cos(radians(slots[slot])) * armRadius.x
+      const y = Math.sin(radians(slots[slot])) * armRadius.y
+      return (x * target.x + y * target.y) / Math.hypot(x, y) / Math.hypot(target.x, target.y)
+    }
+    take(arm, free.reduce((best, slot) => alignment(slot) > alignment(best) ? slot : best))
+  })
+  // Heavy hub-linked arms are paired on opposite sides.
+  let previous = 0
+  arms.filter(arm => !slotOf.has(arm)).forEach((arm, armIndex) => {
+    const opposite = (previous + Math.floor(slots.length / 2)) % slots.length
+    take(arm, armIndex % 2 && free.includes(opposite) ? opposite : free[0])
+    previous = slotOf.get(arm)
+  })
+
+  arms.forEach(arm => {
+    const angle = slots[slotOf.get(arm)]
+    const { gateway } = links.get(arm)
     place(gateway, positions.get(hub), angle, armRadius)
 
+    // Members a site's own links cannot reach still hang off its gateway.
+    const reachable = new Set([gateway])
+    for (const id of reachable) {
+      neighbors.get(id).forEach(peer => {
+        if (arm.includes(peer)) reachable.add(peer)
+      })
+    }
     const directions = new Map([[gateway, angle]])
     const queue = [gateway]
     for (let index = 0; index < queue.length; index++) {
       const parent = queue[index]
       const heading = directions.get(parent)
-      const children = [...neighbors.get(parent)].filter(id => arm.includes(id) && !positions.has(id)).sort(order)
+      const children = arm.filter(id => !positions.has(id) &&
+        (neighbors.get(parent).has(id) || (parent === gateway && !reachable.has(id)))).sort(order)
       const width = Math.min(150, 70 * (children.length - 1))
       children.forEach((id, childIndex) => {
         const vertical = Math.sin(radians(heading)) < 0 ? -90 : 90

@@ -22,7 +22,37 @@ const crowded = result => result.flatMap((a, index) => result.slice(index + 1)
   .filter(b => Math.abs(a.x - b.x) < 250 && Math.abs(a.y - b.y) < 110)
   .map(b => `${a.id}/${b.id}`))
 
-it('keeps the hub site in the middle and gives every other site its own diagonal arm', () => {
+// The ZJ payload: sites are reported per node, Shenzhen hangs off master-141 and
+// Hangzhou off master-215 instead of the hub.
+const siteNodes = Object.entries(sites).flatMap(([site, members]) => members.map(id => ({ id, label: id, site })))
+const uplinks = { 'cluster-sz-1': 'master-141', 'cluster-hz-1': 'master-215' }
+const uplinkEdges = edges.map(edge => edge.target === 'master-40' && uplinks[edge.source]
+  ? { ...edge, target: uplinks[edge.source] } : edge)
+
+it('hangs sites that link to a hub-site member on that member\'s side', () => {
+  const graph = positions(layoutTopology(siteNodes, uplinkEdges))
+  const hub = graph['master-40']
+  const quadrant = id => `${graph[id].y < hub.y ? 'upper' : 'lower'}-${graph[id].x < hub.x ? 'left' : 'right'}`
+  expect(['sh', 'sz', 'bj', 'hz'].map(site => [...new Set(sites[site].map(quadrant))]))
+    .toEqual([['upper-right'], ['lower-left'], ['upper-left'], ['lower-right']])
+  expect(graph['master-141'].x).toBeLessThan(hub.x)
+  expect(graph['master-215'].x).toBeGreaterThan(hub.x)
+  expect(distance(graph['cluster-sz-1'], graph['master-141']))
+    .toBeLessThan(distance(graph['cluster-sz-1'], graph['master-215']))
+  expect(distance(graph['cluster-hz-1'], graph['master-215']))
+    .toBeLessThan(distance(graph['cluster-hz-1'], graph['master-141']))
+  expect(crowded(layoutTopology(siteNodes, uplinkEdges))).toEqual([])
+})
+
+it('keeps a site together even when its own links are missing', () => {
+  const partial = uplinkEdges.filter(({ source, target }) => ![source, target].includes('cluster-sh-3'))
+  const graph = positions(layoutTopology(siteNodes, partial))
+  expect(graph['cluster-sh-3'].x).toBeGreaterThan(graph['master-40'].x)
+  expect(graph['cluster-sh-3'].y).toBeLessThan(graph['master-40'].y)
+  expect(crowded(layoutTopology(siteNodes, partial))).toEqual([])
+})
+
+it('without sites, keeps the hub site in the middle and gives every other site its own diagonal arm', () => {
   const graph = positions(layoutTopology(nodes, edges))
   const hub = graph['master-40']
   expect(graph['master-141'].y).toBeGreaterThan(hub.y)
@@ -50,6 +80,8 @@ it('keeps positions stable across API ordering, coordinates, and metric updates'
   const updated = [...nodes].reverse().map(node => ({ ...node, cpu: 90, x: 400, y: 900 }))
   expect(positions(layoutTopology(updated, [...edges].reverse())))
     .toEqual(positions(layoutTopology(nodes, edges)))
+  expect(positions(layoutTopology([...siteNodes].reverse(), [...uplinkEdges].reverse())))
+    .toEqual(positions(layoutTopology(siteNodes, uplinkEdges)))
 })
 
 it('does not mutate node metadata or the actual connections', () => {
