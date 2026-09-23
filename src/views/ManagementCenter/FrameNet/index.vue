@@ -49,8 +49,8 @@
                     <path
                       :d="getEdgePath(e)"
                       class="edge-line"
-                      :class="{ 'is-connected': isConnectedEdge(e), 'is-unavailable': e.active === false }"
-                      :stroke-dasharray="e.active === false ? '5 6' : null"
+                      :class="{ 'is-connected': isConnectedEdge(e), 'is-unavailable': isEdgeUnavailable(e) }"
+                      :stroke-dasharray="isEdgeUnavailable(e) ? '5 6' : null"
                     />
                     <path :d="getEdgePath(e)" class="edge-hit-area" />
                   </g>
@@ -517,6 +517,14 @@ export default {
     },
     isConnectedEdge(edge) {
       return edge.source === this.selectedNodeId || edge.target === this.selectedNodeId
+    },
+    isEdgeUnavailable(edge) {
+      if (edge.active === false) return true
+      if (edge.active === true) return false
+      if (edge.status) {
+        return !['active', 'up'].includes(String(edge.status).toLowerCase())
+      }
+      return false
     },
     getNodeColor(node) {
       const colors = { AVAILABLE: '#279b76', DISABLED: '#a4acb9', INACTIVE: '#a4acb9' }
