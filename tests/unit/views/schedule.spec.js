@@ -35,7 +35,14 @@ const rows = [
     createTime: '2026-09-24 10:00:00',
     schedule: '分布式调度方案:\nds-a: n1 -> n1\nds-b: n2 -> n2\n中心化调度方案:\nds-a: n1 -> central\nds-b: 执行失败'
   },
-  { taskId: 6, taskName: '计算调度', createTime: '2026-09-24 11:00:00', schedule: '调度目标节点 node-7:\nds-c: n3 -> node-7 [复制]' }
+  { taskId: 6, taskName: '计算调度', createTime: '2026-09-24 11:00:00', schedule: '调度目标节点 node-7:\nds-c: n3 -> node-7 [复制]' },
+  {
+    taskId: 8,
+    taskName: '旧计算调度',
+    createTime: '2026-09-10 08:39:49',
+    manualSchedule: true,
+    schedule: '分布式调度方案:nlpcc2013: alibj -> master-88 [COPY_AND_USE]\n中心化调度方案:'
+  }
 ]
 
 const flush = () => new Promise(resolve => setTimeout(resolve, 0))
@@ -52,11 +59,11 @@ it('renders one row per task with structured schedule blocks in the schedule cel
   await vm.$nextTick()
 
   expect(fetchScheduleList).toHaveBeenCalledWith(1, 100, '')
-  expect(vm.TaskData.map(row => row.taskId)).toEqual([7, 5, 6])
+  expect(vm.TaskData.map(row => row.taskId)).toEqual([7, 5, 6, 8])
   const cells = vm.$el.querySelectorAll('.schedule-cell')
-  expect(cells).toHaveLength(3)
+  expect(cells).toHaveLength(4)
 
-  // Rows are sorted by task id: 5 (comparison), 6 (target node), 7 (unrecognised).
+  // Rows are sorted by task id: 5 (comparison), 6 (target node), 7 (unrecognised), 8 (legacy compute schedule).
   expect(texts(cells[0], '.schedule-title')).toEqual(['分布式调度方案', '集中式调度方案'])
   const [distributed, centralized] = cells[0].querySelectorAll('.schedule-section')
   expect(texts(distributed, '.schedule-line')).toEqual(['ds-a: n1 -> n1', 'ds-b: n2 -> n2'])
@@ -69,6 +76,12 @@ it('renders one row per task with structured schedule blocks in the schedule cel
 
   expect(cells[2].querySelector('.schedule-section')).toBeNull()
   expect(texts(cells[2], '.schedule-raw')).toEqual(['data1: nodeA -> nodeC'])
+
+  // A 数据集管理 compute schedule is one scheduling by target node, never a distributed/centralized pair.
+  expect(texts(cells[3], '.schedule-title')).toEqual(['调度目标节点 master-88'])
+  expect(texts(cells[3], '.schedule-line')).toEqual(['nlpcc2013: alibj -> master-88 [复制]'])
+  expect(cells[3].textContent).not.toContain('分布式')
+  expect(cells[3].textContent).not.toContain('集中式')
   vm.$destroy()
 })
 

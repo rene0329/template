@@ -73,7 +73,6 @@ it('shows only the task id passed from data selection, matching it exactly acros
   expect(fetchAnalysisData.mock.calls).toEqual([[1, 100, ''], [2, 100, '']])
   expect(vm.analysisData.map(row => row.taskId)).toEqual([142])
   expect(vm.total).toBe(1)
-  expect(vm.taskScopeLabel(vm.analysisData[0])).toBe('多数据集任务')
   expect(vm.focusText).toContain('仅显示任务 #142')
   expect(vm.loading).toBe(false)
 })

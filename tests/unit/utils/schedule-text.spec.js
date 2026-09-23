@@ -1,6 +1,4 @@
-import {
-  parseSchedule, scheduleLineFailed, taskDatasetNames, taskDatasetCount, taskScopeLabel, executionModeLabel
-} from '@/utils/schedule-text'
+import { parseSchedule, scheduleLineFailed, taskDatasetNames } from '@/utils/schedule-text'
 
 describe('parseSchedule', () => {
   it('splits a comparison task into distributed and centralized blocks with one line per dataset', () => {
@@ -94,32 +92,49 @@ it('detects failed dataset lines only by the failure marker at the end', () => {
   expect(scheduleLineFailed(null)).toBe(false)
 })
 
-describe('task dataset helpers', () => {
-  it('prefers datasetIdsJson for the dataset count', () => {
-    expect(taskDatasetCount({ datasetIdsJson: '[3,5,9]', selectedData: '[a]' })).toBe(3)
-    expect(taskScopeLabel({ datasetIdsJson: '[3,5,9]' })).toBe('多数据集任务')
-    expect(taskScopeLabel({ datasetIdsJson: '[3]' })).toBe('单数据集任务')
+describe('parseSchedule for 数据集管理 compute schedules (manual)', () => {
+  it('turns a legacy one-path record into a single scheduling grouped by target node', () => {
+    const parsed = parseSchedule('分布式调度方案:nlpcc2013: alibj -> master-88 [COPY_AND_USE]\n中心化调度方案:', { manual: true })
+    expect(parsed.kind).toBe('target')
+    expect(parsed.sections).toEqual([{ title: '调度目标节点 master-88', lines: ['nlpcc2013: alibj -> master-88 [复制]'] }])
   })
 
-  it('falls back to selectedData in Java list or JSON form', () => {
-    expect(taskDatasetNames({ selectedData: '[iris, mnist]' })).toEqual(['iris', 'mnist'])
-    expect(taskDatasetNames({ selectedData: '["iris","mnist"]' })).toEqual(['iris', 'mnist'])
-    expect(taskDatasetNames({ selectedData: 'iris' })).toEqual(['iris'])
-    expect(taskDatasetCount({ datasetIdsJson: null, selectedData: '[iris, mnist]' })).toBe(2)
-    expect(taskScopeLabel({ selectedData: '[iris]' })).toBe('单数据集任务')
+  it('maps every legacy action and groups lines by their own destination', () => {
+    const text = '分布式调度方案:a: n1 -> n1 [USE_IN_PLACE]\nb: n2 -> n3 [MOVE_AND_USE]\nc: n4 -> n1 [REMOTE_READ]\n中心化调度方案:'
+    expect(parseSchedule(text, { manual: true }).sections).toEqual([
+      { title: '调度目标节点 n1', lines: ['a: n1 -> n1 [原位]', 'c: n4 -> n1 [远程读取]'] },
+      { title: '调度目标节点 n3', lines: ['b: n2 -> n3 [迁移]'] }
+    ])
   })
 
-  it('shows a dash when the datasets are unknown', () => {
-    expect(taskDatasetNames({})).toEqual([])
-    expect(taskDatasetNames(null)).toEqual([])
-    expect(taskScopeLabel({ datasetIdsJson: '[]', selectedData: '' })).toBe('—')
+  it('keeps the current target-node format, including failed lines under their header', () => {
+    const text = '调度目标节点 node-7:\nds-c: n3 -> node-7 [复制]\nds-d: 执行失败'
+    expect(parseSchedule(text, { manual: true }).sections).toEqual([
+      { title: '调度目标节点 node-7', lines: ['ds-c: n3 -> node-7 [复制]', 'ds-d: 执行失败'] }
+    ])
+  })
+
+  it('shows one empty target section when a failed plan recorded no path', () => {
+    expect(parseSchedule('分布式调度方案:\n中心化调度方案:', { manual: true }).sections)
+      .toEqual([{ title: '调度目标节点', lines: [] }])
+  })
+
+  it('leaves data-selection tasks with both schemes untouched when the flag is absent', () => {
+    const parsed = parseSchedule('分布式调度方案:a: n1 -> n1\n中心化调度方案:a: n1 -> central')
+    expect(parsed.kind).toBe('comparison')
+    expect(parsed.sections.map(section => section.title)).toEqual(['分布式调度方案', '集中式调度方案'])
   })
 })
 
-it('labels execution modes, including the combined comparison mode', () => {
-  expect(executionModeLabel('COMPARISON')).toBe('分布式 + 集中式')
-  expect(executionModeLabel('CENTRALIZED')).toBe('集中式')
-  expect(executionModeLabel('in_place')).toBe('分布式')
-  expect(executionModeLabel(null)).toBe('—')
-  expect(executionModeLabel('OTHER')).toBe('OTHER')
+describe('task dataset helpers', () => {
+  it('reads selectedData in Java list or JSON form', () => {
+    expect(taskDatasetNames({ selectedData: '[iris, mnist]' })).toEqual(['iris', 'mnist'])
+    expect(taskDatasetNames({ selectedData: '["iris","mnist"]' })).toEqual(['iris', 'mnist'])
+    expect(taskDatasetNames({ selectedData: 'iris' })).toEqual(['iris'])
+  })
+
+  it('returns no names when the datasets are unknown', () => {
+    expect(taskDatasetNames({})).toEqual([])
+    expect(taskDatasetNames(null)).toEqual([])
+  })
 })

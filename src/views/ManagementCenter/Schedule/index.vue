@@ -148,7 +148,7 @@ export default {
         const keyword = this.formInline.name.trim()
         this.TaskData = tasks
           .filter(task => !keyword || String(task.taskId) === keyword || String(task.taskName || '').includes(keyword))
-          .map(task => ({ ...task, parsedSchedule: parseSchedule(task.schedule) }))
+          .map(task => ({ ...task, parsedSchedule: parseSchedule(task.schedule, { manual: task.manualSchedule === true }) }))
         this.total = this.TaskData.length
         this.currentPage = clampPage(this.currentPage, this.pageSize, this.total)
       } catch (err) {

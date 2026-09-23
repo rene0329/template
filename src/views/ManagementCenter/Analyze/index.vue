@@ -63,9 +63,6 @@
           empty-text="暂无可展示的性能数据"
         >
           <el-table-column prop="taskId" label="任务ID" min-width="100" align="center" />
-          <el-table-column label="任务类型" min-width="130" align="center">
-            <template v-slot:default="scope">{{ taskScopeLabel(scope.row) }}</template>
-          </el-table-column>
           <el-table-column prop="t2" label="集中式数据移动时间" min-width="200" align="center">
             <template v-slot:default="scope">{{ milliseconds(scope.row.t2) }}</template>
           </el-table-column>
@@ -121,7 +118,6 @@ import { fetchAnalysisData } from '@/api/managementCenterApi'
 import { fetchRegisteredTaskExecution, fetchTaskRunComparison } from '@/api/registrationApi'
 import { buildSpeedupOption, taskLabel, speedupText, milliseconds, speedupValue } from '@/utils/analysis-chart'
 import { fetchAllPages } from '@/utils/dataset-catalog'
-import { taskScopeLabel } from '@/utils/schedule-text'
 
 // 从数据选择页跳转过来（?taskId=）时，任务可能还在执行，定时刷新直到出现测量结果。
 const FOCUS_REFRESH_MS = 5000
@@ -209,7 +205,6 @@ export default {
     milliseconds,
     speedupText,
     speedupValue,
-    taskScopeLabel,
     rawMs(value) { return value == null ? '—' : `${value} ms` },
     refreshFocus() {
       if (!this.focusTaskId || this.analysisData.length || this.loading) return null
