@@ -54,7 +54,6 @@ it('loads fresh eligible resources by logical ID and asks for a target node firs
   expect(vm.targetNodes.map(node => node.nodeId)).toEqual([3])
   expect(vm.canSubmit).toBe(false)
   await chooseTarget(vm, 3)
-  expect(vm.inPlace).toBe(false)
   expect(vm.withCompute).toBe(false)
   expect(vm.canSubmit).toBe(true)
 })
@@ -243,50 +242,30 @@ it.each(['COPY', 'MOVE'])('submits %s plus computation as a compute plan and sho
   expect(vm.$emit).toHaveBeenCalledWith('submitted', vm.acceptedPlan)
 })
 
-it('computes in place when the target already holds a replica, without copy, move or confirmation', async() => {
-  const vm = context()
-  await vm.open(dataset)
-  const local = { ...replica, replicaId: 21, nodeId: 3 }
-  vm.replicas = [replica, local]
-  expect(vm.targetNodes.map(node => node.nodeId)).toEqual([3])
-  expect(vm.targetLabel(vm.targetNodes[0])).toContain('原位计算')
-  vm.form.action = 'MOVE'
-  vm.form.targetNodeId = 3
-  vm.syncTarget()
-  expect(vm.inPlace).toBe(true)
-  expect(vm.withCompute).toBe(true)
-  expect(vm.sourceReplicas).toEqual([local])
-  expect(vm.form.replicaId).toBe(21)
-  expect(fetchRuntimeImages).toHaveBeenCalled()
-  await vm.loadImages()
-  expect(vm.canSubmit).toBe(false)
-  vm.form.runtimeImageId = 7
-  expect(vm.unavailableReason).toBe('')
-  expect(vm.canSubmit).toBe(true)
-  await vm.submit()
-  expect(submitComputeSchedule).toHaveBeenCalledWith({
-    externalPlanId: 'manual-one', taskId: 'manual-one', runtimeImageId: 7, algorithm,
-    assignments: [{ datasetId: 9, replicaId: 21, sourceNodeId: 3, targetNodeId: 3, action: 'USE_IN_PLACE' }]
-  })
-  expect(vm.$confirm).not.toHaveBeenCalled()
-  expect(submitDatasetSchedule).not.toHaveBeenCalled()
-  expect(vm.acceptedMessage).toBe('计算调度已提交，任务 ID：#77（调度计划 #43）')
-})
-
-it('keeps a valid source replica and makes compute opt-in again when leaving an in-place target', async() => {
+it('never offers a node that already holds a replica, so every schedule transfers data', async() => {
   fetchRegisteredNodes.mockResolvedValue({ list: [...nodes, { nodeId: 5, schedulable: true, role: 'COMPUTE_STORAGE' }], total: 5 })
   const vm = context()
   await vm.open(dataset)
   vm.replicas = [replica, { ...replica, replicaId: 21, nodeId: 3 }]
-  await chooseTarget(vm, 3)
-  expect(vm.form.replicaId).toBe(21)
-  vm.form.runtimeImageId = 7
+  expect(vm.targetNodes.map(node => node.nodeId)).toEqual([5])
+  expect(vm.targetLabel(vm.targetNodes[0])).not.toContain('原位')
   await chooseTarget(vm, 5)
-  expect(vm.inPlace).toBe(false)
   expect(vm.sourceReplicas.map(item => item.replicaId)).toEqual([19, 21])
-  expect(vm.form.replicaId).toBe(21)
   expect(vm.withCompute).toBe(false)
-  expect(vm.form.runtimeImageId).toBeNull()
+  vm.form.compute = true
+  vm.syncImage()
+  await vm.loadImages()
+  vm.form.runtimeImageId = 7
+  vm.form.replicaId = 21
+  await vm.submit()
+  expect(submitComputeSchedule.mock.calls[0][0].assignments).toEqual([
+    { datasetId: 9, replicaId: 21, sourceNodeId: 3, targetNodeId: 5, action: 'COPY_AND_USE' }
+  ])
+})
+
+it('describes the dialog without in-place compute', () => {
+  const source = require('fs').readFileSync(require('path').resolve(__dirname, '../../../src/views/ManagementCenter/DataManagement/ManualScheduleDialog.vue'), 'utf8')
+  expect(source).not.toMatch(/原位|USE_IN_PLACE|inPlace/)
 })
 
 it('reads the numeric task ID from the accepted response when the backend provides it', async() => {
