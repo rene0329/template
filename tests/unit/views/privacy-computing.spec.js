@@ -22,12 +22,12 @@ function context() {
 }
 
 const template = (id, count) => ({ templateId: id, participantCount: count, securityProfile: 'SEMI_HONEST', available: true, maxTimeoutSeconds: 1800 })
-const dataset = (id, domainId, ownerId, fields = ['id']) => ({ datasetId: id, version: 'v1', ownerUserId: ownerId, ownerUsername: `owner-${ownerId}`, ownerDomainId: domainId, ownerDomainName: `域 ${domainId}`, authoritativeSha256: 'a'.repeat(64), schema: { columns: fields }})
+const dataset = (id, domainId, fields = ['id']) => ({ datasetId: id, version: 'v1', domainIds: [domainId], domainNames: [`域 ${domainId}`], authoritativeSha256: 'a'.repeat(64), schema: { columns: fields }})
 
 it('builds the new slot-based job request without client-selected parties or recipients', () => {
   const vm = context()
   vm.templates = [template('psi-2p-v1', 2)]
-  vm.datasets = [dataset(11, 1, 21), dataset(12, 2, 22)]
+  vm.datasets = [dataset(11, 1), dataset(12, 2)]
   vm.jobForm.templateId = 'psi-2p-v1'
   vm.applyTemplate('psi-2p-v1')
   vm.jobForm.inputs.forEach((input, index) => { input.datasetId = 11 + index; vm.syncInputDataset(input) })
@@ -45,11 +45,13 @@ it('builds the new slot-based job request without client-selected parties or rec
   expect(vm.canPreflight).toBe(true)
 })
 
-it('groups datasets by owner domain and rejects duplicate domains', () => {
+it('groups datasets by location domain, skips unlocated or multi-domain ones and rejects duplicate domains', () => {
   const vm = context()
   vm.templates = [template('psi-2p-v1', 2)]
-  vm.datasets = [dataset(1, 8, 20), dataset(2, 8, 21), dataset(3, 9, 22), { datasetId: 4, version: 'v1' }]
-  expect(vm.datasetGroups.map(group => group.key)).toEqual(['8:20', '8:21', '9:22'])
+  vm.datasets = [dataset(1, 8), dataset(2, 8), dataset(3, 9), { datasetId: 4, version: 'v1', domainIds: [] },
+    { datasetId: 5, version: 'v1', domainIds: [8, 9], domainNames: ['域 8', '域 9'] }]
+  expect(vm.datasetGroups.map(group => [group.key, group.label, group.datasets.map(item => item.datasetId)]))
+    .toEqual([['8', '域 8', [1, 2]], ['9', '域 9', [3]]])
   vm.jobForm.templateId = 'psi-2p-v1'
   vm.applyTemplate('psi-2p-v1')
   vm.jobForm.inputs.forEach((input, index) => { input.datasetId = index + 1; vm.syncInputDataset(input) })
@@ -69,4 +71,15 @@ it('allows only the initiator to read a successful plaintext result', () => {
   expect(vm.canReadResult).toBe(true)
   vm.$store.getters.userId = 9
   expect(vm.canReadResult).toBe(false)
+})
+
+it('matches approvals to participants by participant id rather than by a dataset holder', () => {
+  const vm = context()
+  vm.selectedJob = { jobId: 'job-2', approvals: [
+    { participantId: 'P0', ownerDomainId: 1, decision: 'AUTO_APPROVED' },
+    { participantId: 'P1', ownerDomainId: 2, decision: 'PENDING' }
+  ] }
+  expect(vm.approvalState({ partyId: 'P0', datasetId: 11 })).toBe('AUTO_APPROVED')
+  expect(vm.approvalState({ partyId: 'P1', datasetId: 12 })).toBe('PENDING')
+  expect(vm.approvalState({ partyId: 'P2', datasetId: 13 })).toBe('PENDING')
 })

@@ -17,10 +17,11 @@ it('uses login identity and never asks users for A/B/C secrets', () => {
   expect(header).toContain("roleText(role)")
 })
 
-it('submits owner-derived slot inputs and exposes pending approvals', () => {
+it('submits domain-derived slot inputs and exposes pending approvals', () => {
   expect(api).toContain('/approvals/pending')
   expect(page).toContain('participantSlots')
   expect(page).toContain('inputs: this.jobForm.inputs.map')
-  expect(page).toContain('ownerUserId')
+  expect(page).toContain('domainIds')
+  expect(page).not.toContain('ownerUserId')
   expect(page).toContain('同一任务中的数据必须来自不同业务域')
 })
