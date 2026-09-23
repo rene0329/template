@@ -307,9 +307,14 @@ export default {
         id: e.id || `edge-${index}`,
         source: String(e.source ?? e.from ?? '').trim(),
         target: String(e.target ?? e.to ?? '').trim(),
-        latency: Number(e.latency ?? e.delay ?? 0),
-        bandwidth: Number(e.bandwidth ?? e.bw ?? 0)
+        latency: this.optionalNumber(e.latency ?? e.delay),
+        bandwidth: this.optionalNumber(e.bandwidth ?? e.bw)
       })).filter(e => e.source && e.target)
+    },
+    optionalNumber(value) {
+      if (value == null || value === '') return null
+      const number = Number(value)
+      return Number.isFinite(number) ? number : null
     },
     datasetBelongsToNode(dataset, node) {
       if (dataset.dataNodeId != null && node.nodeId != null) {
@@ -460,8 +465,8 @@ export default {
           <div style="min-width:220px;line-height:1.6;">
             <div><b>连接：</b>${esc(s)} — ${esc(t)}</div>
             <div><b>链路状态：</b>${esc(data.status || (data.active === false ? '未就绪' : '可用'))}</div>
-            <div><b>延迟：</b>${data.latency} ms</div>
-            <div><b>带宽：</b>${data.bandwidth} Mbps</div>
+            <div><b>延迟：</b>${data.latency == null ? '未测量' : data.latency + ' ms'}</div>
+            <div><b>带宽：</b>${data.bandwidth == null ? '未测量' : data.bandwidth + ' Mbps'}</div>
           </div>
         `
       }
