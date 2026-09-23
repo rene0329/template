@@ -75,9 +75,12 @@
           <div class="replica-toolbar">
             <el-button size="mini" :loading="reverifyLoading" @click="onReverify">重新校验</el-button>
             <el-button size="mini" @click="openAddReplica">从候选添加副本</el-button>
+            <el-button size="mini" type="danger" plain :loading="removeReplicaLoading"
+                       :disabled="!selectedReplicaIds.length" @click="onRemoveReplicas">删除选定副本</el-button>
           </div>
-          <el-table :data="selectedTask.replicas || []" row-key="replicaId" empty-text="暂无副本"
-                    :row-class-name="replicaRowClass">
+          <el-table ref="replicaTable" :data="selectedTask.replicas || []" row-key="replicaId" empty-text="暂无副本"
+                    :row-class-name="replicaRowClass" @selection-change="onReplicaSelectionChange">
+            <el-table-column type="selection" width="45" :selectable="() => !removeReplicaLoading" />
             <el-table-column prop="replicaId" label="副本 ID" width="90" />
             <el-table-column label="节点名称" min-width="150" show-overflow-tooltip>
               <template slot-scope="scope"><span :title="`节点 ID：${scope.row.nodeId}`">{{ nodeName(scope.row.nodeId) }}</span></template>
@@ -146,7 +149,7 @@ import StoragePlanDialog from './StoragePlanDialog'
 import AccessTestDialog from './AccessTestDialog'
 import { keepStableCollection } from '@/utils/live-refresh'
 import { clampPage, datasetRow, fetchAllPages, formatBytes, formatHeat, paginateRows, sortRows } from '@/utils/dataset-catalog'
-import { addDatasetReplica, fetchDatasetCandidates, fetchRegisteredDatasets, fetchRegisteredNodes, verifyDataset } from '@/api/registrationApi'
+import { addDatasetReplica, fetchDatasetCandidates, fetchRegisteredDatasets, fetchRegisteredNodes, removeDatasetReplica, verifyDataset } from '@/api/registrationApi'
 import { fetchStoragePolicy, refreshDatasetHeat } from '@/api/datasetStorageApi'
 
 export default {
@@ -180,7 +183,9 @@ export default {
       candidateQuery: '',
       candidatesLoading: false,
       candidates: [],
-      addReplicaLoading: null
+      addReplicaLoading: null,
+      selectedReplicaIds: [],
+      removeReplicaLoading: false
     }
   },
   computed: {
@@ -290,6 +295,7 @@ export default {
       this.currentPage = 1
     },
     openTaskDialog(dataset) {
+      if (dataset.datasetId !== this.selectedTask.datasetId) this.clearReplicaSelection()
       this.selectedTask = dataset
       this.dialogVisibleDetail = true
       return this.loadNodeNames()
@@ -348,6 +354,51 @@ export default {
       } finally {
         this.candidatesLoading = false
       }
+    },
+    onReplicaSelectionChange(rows) {
+      this.selectedReplicaIds = rows.map(row => row.replicaId)
+    },
+    clearReplicaSelection() {
+      this.selectedReplicaIds = []
+      if (this.$refs.replicaTable) this.$refs.replicaTable.clearSelection()
+    },
+    async onRemoveReplicas() {
+      if (this.removeReplicaLoading) return
+      const dataset = this.selectedTask
+      const replicas = (dataset.replicas || []).filter(replica => this.selectedReplicaIds.includes(replica.replicaId))
+      if (!replicas.length) return
+      const usable = (dataset.replicas || []).filter(replica => replica.effectiveAvailability === 'USABLE')
+      if (usable.length && usable.every(replica => this.selectedReplicaIds.includes(replica.replicaId))) {
+        this.$message.error('不能删除数据集最后一个可用副本，请至少保留一个可用副本')
+        return
+      }
+      const list = replicas.map(replica => `${this.nodeName(replica.nodeId)}：${replica.filePath}`).join('；')
+      try {
+        await this.$confirm(`将删除 ${replicas.length} 个副本（${list}）。节点上的文件会被一并删除，无法恢复。`,
+          '删除副本', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' })
+      } catch (cancelled) {
+        return
+      }
+      this.removeReplicaLoading = true
+      const failures = []
+      try {
+        // One at a time: the server holds the dataset lock per deletion and re-checks
+        // that a usable replica remains, so parallel requests would only race each other.
+        for (const replica of replicas) {
+          try {
+            await removeDatasetReplica(dataset.datasetId, replica.replicaId)
+          } catch (error) {
+            failures.push(`副本 ${replica.replicaId}：${error.message}`)
+          }
+        }
+      } finally {
+        this.removeReplicaLoading = false
+      }
+      const removed = replicas.length - failures.length
+      if (failures.length) this.$message.error(`已删除 ${removed} 个副本，${failures.length} 个失败：${failures.join('；')}`)
+      else this.$message.success(`已删除 ${removed} 个副本`)
+      this.clearReplicaSelection()
+      await this.fetchData()
     },
     async onAddReplica(candidate) {
       this.addReplicaLoading = candidate.candidateId

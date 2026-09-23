@@ -1,12 +1,12 @@
 import fs from 'fs'
 import path from 'path'
 import DataManagement from '@/views/ManagementCenter/DataManagement/index.vue'
-import { fetchRegisteredDatasets, fetchRegisteredNodes } from '@/api/registrationApi'
+import { fetchRegisteredDatasets, fetchRegisteredNodes, removeDatasetReplica } from '@/api/registrationApi'
 import { fetchStoragePolicy, refreshDatasetHeat } from '@/api/datasetStorageApi'
 import { formatHeat } from '@/utils/dataset-catalog'
 
 jest.mock('@/api/registrationApi', () => ({
-  fetchRegisteredDatasets: jest.fn(), fetchRegisteredNodes: jest.fn()
+  fetchRegisteredDatasets: jest.fn(), fetchRegisteredNodes: jest.fn(), removeDatasetReplica: jest.fn()
 }))
 jest.mock('@/api/datasetAccessApi', () => ({
   runDatasetAccessTest: jest.fn(), fetchDatasetAccessEvents: jest.fn()
@@ -299,4 +299,68 @@ it('opens manual scheduling only for an active logical dataset with available re
   vm.openScheduleDialog({ ...dataset, availableReplicaCount: 0 })
   expect(vm.$refs.manualSchedule.open).toHaveBeenCalledTimes(1)
   expect(DataManagement.methods.toggleStatus).toBeUndefined()
+})
+
+describe('deleting selected replicas', () => {
+  const replicas = [
+    { replicaId: 21, nodeId: 6, filePath: '/dataset/a.npz', effectiveAvailability: 'USABLE' },
+    { replicaId: 22, nodeId: 5, filePath: '/dataset/b.npz', effectiveAvailability: 'USABLE' },
+    { replicaId: 23, nodeId: 3, filePath: '/dataset/c.npz', availability: 'MISSING', effectiveAvailability: 'MISSING' }
+  ]
+  const withReplicas = { ...dataset, replicas }
+
+  function deleting(confirm = jest.fn().mockResolvedValue('confirm')) {
+    const vm = context()
+    vm.$confirm = confirm
+    vm.fetchData = jest.fn().mockResolvedValue()
+    vm.selectedTask = withReplicas
+    return vm
+  }
+
+  it('refuses to delete every usable replica without asking the server', async() => {
+    const vm = deleting()
+    vm.onReplicaSelectionChange([replicas[0], replicas[1]])
+    await vm.onRemoveReplicas()
+    expect(vm.$message.error).toHaveBeenCalledWith('不能删除数据集最后一个可用副本，请至少保留一个可用副本')
+    expect(vm.$confirm).not.toHaveBeenCalled()
+    expect(removeDatasetReplica).not.toHaveBeenCalled()
+  })
+
+  it('deletes the selected replicas one by one after confirmation and refreshes', async() => {
+    const vm = deleting()
+    removeDatasetReplica.mockResolvedValue({})
+    vm.onReplicaSelectionChange([replicas[0], replicas[2]])
+    await vm.onRemoveReplicas()
+    expect(vm.$confirm.mock.calls[0][0]).toContain('节点上的文件会被一并删除')
+    expect(removeDatasetReplica.mock.calls).toEqual([[9, 21], [9, 23]])
+    expect(vm.$message.success).toHaveBeenCalledWith('已删除 2 个副本')
+    expect(vm.selectedReplicaIds).toEqual([])
+    expect(vm.removeReplicaLoading).toBe(false)
+    expect(vm.fetchData).toHaveBeenCalled()
+  })
+
+  it('reports which replicas the server refused', async() => {
+    const vm = deleting()
+    removeDatasetReplica.mockResolvedValueOnce({}).mockRejectedValueOnce(new Error('数据集正在使用'))
+    vm.onReplicaSelectionChange([replicas[0], replicas[2]])
+    await vm.onRemoveReplicas()
+    expect(vm.$message.error).toHaveBeenCalledWith('已删除 1 个副本，1 个失败：副本 23：数据集正在使用')
+    expect(vm.fetchData).toHaveBeenCalled()
+  })
+
+  it('does nothing when the confirmation is cancelled', async() => {
+    const vm = deleting(jest.fn().mockRejectedValue('cancel'))
+    vm.onReplicaSelectionChange([replicas[2]])
+    await vm.onRemoveReplicas()
+    expect(removeDatasetReplica).not.toHaveBeenCalled()
+    expect(vm.fetchData).not.toHaveBeenCalled()
+  })
+
+  it('drops the replica selection when details open for another dataset', () => {
+    const vm = deleting()
+    vm.onReplicaSelectionChange([replicas[2]])
+    vm.loadNodeNames = jest.fn()
+    vm.openTaskDialog({ datasetId: 99, replicas: [] })
+    expect(vm.selectedReplicaIds).toEqual([])
+  })
 })

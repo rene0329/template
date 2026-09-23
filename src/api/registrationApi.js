@@ -38,6 +38,9 @@ export const fetchDatasetReplicas = (datasetId, options = {}) => request({
 export const addDatasetReplica = (datasetId, candidateId) => mutation(
   `/api/v1/datasets/${datasetId}/replicas`, 'post', { candidateId }
 )
+export const removeDatasetReplica = (datasetId, replicaId) => mutation(
+  `/api/v1/datasets/${datasetId}/replicas/${replicaId}`, 'delete'
+)
 export const activateDataset = (id) => mutation(`/api/v1/datasets/${id}/activate`)
 export const disableDataset = (id) => mutation(`/api/v1/datasets/${id}/disable`)
 export const unregisterDataset = (id) => mutation(`/api/v1/datasets/${id}`, 'delete')
