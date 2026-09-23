@@ -372,7 +372,8 @@ export default {
     },
     clearReplicaSelection() {
       this.selectedReplicaIds = []
-      if (this.$refs.replicaTable) this.$refs.replicaTable.clearSelection()
+      const table = this.$refs && this.$refs.replicaTable
+      if (table) table.clearSelection()
     },
     async onRemoveReplicas() {
       if (this.removeReplicaLoading) return
