@@ -52,10 +52,3 @@ export const toggleDataStatus = (dataName) => {
   });
 };
 
-export const submitUserSelectedData = (currentTaskId, selectedDatas) => {
-  return request({
-    url: `/common/submitData/${currentTaskId}`, // 路径前缀 '/common' 会被代理处理
-    method: 'post',
-    data: selectedDatas // 后端接收 List<String> 作为 RequestBody
-  });
-};

@@ -12,11 +12,21 @@
             <el-button @click="onCancel">重置</el-button>
           </el-form>
           <div class="action-buttons">
+            <el-select
+              v-model="selectedImageId"
+              size="medium"
+              filterable
+              placeholder="选择运行镜像"
+              class="image-select"
+              :title="'对比任务只关心数据搬运耗时，默认选用 hash-demo（只对数据算哈希）而不是真实训练镜像，避免计算时长掩盖数据移动耗时'"
+            >
+              <el-option v-for="img in runtimeImages" :key="img.imageId" :label="img.name" :value="img.imageId" />
+            </el-select>
             <el-button
               type="primary"
               :loading="submitting"
-              :disabled="selectedRows.length === 0 || submitting || !demoImageReady"
-              :title="demoImageReady ? '' : '需要先注册并激活名为 hash-demo 的运行镜像'"
+              :disabled="selectedRows.length === 0 || submitting || !selectedImageId"
+              :title="selectedImageId ? '' : '没有可用的已激活运行镜像'"
               @click="handleSubmit"
             >创建对比任务（集中式 / 原位）</el-button>
           </div>
@@ -25,7 +35,7 @@
         <div class="content-row">
           <div class="table-card">
             <el-alert v-if="loadError" :title="loadError" type="warning" :closable="false" />
-            <el-alert v-if="!demoImageReady" title="未找到已激活的 hash-demo 运行镜像，请先在“资源与数据 - 运行镜像”页注册并激活一个名为 hash-demo 的镜像（用于计算数据哈希，不代表真实计算任务）。" type="warning" :closable="false" />
+            <el-alert v-if="!runtimeImages.length" title="没有已激活的运行镜像，请先在“资源与数据 - 运行镜像”页注册并激活至少一个镜像。若只想对比数据搬运耗时，推荐注册一个只计算哈希的轻量镜像（如 busybox + sha256sum），避免真实训练/推理耗时掩盖数据移动耗时。" type="warning" :closable="false" />
             <el-alert
               v-if="comparisonResult"
               :title="`集中式任务 #${comparisonResult.centralizedTaskId} 与 原位任务 #${comparisonResult.inPlaceTaskId} 已提交，运行 ID: ${comparisonResult.runId}（轮次 ${comparisonResult.round}）`"
@@ -173,7 +183,8 @@ export default {
       refreshing: false,
       requestVersion: 0,
       submitting: false,
-      demoImage: null,
+      runtimeImages: [],
+      selectedImageId: null,
       comparisonResult: null,
       loadError: '',
       refreshTimer: null,
@@ -198,14 +209,11 @@ export default {
   computed: {
     currentPageData() {
       return paginateRows(sortRows(this.TaskData, this.sort), this.currentPage, this.pageSize)
-    },
-    demoImageReady() {
-      return !!(this.demoImage && this.demoImage.imageId)
     }
   },
   created() {
     this.fetchData()
-    this.loadDemoImage()
+    this.loadRuntimeImages()
   },
 
   mounted() {
@@ -301,29 +309,33 @@ export default {
     resourceLabel(resources = {}) {
       return `CPU ${resources.cpu == null ? '-' : resources.cpu} 核 / 内存 ${resources.memoryGi == null ? '-' : resources.memoryGi} GiB / GPU ${resources.gpu == null ? '-' : resources.gpu}`
     },
-    async loadDemoImage() {
+    async loadRuntimeImages() {
       try {
-        const r = await fetchRuntimeImages({ query: 'hash-demo', status: 'READY' })
-        this.demoImage = (r.list || []).find(image => image.enabled) || null
+        const r = await fetchRuntimeImages({ status: 'READY', pageSize: 100 })
+        this.runtimeImages = (r.list || []).filter(image => image.enabled)
+        const hashDemo = this.runtimeImages.find(image => image.name === 'hash-demo')
+        this.selectedImageId = (hashDemo || this.runtimeImages[0] || {}).imageId || null
       } catch (e) {
-        console.error('加载 hash-demo 运行镜像失败:', e)
-        this.demoImage = null
+        console.error('加载运行镜像列表失败:', e)
+        this.runtimeImages = []
+        this.selectedImageId = null
       }
     },
     goToComparison() {
       if (!this.comparisonResult) return
       this.$router.push({ path: '/operations/analysis', query: { runId: this.comparisonResult.runId, round: String(this.comparisonResult.round) } })
     },
-    // 数据移动效率对比只关心数据搬运耗时，计算步骤故意用 hash-demo 镜像（只对已落地的数据算一次哈希）代替真实训练/推理，
-    // 避免计算时长掩盖我们真正要比较的“集中式 vs 原位”数据迁移耗时差异。
+    // 数据移动效率对比只关心数据搬运耗时；运行镜像可选，默认指向 hash-demo（只对已落地的数据算一次哈希）
+    // 而不是真实训练/推理镜像，避免计算时长掩盖我们真正要比较的"集中式 vs 原位"数据迁移耗时差异，
+    // 但用户可以按需切换成任意已激活镜像。
     async handleSubmit() {
       if (this.submitting) return
       if (this.selectedRows.length === 0) {
         this.$message.warning('数据不能为空，请选择数据。')
         return
       }
-      if (!this.demoImageReady) {
-        this.$message.warning('未找到已激活的 hash-demo 运行镜像，请先注册并激活。')
+      if (!this.selectedImageId) {
+        this.$message.warning('请先选择运行镜像。')
         return
       }
 
@@ -333,7 +345,7 @@ export default {
       const base = {
         taskName: `对比任务-${runId}`,
         datasetIds,
-        runtimeImageId: this.demoImage.imageId,
+        runtimeImageId: this.selectedImageId,
         acceptanceRunId: runId,
         runRound: 1
       }
@@ -473,6 +485,9 @@ export default {
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+}
+.image-select {
+  width: 200px;
 }
 .content-row {
   flex: 1;
