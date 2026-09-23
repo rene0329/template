@@ -1,21 +1,9 @@
 <template>
-  <el-dialog :title="title" :visible.sync="visible" width="820px" :close-on-click-modal="false" :show-close="!submitting" :close-on-press-escape="!submitting">
+  <el-dialog title="热敏存储 · 分配预览" :visible.sync="visible" width="820px" :close-on-click-modal="false" :show-close="!submitting" :close-on-press-escape="!submitting">
     <div v-loading="loading">
-      <el-form v-if="mode === 'aggregation'" label-width="120px">
-        <el-form-item label="任务所需数据集">
-          <el-select v-model="datasetIds" multiple filterable style="width: 100%" :disabled="loading || submitting || !!accepted" placeholder="选择本次计算需要的数据" @change="invalidatePreview">
-            <el-option v-for="dataset in datasets" :key="dataset.datasetId" :label="`${dataset.name} #${dataset.datasetId}`" :value="dataset.datasetId" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="目标计算节点">
-          <el-select v-model="targetNodeId" filterable style="width: 100%" :disabled="loading || submitting || !!accepted" placeholder="选择本次计算的目标节点" @change="invalidatePreview">
-            <el-option v-for="node in nodes" :key="node.nodeId" :label="node.displayName || node.k8sNodeName" :value="node.nodeId" />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <el-alert :title="mode === 'heat' ? '按热度、存储容量和计算节点邻近度整理全部已激活数据集；跳过正在被任务或调度占用的数据。' : '仅准备所选数据，优先放到目标计算存储节点；目标为纯计算节点或容量不足时选择邻近存储节点。复用已有副本，新增副本只复制，不删除源文件。'" type="info" :closable="false" show-icon />
-      <p v-if="mode === 'heat'">近期有真实消费的数据会优先靠近消费节点增加副本；低热度数据可清退冗余副本，但始终保留至少一个已验证可用副本。请核对操作清单。</p>
-      <p>两种功能可同时使用；只处理数据，不启动计算任务。同一数据集被占用时请等待结束后重试。</p>
+      <el-alert title="按热度、存储容量和计算节点邻近度整理全部已激活数据集；跳过正在被任务或调度占用的数据。" type="info" :closable="false" show-icon />
+      <p>近期有真实消费的数据会优先靠近消费节点增加副本；低热度数据可清退冗余副本，但始终保留至少一个已验证可用副本。请核对操作清单。</p>
+      <p>只处理数据，不启动计算任务。同一数据集被占用时请等待结束后重试。</p>
       <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
       <template v-if="preview">
         <p>检查 {{ preview.datasetCount }} 个数据集，计划执行 {{ preview.assignments.length }} 项操作。</p>
@@ -44,68 +32,37 @@
 
 <script>
 import { previewDatasetStorage, submitDatasetStorage } from '@/api/datasetStorageApi'
-import { requestId, fetchRegisteredDatasets, fetchRegisteredNodes } from '@/api/registrationApi'
-import { formatHeat, fetchAllPages } from '@/utils/dataset-catalog'
+import { requestId } from '@/api/registrationApi'
+import { formatHeat } from '@/utils/dataset-catalog'
 
 export default {
   name: 'StoragePlanDialog',
   data() {
-    return { visible: false, mode: 'heat', datasetIds: [], targetNodeId: null, datasets: [], nodes: [], loading: false, submitting: false, preview: null, error: '', accepted: null, pending: null, version: 0 }
+    return { visible: false, loading: false, submitting: false, preview: null, error: '', accepted: null, pending: null, version: 0 }
   },
-  computed: { title() { return `${this.mode === 'heat' ? '热敏存储' : '原位汇聚'} · 分配预览` } },
   beforeDestroy() { this.version++ },
   methods: {
     formatHeat,
     actionLabel(action) {
       return { COPY: '复制备份', MOVE: '迁移数据', DELETE: '清退副本' }[action] || action
     },
-    async open(mode) {
-      this.mode = mode
+    open() {
       this.visible = true
       this.accepted = null
-      this.datasetIds = []
-      this.targetNodeId = null
-      this.invalidatePreview()
-      if (mode === 'heat') return this.load()
-      const version = ++this.version
-      this.loading = true
-      try {
-        const [datasets, nodes] = await Promise.all([
-          fetchAllPages(params => fetchRegisteredDatasets({ ...params, status: 'ACTIVE' })),
-          fetchAllPages(fetchRegisteredNodes)
-        ])
-        if (version !== this.version) return
-        this.datasets = datasets.filter(dataset => dataset.status === 'ACTIVE')
-        this.nodes = nodes.filter(node => node.schedulable && ['COMPUTE', 'COMPUTE_STORAGE'].includes(node.role))
-      } catch (error) {
-        if (version === this.version) this.error = `汇聚资源加载失败：${error.message}`
-      } finally {
-        if (version === this.version) this.loading = false
-      }
-    },
-    invalidatePreview() {
-      this.version++
-      this.preview = null
-      this.pending = null
-      this.error = ''
+      return this.load()
     },
     async load() {
       if (this.submitting) return
-      if (this.mode === 'aggregation' && (!this.datasetIds.length || !this.targetNodeId)) {
-        this.error = '请选择任务所需数据集和目标计算节点'
-        return
-      }
       const version = ++this.version
       this.loading = true
       this.error = ''
       this.preview = null
       this.pending = null
       try {
-        const options = this.mode === 'aggregation' ? { datasetIds: [...this.datasetIds], targetNodeId: this.targetNodeId } : {}
-        const preview = await previewDatasetStorage(this.mode, options)
+        const preview = await previewDatasetStorage('heat')
         if (version !== this.version) return
         this.preview = preview
-        this.pending = { mode: this.mode, ...options, externalPlanId: `storage-${requestId()}`, assignments: preview.assignments }
+        this.pending = { mode: 'heat', externalPlanId: `storage-${requestId()}`, assignments: preview.assignments }
       } catch (error) {
         if (version === this.version) this.error = `分配预览失败：${error.message}`
       } finally {

@@ -14,13 +14,10 @@
           <div class="action-buttons">
             <el-button type="primary" :loading="heatLoading" @click="onUpdateHeatAll">热度全部更新</el-button>
             <el-tooltip :disabled="!!storagePolicy.heatEnabled" :content="storagePolicy.heatReason || policyError || '正在加载存储策略'" placement="top">
-              <span><el-button type="primary" :disabled="heatLoading || !storagePolicy.heatEnabled" @click="openStoragePlan('heat')">热敏存储</el-button></span>
-            </el-tooltip>
-            <el-tooltip :disabled="!!storagePolicy.aggregationEnabled" :content="storagePolicy.aggregationReason || policyError || '正在加载存储策略'" placement="top">
-              <span><el-button type="primary" :disabled="heatLoading || !storagePolicy.aggregationEnabled" @click="openStoragePlan('aggregation')">原位汇聚</el-button></span>
+              <span><el-button type="primary" :disabled="heatLoading || !storagePolicy.heatEnabled" @click="openStoragePlan()">热敏存储</el-button></span>
             </el-tooltip>
             <el-button :loading="loading" @click="fetchData()">刷新</el-button>
-            <el-button type="primary" @click="$router.push('/RegistrationCenter/DatasetRegistry')">数据集注册</el-button>
+            <el-button type="primary" @click="$router.push('/resources/datasets/register')">数据集注册</el-button>
           </div>
           <live-refresh-status class="live-refresh-anchor" :updated-at="lastUpdatedAt" />
         </div>
@@ -221,9 +218,8 @@ export default {
         this.heatLoading = false
       }
     },
-    openStoragePlan(mode) {
-      const enabled = mode === 'heat' ? this.storagePolicy.heatEnabled : mode === 'aggregation' && this.storagePolicy.aggregationEnabled
-      if (!this.heatLoading && enabled) this.$refs.storagePlan.open(mode)
+    openStoragePlan() {
+      if (!this.heatLoading && this.storagePolicy.heatEnabled) this.$refs.storagePlan.open()
     },
     nonMissingReplicas(dataset) {
       return (dataset.replicas || []).filter(replica => replica.availability !== 'MISSING' && replica.effectiveAvailability !== 'MISSING')

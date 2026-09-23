@@ -10,6 +10,10 @@ function context() {
   return vm
 }
 
+beforeEach(() => {
+  jest.resetAllMocks()
+})
+
 it('opens the registered scheduling logs route after a plan is submitted', () => {
   const vm = context()
   vm.visible = true
@@ -17,26 +21,20 @@ it('opens the registered scheduling logs route after a plan is submitted', () =>
   expect(vm.visible).toBe(false)
   expect(vm.$router.push).toHaveBeenCalledWith({ name: 'SchedulingLogs' })
 })
-beforeEach(() => {
-  jest.resetAllMocks()
-  fetchRegisteredDatasets.mockResolvedValue({ list: [{ datasetId: 9, name: 'test', status: 'ACTIVE' }], total: 1 })
-  fetchRegisteredNodes.mockResolvedValue({ list: [{ nodeId: 5, role: 'COMPUTE_STORAGE', schedulable: true }], total: 1 })
-})
 
-it('previews without mutating data, then submits only the reviewed pure-data assignments', async() => {
+it('previews heat placement without mutating data, then submits only the reviewed pure-data assignments', async() => {
   const vm = context()
   previewDatasetStorage.mockResolvedValue({ datasetCount: 1, assignments, placements: [], notices: [] })
   submitDatasetStorage.mockResolvedValue({ planId: 7 })
-  await vm.open('aggregation')
-  expect(previewDatasetStorage).not.toHaveBeenCalled()
-  vm.datasetIds = [9]
-  vm.targetNodeId = 5
-  await vm.load()
+  await vm.open()
+  expect(vm.visible).toBe(true)
+  expect(previewDatasetStorage).toHaveBeenCalledWith('heat')
   expect(submitDatasetStorage).not.toHaveBeenCalled()
   await vm.submit()
   expect(vm.$confirm).toHaveBeenCalled()
-  expect(submitDatasetStorage).toHaveBeenCalledWith({ mode: 'aggregation', datasetIds: [9], targetNodeId: 5, externalPlanId: 'storage-test-request-id', assignments })
+  expect(submitDatasetStorage).toHaveBeenCalledWith({ mode: 'heat', externalPlanId: 'storage-test-request-id', assignments })
   expect(vm.accepted.planId).toBe(7)
+  expect(vm.$emit).toHaveBeenCalledWith('submitted', vm.accepted)
   await vm.submit()
   expect(submitDatasetStorage).toHaveBeenCalledTimes(1)
 })
@@ -44,7 +42,7 @@ it('previews without mutating data, then submits only the reviewed pure-data ass
 it('does not submit cancelled or empty plans and reuses the request identity on retries', async() => {
   const vm = context()
   previewDatasetStorage.mockResolvedValue({ assignments, placements: [], notices: [] })
-  await vm.open('heat')
+  await vm.open()
   vm.$confirm.mockRejectedValueOnce('cancel')
   await vm.submit()
   expect(submitDatasetStorage).not.toHaveBeenCalled()
@@ -58,20 +56,30 @@ it('does not submit cancelled or empty plans and reuses the request identity on 
   expect(submitDatasetStorage).toHaveBeenCalledTimes(2)
 })
 
-it('requires aggregation inputs and invalidates the reviewed plan when they change', async() => {
+it('has no in-place aggregation mode and never loads dataset or node pickers', async() => {
   const vm = context()
+  previewDatasetStorage.mockResolvedValue({ assignments: [], placements: [], notices: [] })
   await vm.open('aggregation')
+  expect(previewDatasetStorage).toHaveBeenCalledTimes(1)
+  expect(previewDatasetStorage).toHaveBeenCalledWith('heat')
+  expect(fetchRegisteredDatasets).not.toHaveBeenCalled()
+  expect(fetchRegisteredNodes).not.toHaveBeenCalled()
+  expect(vm).not.toHaveProperty('mode')
+  expect(vm).not.toHaveProperty('datasetIds')
+  expect(vm.pending.mode).toBe('heat')
+})
+
+it('ignores a superseded preview and reports preview failures', async() => {
+  const vm = context()
+  let finish
+  previewDatasetStorage.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    .mockRejectedValueOnce(new Error('offline'))
+  const first = vm.open()
   await vm.load()
-  expect(previewDatasetStorage).not.toHaveBeenCalled()
-  expect(vm.error).toContain('请选择')
-  vm.datasetIds = [9]
-  vm.targetNodeId = 5
-  previewDatasetStorage.mockResolvedValue({ assignments, placements: [], notices: [] })
-  await vm.load()
-  expect(previewDatasetStorage).toHaveBeenLastCalledWith('aggregation', { datasetIds: [9], targetNodeId: 5 })
-  vm.targetNodeId = 6
-  vm.invalidatePreview()
-  await vm.submit()
-  expect(submitDatasetStorage).not.toHaveBeenCalled()
+  finish({ assignments, placements: [], notices: [] })
+  await first
+  expect(vm.preview).toBeNull()
   expect(vm.pending).toBeNull()
+  expect(vm.error).toBe('分配预览失败：offline')
+  expect(vm.loading).toBe(false)
 })

@@ -36,6 +36,7 @@ it('a user search supersedes an in-flight poll', async() => {
 
 it('failed submission retry reuses the key and real dataset IDs', async() => {
   const vm = context(SelectData)
+  vm.selectedImageId = 9
   vm.selectedRows = [{ datasetId: 5001, dataId: 1 }]
   preflightRegisteredTask.mockResolvedValue({ valid: true, checks: [] })
   createRegisteredTask.mockRejectedValueOnce(new Error('timeout')).mockResolvedValueOnce({ taskId: 42 })
@@ -43,11 +44,13 @@ it('failed submission retry reuses the key and real dataset IDs', async() => {
   await vm.handleSubmit()
   expect(createRegisteredTask.mock.calls[0]).toEqual(createRegisteredTask.mock.calls[1])
   expect(createRegisteredTask.mock.calls[0][0].datasetIds).toEqual([5001])
-  expect(vm.lastTaskId).toBe(42)
+  expect(createRegisteredTask.mock.calls[0][0].executionMode).toBe('COMPARISON')
+  expect(vm.submitResult.taskId).toBe(42)
 })
 
 it('rejects unavailable selections and prevents duplicate clicks', async() => {
   const vm = context(SelectData)
+  vm.selectedImageId = 9
   vm.selectedRows = [{ datasetId: 5001 }]
   preflightRegisteredTask.mockResolvedValue({ valid: false, checks: [{ available: false, name: 'd', message: 'disabled' }] })
   const pending = vm.handleSubmit()

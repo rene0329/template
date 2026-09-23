@@ -2,13 +2,26 @@
   <el-container class="security-page">
     <el-main>
       <section class="content-card">
-        <div class="title-row">
-          <h2>安全与完整性验收</h2>
-          <router-link to="/ManagementCenter/PrivacyComputing"><el-button type="primary" plain icon="el-icon-lock">进入隐私协同计算</el-button></router-link>
-        </div>
-        <el-alert title="这里只执行功能并保留原始证据；是否满足验收标准由人工 judge。" type="info" :closable="false" show-icon />
+        <h2>异常访问日志</h2>
+        <el-alert v-if="activeTab !== 'abnormal'" title="这里只执行功能并保留原始证据；是否满足验收标准由人工 judge。" type="info" :closable="false" show-icon />
 
         <el-tabs v-model="activeTab">
+          <el-tab-pane label="异常访问记录" name="abnormal">
+            <div class="toolbar">
+              <span>被拒绝的数据集访问请求，主要是域用户跨域访问权限外的数据集；显示最近 {{ abnormal.limit }} 条。</span>
+              <el-button icon="el-icon-refresh" :loading="abnormal.loading" @click="loadAbnormalEvents">刷新</el-button>
+            </div>
+            <el-alert v-if="abnormal.error" :title="abnormal.error" type="error" :closable="false" show-icon class="toolbar-alert" />
+            <el-table v-loading="abnormal.loading" :data="abnormal.events" :empty-text="abnormal.error ? '异常访问记录加载失败' : '暂无异常访问记录'" size="small" border>
+              <el-table-column label="时间" min-width="160"><template slot-scope="s">{{ formatEventTime(s.row.createdAt) }}</template></el-table-column>
+              <el-table-column label="用户" min-width="120"><template slot-scope="s">{{ s.row.principal || '—' }}</template></el-table-column>
+              <el-table-column label="数据集" min-width="170" show-overflow-tooltip><template slot-scope="s">{{ datasetLabel(s.row.datasetId) }}</template></el-table-column>
+              <el-table-column label="动作" width="110"><template slot-scope="s">{{ actionLabel(s.row.action) }}</template></el-table-column>
+              <el-table-column label="原因" min-width="200" show-overflow-tooltip><template slot-scope="s">{{ reasonLabel(s.row.reason) }}</template></el-table-column>
+              <el-table-column label="请求 ID" min-width="200" show-overflow-tooltip><template slot-scope="s">{{ s.row.requestId || '—' }}</template></el-table-column>
+            </el-table>
+          </el-tab-pane>
+
           <el-tab-pane label="文件强校验" name="integrity">
             <el-form label-width="120px" class="validation-form">
               <el-form-item label="数据集">
@@ -52,12 +65,12 @@
             <el-alert v-if="access.message" :title="access.message" :type="access.error ? 'error' : 'success'" :closable="false" show-icon />
             <el-descriptions v-if="access.authorization" title="签发结果" :column="2" border>
               <el-descriptions-item label="认证主体">{{ access.authorization.principal }}</el-descriptions-item>
-              <el-descriptions-item label="到期时间">{{ access.authorization.expiresAt }}</el-descriptions-item>
+              <el-descriptions-item label="到期时间">{{ formatEventTime(access.authorization.expiresAt) }}</el-descriptions-item>
               <el-descriptions-item label="令牌 ID">{{ access.authorization.jti }}</el-descriptions-item>
               <el-descriptions-item label="令牌范围">{{ scopeText(access.authorization.scope) }}</el-descriptions-item>
             </el-descriptions>
             <el-table :data="access.events" size="small" max-height="320" border>
-              <el-table-column prop="createdAt" label="时间" min-width="170" />
+              <el-table-column label="时间" min-width="170"><template slot-scope="s">{{ formatEventTime(s.row.createdAt) }}</template></el-table-column>
               <el-table-column prop="principal" label="主体" width="120" />
               <el-table-column prop="action" label="动作" width="85" />
               <el-table-column prop="datasetId" label="数据集" width="100" />
@@ -85,7 +98,7 @@
               <el-descriptions-item label="失败原因">{{ aggregation.result.failureReason || '—' }}</el-descriptions-item>
             </el-descriptions>
             <el-table v-if="aggregation.events.length" :data="aggregation.events" size="small" max-height="340" border class="events-table">
-              <el-table-column prop="createdAt" label="时间" min-width="170" />
+              <el-table-column label="时间" min-width="170"><template slot-scope="s">{{ formatEventTime(s.row.createdAt) }}</template></el-table-column>
               <el-table-column prop="participantId" label="参与方" width="85" />
               <el-table-column prop="direction" label="方向" width="100" />
               <el-table-column prop="messageType" label="消息类型" min-width="180" />
@@ -103,6 +116,7 @@
 <script>
 import { fetchRegisteredDatasets, fetchRegisteredNodes, verifyDataset } from '@/api/registrationApi'
 import { fetchAllPages } from '@/utils/dataset-catalog'
+import { parseTime } from '@/utils'
 import {
   authorizeDatasetAccess,
   fetchDatasetAccessAuditEvents,
@@ -111,14 +125,30 @@ import {
   fetchSecureAggregationEvents
 } from '@/api/securityValidationApi'
 
+const ACTION_LABELS = { TASK_CREATE: '创建任务' }
+const REASON_LABELS = { CROSS_DOMAIN_ACCESS_DENIED: '跨域访问权限外数据集' }
+
+// 审计时间由后端以 UTC 写入（UTC_TIMESTAMP，JVM 时区为 UTC），序列化时不带时区后缀；
+// 统一按 UTC 解析后以浏览器本地时间显示。已带 Z/偏移量的时间按原值解析。
+const parseServerTime = value => {
+  if (Array.isArray(value)) {
+    const [year, month, day, hour = 0, minute = 0, second = 0, nano = 0] = value
+    return Date.UTC(year, month - 1, day, hour, minute, second, Math.floor(nano / 1e6))
+  }
+  if (typeof value === 'number') return value
+  const text = String(value).trim().replace(' ', 'T')
+  return Date.parse(/(Z|[+-]\d{2}:?\d{2})$/i.test(text) ? text : `${text}Z`)
+}
+
 export default {
   name: 'SecurityValidation',
   data() {
     return {
-      activeTab: 'integrity',
+      activeTab: 'abnormal',
       datasets: [],
       nodes: [],
       actions: ['READ', 'VERIFY'],
+      abnormal: { loading: false, events: [], error: '', limit: 100 },
       integrity: { datasetId: null, running: false, result: null, message: '', error: false },
       access: { datasetId: null, action: 'READ', targetNode: '', path: '', username: '', password: '', running: false, loadingEvents: false, authorization: null, events: [], message: '', error: false },
       aggregation: { running: false, result: null, events: [], message: '', error: false }
@@ -129,6 +159,7 @@ export default {
     canAuthorize() { return this.access.datasetId && this.access.path && this.access.targetNode && this.access.username && this.access.password }
   },
   async created() {
+    this.loadAbnormalEvents()
     try {
       const [datasets, nodes] = await Promise.all([
         fetchAllPages(fetchRegisteredDatasets),
@@ -152,6 +183,32 @@ export default {
     this.access.password = ''
   },
   methods: {
+    formatEventTime(value) {
+      if (value == null || value === '') return '—'
+      const time = parseServerTime(value)
+      return Number.isFinite(time) ? parseTime(new Date(time)) : String(value)
+    },
+    datasetLabel(datasetId) {
+      if (datasetId == null || datasetId === '') return '—'
+      const dataset = this.datasets.find(item => String(item.datasetId) === String(datasetId))
+      return dataset && dataset.name ? `${dataset.name} #${datasetId}` : String(datasetId)
+    },
+    actionLabel(action) { return ACTION_LABELS[action] || action || '—' },
+    reasonLabel(reason) { return REASON_LABELS[reason] || reason || '—' },
+    async loadAbnormalEvents() {
+      this.abnormal.loading = true
+      try {
+        const result = await fetchDatasetAccessAuditEvents({ decision: 'DENIED', limit: this.abnormal.limit })
+        const events = Array.isArray(result) ? result : ((result && result.list) || [])
+        // 兼容尚未支持 decision 过滤的后端：页面只展示被拒绝的事件。
+        this.abnormal.events = events.filter(event => !event.decision || event.decision === 'DENIED')
+        this.abnormal.error = ''
+      } catch (error) {
+        this.abnormal.error = `异常访问记录加载失败：${error.message}`
+      } finally {
+        this.abnormal.loading = false
+      }
+    },
     scopeText(scope) { return scope ? `${scope.action} ${scope.datasetId}@${scope.datasetVersion} · ${scope.targetNode} · ${scope.path}` : '—' },
     syncAccessDefaults() {
       const dataset = this.selectedDataset
@@ -234,8 +291,10 @@ export default {
 .security-page { min-height: calc(100vh - 90px); background: #f5f7fa; }
 .content-card { background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0, 0, 0, .04); }
 h2 { margin: 0 0 18px; color: #253747; }
-.title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .el-tabs { margin-top: 18px; }
+.toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.toolbar span { color: #697986; font-size: 13px; }
+.toolbar-alert { margin-bottom: 14px; }
 .validation-form { max-width: 760px; margin-top: 18px; }
 .hint { color: #697986; line-height: 1.7; }
 .result-alert, .events-table { margin-top: 16px; }

@@ -26,9 +26,9 @@
               type="primary"
               :loading="submitting"
               :disabled="selectedRows.length === 0 || submitting || !selectedImageId"
-              :title="selectedImageId ? '' : '没有可用的已激活运行镜像'"
+              :title="selectedImageId ? '一个任务 ID 内，每个所选数据集都按分布式与集中式两种模式各调度一次' : '没有可用的已激活运行镜像'"
               @click="handleSubmit"
-            >创建对比任务（集中式 / 原位）</el-button>
+            >创建任务（分布式 + 集中式）</el-button>
           </div>
           <live-refresh-status class="live-refresh-anchor" :updated-at="lastUpdatedAt" />
         </div>
@@ -36,13 +36,8 @@
           <div class="table-card">
             <el-alert v-if="loadError" :title="loadError" type="warning" :closable="false" />
             <el-alert v-if="!runtimeImages.length" title="没有已激活的运行镜像，请先在“资源与数据 - 运行镜像”页注册并激活至少一个镜像。若只想对比数据搬运耗时，推荐注册一个只计算哈希的轻量镜像（如 busybox + sha256sum），避免真实训练/推理耗时掩盖数据移动耗时。" type="warning" :closable="false" />
-            <el-alert
-              v-if="comparisonResult"
-              :title="`集中式任务 #${comparisonResult.centralizedTaskId} 与 原位任务 #${comparisonResult.inPlaceTaskId} 已提交，运行 ID: ${comparisonResult.runId}（轮次 ${comparisonResult.round}）`"
-              type="success"
-              :closable="false"
-            />
-            <el-button v-if="comparisonResult" type="text" @click="goToComparison">查看数据移动效率对比</el-button>
+            <el-alert v-if="submitResult" :title="submitSummary(submitResult)" type="success" :closable="false" />
+            <el-button v-if="submitResult" type="text" @click="goToAnalysis">查看性能分析</el-button>
             <div class="table-wrapper">
               <el-table
                 ref="datasetTable"
@@ -163,6 +158,23 @@ import { clampPage, datasetRow, fetchAllPages, formatBytes, paginateRows, sortRo
 import LiveRefreshStatus from '@/components/LiveRefreshStatus'
 import { keepStableCollection } from '@/utils/live-refresh'
 
+const ACCESS_DENIED = 'DATASET_ACCESS_DENIED'
+const ACCESS_DENIED_MESSAGE = '任务创建失败，用户访问受限'
+const MODE_LABELS = { IN_PLACE: '分布式', CENTRALIZED: '集中式' }
+
+// axiosConfig 把 { code, msg, errorCode } 响应体归一化为 error.errorCode；
+// 同时兼容未经拦截器归一化、仍挂在 error.response.data 上的响应体。
+function isAccessDenied(error) {
+  if (!error || typeof error !== 'object') return false
+  const body = (error.response && error.response.data) || {}
+  return [error.errorCode, error.code, body.errorCode, body.code].includes(ACCESS_DENIED)
+}
+
+function checkMode(check) {
+  const mode = String(check.executionMode || '').toUpperCase()
+  return MODE_LABELS[mode] ? mode : null
+}
+
 export default {
   name: 'NodeList',
   components: { LiveRefreshStatus },
@@ -185,7 +197,10 @@ export default {
       submitting: false,
       runtimeImages: [],
       selectedImageId: null,
-      comparisonResult: null,
+      // 最近一次创建成功的任务：{ taskId, datasetCount }
+      submitResult: null,
+      // 创建请求超时/失败后重试时复用同一个幂等键和请求体，避免重复建任务。
+      pendingSubmission: null,
       loadError: '',
       refreshTimer: null,
       lastUpdatedAt: '',
@@ -321,12 +336,27 @@ export default {
         this.selectedImageId = null
       }
     },
-    goToComparison() {
-      if (!this.comparisonResult) return
-      this.$router.push({ path: '/operations/analysis', query: { runId: this.comparisonResult.runId, round: String(this.comparisonResult.round) } })
+    submitSummary({ taskId, datasetCount }) {
+      return `已创建任务 #${taskId}：${datasetCount} 个数据集，按分布式与集中式两种模式调度`
     },
-    // 数据移动效率对比只关心数据搬运耗时；运行镜像可选，默认指向 hash-demo（只对已落地的数据算一次哈希）
-    // 而不是真实训练/推理镜像，避免计算时长掩盖我们真正要比较的"集中式 vs 原位"数据迁移耗时差异，
+    goToAnalysis() {
+      if (!this.submitResult) return
+      this.$router.push({ path: '/operations/analysis', query: { taskId: String(this.submitResult.taskId) }})
+    },
+    // 按模式分组列出未通过的检查项：先列两种模式共用的检查，再列 [分布式]、[集中式]。
+    preflightFailureText(checks = []) {
+      const failed = checks.filter(check => !check.available)
+      const lines = []
+      for (const mode of [null, 'IN_PLACE', 'CENTRALIZED']) {
+        failed.filter(check => checkMode(check) === mode).forEach(check => {
+          const detail = `${check.name || check.resourceId || check.resourceType}: ${check.message || check.status}`
+          lines.push(mode ? `[${MODE_LABELS[mode]}] ${detail}` : detail)
+        })
+      }
+      return lines.join('\n')
+    },
+    // 一次点击只建一个任务 ID（executionMode=COMPARISON）：所选的每个数据集都按分布式与集中式各调度一次。
+    // 运行镜像默认指向 hash-demo（只对已落地的数据算一次哈希），避免计算时长掩盖数据移动耗时，
     // 但用户可以按需切换成任意已激活镜像。
     async handleSubmit() {
       if (this.submitting) return
@@ -341,38 +371,52 @@ export default {
 
       this.submitting = true
       const datasetIds = this.selectedRows.map(r => r.datasetId).sort((a, b) => a - b)
-      const runId = `cmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-      const base = {
-        taskName: `对比任务-${runId}`,
-        datasetIds,
-        runtimeImageId: this.selectedImageId,
-        acceptanceRunId: runId,
-        runRound: 1
-      }
-      try {
-        const modes = ['CENTRALIZED', 'IN_PLACE']
-        const preflights = await Promise.all(modes.map(executionMode => preflightRegisteredTask({ ...base, executionMode })))
-        const failed = preflights
-          .map((preflight, idx) => ({ preflight, mode: modes[idx] }))
-          .filter(({ preflight }) => !preflight.valid)
-        if (failed.length) {
-          const reasons = failed.map(({ preflight, mode }) => {
-            const detail = preflight.checks.filter(check => !check.available).map(check => `${check.name || check.resourceId}: ${check.message || check.status}`).join('；')
-            return `[${mode === 'CENTRALIZED' ? '集中式' : '原位'}] ${detail}`
-          })
-          await this.$alert(reasons.join('\n'), '任务预检查未通过', { customClass: 'preflight-message' })
-          return
+      const signature = JSON.stringify([datasetIds, this.selectedImageId])
+      if (!this.pendingSubmission || this.pendingSubmission.signature !== signature) {
+        const runId = `cmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+        this.pendingSubmission = {
+          signature,
+          key: requestId(),
+          body: {
+            taskName: `对比任务-${runId}`,
+            datasetIds,
+            runtimeImageId: this.selectedImageId,
+            executionMode: 'COMPARISON',
+            acceptanceRunId: runId,
+            runRound: 1
+          }
         }
-        const [centralizedTask, inPlaceTask] = await Promise.all(
-          modes.map(executionMode => createRegisteredTask({ ...base, executionMode }, requestId()))
-        )
-        this.comparisonResult = { runId, round: base.runRound, centralizedTaskId: centralizedTask.taskId, inPlaceTaskId: inPlaceTask.taskId }
-        this.$message.success(`已提交集中式任务 #${centralizedTask.taskId} 与原位任务 #${inPlaceTask.taskId}，正在后台执行`)
+      }
+      const { body, key } = this.pendingSubmission
+      try {
+        if (!this.pendingSubmission.attempted) {
+          const preflight = await preflightRegisteredTask(body)
+          const checks = (preflight && preflight.checks) || []
+          if (checks.some(check => check.available !== true && check.errorCode === ACCESS_DENIED)) {
+            this.pendingSubmission = null
+            this.$message.error(ACCESS_DENIED_MESSAGE)
+            return
+          }
+          if (!(preflight && preflight.valid)) {
+            await this.$alert(this.preflightFailureText(checks), '任务预检查未通过', { customClass: 'preflight-message' })
+            return
+          }
+        }
+        this.pendingSubmission.attempted = true
+        const task = await createRegisteredTask(body, key)
+        this.pendingSubmission = null
+        this.submitResult = { taskId: task.taskId, datasetCount: datasetIds.length }
+        this.$message.success(this.submitSummary(this.submitResult))
         this.$refs.datasetTable.clearSelection()
         this.selectedRows = []
       } catch (e) {
+        if (isAccessDenied(e)) {
+          this.pendingSubmission = null
+          this.$message.error(ACCESS_DENIED_MESSAGE)
+          return
+        }
         console.error('提交失败:', e)
-        if (e !== 'cancel' && e !== 'close') this.$message.error(e.message || '提交失败')
+        if (e !== 'cancel' && e !== 'close') this.$message.error((e && e.message) || '提交失败')
       } finally {
         this.submitting = false
       }
@@ -649,4 +693,11 @@ export default {
   */
 }
 
+</style>
+
+<style>
+/* 预检查弹窗挂在 body 上，scoped 样式覆盖不到；按行展示各模式的失败原因。 */
+.preflight-message .el-message-box__message p {
+  white-space: pre-line;
+}
 </style>

@@ -14,35 +14,39 @@
         <strong>{{ dataset.name }}</strong>
         <span>{{ dataset.datasetCode }} / {{ dataset.version }} · ID {{ dataset.datasetId }}</span>
       </div>
-      <el-alert class="schedule-tip" title="支持复制、迁移或原位计算；计算节点可选择运行镜像，结果可在调度日志中查看。" type="info" :closable="false" show-icon />
+      <el-alert class="schedule-tip" title="先选择目标节点，再选择复制或迁移；目标节点具有计算能力时可同时发起计算调度，数据已在该节点时直接原位计算。" type="info" :closable="false" show-icon />
       <el-alert v-if="loadError" class="schedule-tip" :title="loadError" type="error" :closable="false" show-icon />
       <el-alert v-else-if="unavailableReason" class="schedule-tip" :title="unavailableReason" type="warning" :closable="false" show-icon />
       <el-form label-width="100px" :disabled="loading || submitting || !!acceptedPlan" @submit.native.prevent="submit">
+        <el-form-item label="目标节点" required>
+          <el-select v-model="form.targetNodeId" class="full-width" filterable placeholder="请选择目标节点" @change="syncTarget">
+            <el-option v-for="node in targetNodes" :key="node.nodeId" :value="node.nodeId" :label="targetLabel(node)" />
+          </el-select>
+          <div v-if="targetHint" class="field-hint">{{ targetHint }}</div>
+        </el-form-item>
         <el-form-item label="源副本" required>
-          <el-select v-model="form.replicaId" class="full-width" placeholder="请选择可用副本" @change="syncTarget">
-            <el-option v-for="replica in replicas" :key="replica.replicaId" :value="replica.replicaId" :label="replicaLabel(replica)" />
+          <el-select v-model="form.replicaId" class="full-width" placeholder="请选择可用副本">
+            <el-option v-for="replica in sourceReplicas" :key="replica.replicaId" :value="replica.replicaId" :label="replicaLabel(replica)" />
           </el-select>
           <div v-if="sourceReplica" class="field-hint">{{ sourceReplica.filePath }} · {{ formatBytes(sourceReplica.sizeBytes) }}</div>
         </el-form-item>
         <el-form-item label="调度方式" required>
-          <el-select v-model="form.action" class="full-width" @change="syncTarget">
-            <el-option v-for="action in actions" :key="action.value" :value="action.value" :label="action.label" :disabled="action.value === 'USE_IN_PLACE' && !sourceCanCompute" />
-          </el-select>
-          <div class="field-hint" :class="{ 'move-warning': form.action === 'MOVE' }">{{ actionDescription }}</div>
+          <span v-if="inPlace">原位计算（数据已在目标节点，无需复制或迁移）</span>
+          <template v-else>
+            <el-radio-group v-model="form.action">
+              <el-radio v-for="action in actions" :key="action.value" :label="action.value">{{ action.label }}</el-radio>
+            </el-radio-group>
+            <div class="field-hint" :class="{ 'move-warning': form.action === 'MOVE' }">{{ actionDescription }}</div>
+          </template>
         </el-form-item>
-        <el-form-item v-if="!inPlace" label="目标节点" required>
-          <el-select v-model="form.targetNodeId" class="full-width" filterable placeholder="请选择目标存储节点" @change="syncImage">
-            <el-option v-for="node in targetNodes" :key="node.nodeId" :value="node.nodeId" :label="nodeLabel(node)" />
-          </el-select>
+        <el-form-item v-if="computeNode && !inPlace" label="计算调度">
+          <el-checkbox v-model="form.compute" @change="syncImage">数据到达后在目标节点运行计算</el-checkbox>
         </el-form-item>
-        <el-form-item v-else label="计算节点">
-          <span>{{ sourceNode ? nodeLabel(sourceNode) : '请选择具有计算能力的源副本' }}</span>
-        </el-form-item>
-        <el-form-item v-if="computeNode" label="运行镜像" :required="inPlace">
-          <el-select v-model="form.runtimeImageId" class="full-width" filterable clearable :loading="imagesLoading" :placeholder="inPlace ? '请选择运行镜像' : '不选择镜像，仅调度数据'">
+        <el-form-item v-if="withCompute" label="运行镜像" required>
+          <el-select v-model="form.runtimeImageId" class="full-width" filterable :loading="imagesLoading" placeholder="请选择运行镜像">
             <el-option v-for="image in images" :key="image.imageId" :value="image.imageId" :label="imageLabel(image)" />
           </el-select>
-          <div class="field-hint">{{ inPlace ? '直接使用源节点上的数据进行计算，不复制或迁移数据。' : '选择镜像后，数据传输完成将在目标节点运行该镜像；不选择则仅传输数据。' }} 不修改数据集的默认镜像。</div>
+          <div class="field-hint">{{ inPlace ? '直接使用目标节点上已有的数据运行该镜像。' : '数据传输完成后在目标节点运行该镜像。' }}提交后生成计算任务并开始执行，不修改数据集的默认镜像。</div>
           <div v-if="imageError || (!imagesLoading && !images.length)" class="field-hint">
             {{ imageError || '暂无已验证并启用的镜像，请先到镜像注册页面配置。' }}
             <el-button type="text" size="mini" :loading="imagesLoading" @click="loadImages">重新加载镜像</el-button>
@@ -50,7 +54,7 @@
         </el-form-item>
       </el-form>
       <el-alert v-if="submitError" class="schedule-tip" :title="submitError" type="error" :closable="false" show-icon />
-      <el-alert v-if="acceptedPlan" :title="`调度计划 #${acceptedPlan.planId} 已提交，请到调度日志查看执行结果。`" type="success" :closable="false" show-icon />
+      <el-alert v-if="acceptedPlan" :title="acceptedMessage" :description="computeTask ? '任务已创建并开始执行，进度与结果请到调度日志查看。' : ''" type="success" :closable="false" show-icon />
     </div>
     <span slot="footer">
       <el-button v-if="loadError" :loading="loading" @click="loadOptions">重新加载</el-button>
@@ -63,13 +67,12 @@
 
 <script>
 import { fetchRegisteredNodes, fetchRuntimeImages, requestId } from '@/api/registrationApi'
-import { fetchSchedulableDatasets, submitDatasetSchedule, submitComputeSchedule } from '@/api/schedulingApi'
+import { fetchSchedulableDatasets, fetchSchedulingPlan, submitDatasetSchedule, submitComputeSchedule } from '@/api/schedulingApi'
 import { fetchAllPages, formatBytes } from '@/utils/dataset-catalog'
 
 const actions = [
-  { value: 'COPY', label: '复制', description: '复制到目标存储节点，保留源节点上的副本。' },
-  { value: 'MOVE', label: '迁移', description: '复制成功后删除源文件，将副本迁移到目标存储节点。此操作会移除源副本，请谨慎选择。' },
-  { value: 'USE_IN_PLACE', label: '原位计算', description: '在数据所在节点直接运行所选镜像，要求源节点具有 COMPUTE 属性。' }
+  { value: 'COPY', label: '复制', description: '复制到目标节点，保留源节点上的副本。' },
+  { value: 'MOVE', label: '迁移', description: '复制成功后删除源文件，将副本迁移到目标节点。此操作会移除源副本，请谨慎选择。' }
 ]
 
 export default {
@@ -79,54 +82,67 @@ export default {
       visible: false, loading: false, submitting: false, loadVersion: 0,
       dataset: {}, replicas: [], nodes: [],
       images: [], imagesLoading: false, imagesLoaded: false, imageError: '',
-      actions, form: { replicaId: null, targetNodeId: null, action: 'COPY', runtimeImageId: null },
-      loadError: '', submitError: '', acceptedPlan: null, pendingPlan: null
+      actions, form: { targetNodeId: null, replicaId: null, action: 'COPY', compute: false, runtimeImageId: null },
+      loadError: '', submitError: '', acceptedPlan: null, computeTask: null, pendingPlan: null
     }
   },
   computed: {
-    sourceReplica() { return this.replicas.find(replica => replica.replicaId === this.form.replicaId) },
-    sourceNode() { return this.sourceReplica && this.nodes.find(node => node.nodeId === this.sourceReplica.nodeId) },
-    sourceCanCompute() { return this.isComputeNode(this.sourceNode) },
-    inPlace() { return this.form.action === 'USE_IN_PLACE' },
-    computeNode() {
-      const node = this.inPlace ? this.sourceNode : this.targetNodes.find(node => node.nodeId === this.form.targetNodeId)
-      return this.isComputeNode(node) ? node : null
-    },
-    withCompute() { return this.inPlace || (!!this.computeNode && !!this.form.runtimeImageId) },
-    targetNodes() {
-      if (!this.sourceReplica) return []
-      return this.nodes.filter(node => node.nodeId !== this.sourceReplica.nodeId && ['STORAGE', 'COMPUTE_STORAGE'].includes(node.role))
+    // A node that already holds a usable replica needs no transfer, so it is a target only for in-place compute.
+    targetNodes() { return this.nodes.filter(node => this.hostsReplica(node) ? this.isComputeNode(node) : this.isStorageNode(node)) },
+    targetNode() { return this.targetNodes.find(node => node.nodeId === this.form.targetNodeId) },
+    inPlace() { return this.hostsReplica(this.targetNode) },
+    computeNode() { return this.isComputeNode(this.targetNode) ? this.targetNode : null },
+    withCompute() { return this.inPlace || (!!this.computeNode && this.form.compute) },
+    sourceReplicas() { return this.inPlace ? this.replicas.filter(replica => replica.nodeId === this.targetNode.nodeId) : this.replicas },
+    sourceReplica() { return this.sourceReplicas.find(replica => replica.replicaId === this.form.replicaId) },
+    targetHint() {
+      if (!this.targetNode) return ''
+      if (this.inPlace) return '该节点已有此数据集的可用副本且具有计算能力，将直接在该节点计算。'
+      return this.computeNode ? '该节点具有计算能力，可仅调度数据，也可在数据到达后运行计算。' : '该节点仅提供存储，只调度数据，不运行计算。'
     },
     actionDescription() { return (actions.find(action => action.value === this.form.action) || {}).description },
     unavailableReason() {
       if (this.loading || this.loadError) return ''
       if (!this.replicas.length) return '该数据集当前没有可调度副本，请在注册中心检查激活状态和副本健康。'
-      if (this.inPlace && !this.sourceCanCompute) return '原位计算需要选择具有 COMPUTE 属性的源节点副本。'
-      if (!this.inPlace && !this.targetNodes.length) return '当前没有可用的目标存储节点。'
+      if (!this.targetNodes.length) return '当前没有可用的目标节点：需要其他可调度的存储节点，或数据所在节点具有计算能力。'
       return ''
     },
     canSubmit() {
       return !this.loading && !this.submitting && !this.loadError && !this.unavailableReason && !this.acceptedPlan &&
-        actions.some(action => action.value === this.form.action) && !!this.sourceReplica &&
-        (this.inPlace ? this.sourceCanCompute : this.targetNodes.some(node => node.nodeId === this.form.targetNodeId)) &&
+        !!this.targetNode && !!this.sourceReplica && (this.inPlace || actions.some(action => action.value === this.form.action)) &&
         (!this.withCompute || (!this.imagesLoading && !this.imageError && this.images.some(image => image.imageId === this.form.runtimeImageId)))
+    },
+    acceptedMessage() {
+      if (!this.acceptedPlan) return ''
+      const plan = `调度计划 #${this.acceptedPlan.planId}`
+      if (!this.computeTask) return `${plan} 已提交，请到调度日志查看执行结果。`
+      return this.computeTask.taskId == null
+        ? `计算调度已提交（${plan}），任务 ID 暂未获取，请到调度日志查看。`
+        : `计算调度已提交，任务 ID：#${this.computeTask.taskId}（${plan}）`
     }
   },
   beforeDestroy() { this.loadVersion++ },
   methods: {
     formatBytes,
     isComputeNode(node) { return !!node && ['COMPUTE', 'COMPUTE_STORAGE'].includes(node.role) },
+    isStorageNode(node) { return !!node && ['STORAGE', 'COMPUTE_STORAGE'].includes(node.role) },
+    hostsReplica(node) { return !!node && this.replicas.some(replica => replica.nodeId === node.nodeId) },
     imageLabel(image) {
       const isDefault = image.imageId === this.dataset.defaultRuntimeImageId
       const type = [image.taskType, image.modelType].filter(Boolean).join(' / ')
       return `${isDefault ? '【数据集默认】' : ''}${image.name}${type ? `（${type}）` : ''} · ${image.imageRef}`
     },
     nodeLabel(node) { return `${node.displayName || node.k8sNodeName || '节点'} #${node.nodeId} (${node.role})` },
+    targetLabel(node) {
+      const suffix = this.hostsReplica(node) ? ' · 已有副本，原位计算' : this.isComputeNode(node) ? ' · 可计算' : ''
+      return `${this.nodeLabel(node)}${suffix}`
+    },
     replicaLabel(replica) { return `${replica.nodeName || '节点'} #${replica.nodeId} · 副本 #${replica.replicaId}` },
     open(dataset) {
       this.dataset = { ...dataset }
-      this.form = { replicaId: null, targetNodeId: null, action: 'COPY', runtimeImageId: null }
+      this.form = { targetNodeId: null, replicaId: null, action: 'COPY', compute: false, runtimeImageId: null }
       this.acceptedPlan = null
+      this.computeTask = null
       this.pendingPlan = null
       this.submitError = ''
       this.visible = true
@@ -160,13 +176,14 @@ export default {
       }
     },
     syncTarget() {
-      if (!this.targetNodes.some(node => node.nodeId === this.form.targetNodeId)) {
-        this.form.targetNodeId = null
-      }
+      if (!this.targetNode) this.form.targetNodeId = null
+      // In-place compute must read the replica on the target; any replica can feed a transfer.
+      if (!this.sourceReplica) this.form.replicaId = this.sourceReplicas.length ? this.sourceReplicas[0].replicaId : null
+      if (!this.computeNode) this.form.compute = false
       this.syncImage()
     },
     syncImage() {
-      if (!this.computeNode) this.form.runtimeImageId = null
+      if (!this.withCompute) this.form.runtimeImageId = null
       else if (!this.imagesLoaded && !this.imagesLoading) this.loadImages()
     },
     async loadImages() {
@@ -191,28 +208,30 @@ export default {
       this.submitting = true
       this.submitError = ''
       try {
-        if (this.form.action === 'MOVE') {
+        const compute = this.withCompute
+        if (!this.inPlace && this.form.action === 'MOVE') {
           await this.$confirm(`将数据集“${this.dataset.name}”从节点 #${this.sourceReplica.nodeId} 迁移到节点 #${this.form.targetNodeId}。复制后会删除源文件，是否继续？`, '确认迁移数据集', {
             type: 'warning', confirmButtonText: '确认迁移', cancelButtonText: '取消'
           })
         }
         const assignment = {
           datasetId: this.dataset.datasetId, replicaId: this.sourceReplica.replicaId,
-          sourceNodeId: this.sourceReplica.nodeId,
-          targetNodeId: this.inPlace ? this.sourceReplica.nodeId : this.form.targetNodeId,
-          action: this.withCompute && !this.inPlace ? `${this.form.action}_AND_USE` : this.form.action
+          sourceNodeId: this.sourceReplica.nodeId, targetNodeId: this.form.targetNodeId,
+          action: this.inPlace ? 'USE_IN_PLACE' : compute ? `${this.form.action}_AND_USE` : this.form.action
         }
-        const runtimeImageId = this.withCompute ? this.form.runtimeImageId : undefined
+        const runtimeImageId = compute ? this.form.runtimeImageId : undefined
         // An unchanged retry must not create a second asynchronous execution.
         if (!this.pendingPlan || this.pendingPlan.runtimeImageId !== runtimeImageId || JSON.stringify(this.pendingPlan.assignments[0]) !== JSON.stringify(assignment)) {
           const id = `manual-${requestId()}`
           this.pendingPlan = {
             externalPlanId: id, algorithm: { name: '手动数据调度', version: '1.0' }, assignments: [assignment],
-            ...(this.withCompute ? { taskId: id, runtimeImageId } : {})
+            ...(compute ? { taskId: id, runtimeImageId } : {})
           }
         }
-        this.acceptedPlan = await (this.withCompute ? submitComputeSchedule : submitDatasetSchedule)(this.pendingPlan)
-        this.$emit('submitted', this.acceptedPlan)
+        const accepted = await (compute ? submitComputeSchedule : submitDatasetSchedule)(this.pendingPlan)
+        this.computeTask = compute ? { taskId: await this.findTaskId(accepted) } : null
+        this.acceptedPlan = accepted
+        this.$emit('submitted', accepted)
       } catch (error) {
         if (error !== 'cancel' && error !== 'close') {
           this.submitError = error.status === 404 || error.status === 405
@@ -221,6 +240,17 @@ export default {
         }
       } finally {
         this.submitting = false
+      }
+    },
+    // accepted.taskId echoes our external string; internalTaskId is the numeric task_management ID.
+    // Older backends only expose it on the plan record.
+    async findTaskId(accepted) {
+      if (accepted && accepted.internalTaskId != null) return accepted.internalTaskId
+      try {
+        const detail = await fetchSchedulingPlan(accepted.planId)
+        return detail && detail.plan && detail.plan.internalTaskId != null ? detail.plan.internalTaskId : null
+      } catch (error) {
+        return null
       }
     },
     close() { this.loadVersion++ },

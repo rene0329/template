@@ -6,7 +6,7 @@
         <div class="search-container">
           <el-form :inline="true" :model="formInline" size="medium">
             <el-form-item>
-              <el-input v-model="formInline.name" placeholder="请输入任务ID" />
+              <el-input v-model="formInline.name" placeholder="请输入任务ID或任务名称" />
             </el-form-item>
             <el-button @click="onSearch">搜索</el-button>
             <el-button @click="onCancel">重置</el-button>
@@ -42,7 +42,16 @@
                   align="center"
                 >
                   <template slot-scope="scope">
-                    <span style="white-space: pre-wrap; text-align: left; display: inline-block;">{{ scope.row.schedule }}</span>
+                    <div class="schedule-cell">
+                      <template v-if="scope.row.parsedSchedule.kind !== 'raw'">
+                        <div v-for="(section, index) in scope.row.parsedSchedule.sections" :key="index" class="schedule-section">
+                          <div class="schedule-title">{{ section.title }}</div>
+                          <div v-for="(line, lineIndex) in section.lines" :key="lineIndex" class="schedule-line" :class="{ 'is-failed': scheduleLineFailed(line) }">{{ line }}</div>
+                          <div v-if="!section.lines.length" class="schedule-line is-empty">暂无</div>
+                        </div>
+                      </template>
+                      <div v-else class="schedule-raw">{{ scope.row.parsedSchedule.text || '—' }}</div>
+                    </div>
                   </template>
                 </el-table-column>
 
@@ -92,6 +101,7 @@
 <script>
 import { fetchScheduleList } from '@/api/managementCenterApi'
 import { clampPage, fetchAllPages, paginateRows, sortRows } from '@/utils/dataset-catalog'
+import { parseSchedule, scheduleLineFailed } from '@/utils/schedule-text'
 
 export default {
   name: 'NodeList',
@@ -119,20 +129,27 @@ export default {
     }
   },
   created() {
+    const taskId = this.$route && this.$route.query && this.$route.query.taskId
+    if (taskId) this.formInline.name = String(taskId)
     this.fetchData()
   },
 
   methods: {
+    scheduleLineFailed,
     async fetchData() {
       this.loading = true
       try {
+        // 后端 query 只匹配任务名称；这里取全量后在前端按任务ID（精确）或任务名称（包含）过滤。
         const tasks = await fetchAllPages(
           ({ page, pageSize, query }) => fetchScheduleList(page, pageSize, query),
           {},
-          { query: this.formInline.name }
+          { query: '' }
         )
+        const keyword = this.formInline.name.trim()
         this.TaskData = tasks
-        this.total = tasks.length
+          .filter(task => !keyword || String(task.taskId) === keyword || String(task.taskName || '').includes(keyword))
+          .map(task => ({ ...task, parsedSchedule: parseSchedule(task.schedule) }))
+        this.total = this.TaskData.length
         this.currentPage = clampPage(this.currentPage, this.pageSize, this.total)
       } catch (err) {
         console.error('获取调度列表失败:', err)
@@ -378,6 +395,35 @@ export default {
 }
 .pagination-sizes-select :deep(.el-input__suffix) {
   right: 5px;
+}
+.schedule-cell {
+  display: inline-block;
+  text-align: left;
+  line-height: 1.7;
+  padding: 10px 0;
+  white-space: normal;
+}
+.schedule-section + .schedule-section {
+  margin-top: 8px;
+}
+.schedule-title {
+  color: #253747;
+  font-weight: 600;
+}
+.schedule-line {
+  padding-left: 12px;
+  color: #606266;
+  word-break: break-all;
+}
+.schedule-line.is-failed {
+  color: #f56c6c;
+}
+.schedule-line.is-empty {
+  color: #909399;
+}
+.schedule-raw {
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 .page-size-note { color: #666; }
 .search-input {

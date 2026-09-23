@@ -525,6 +525,7 @@ export const constantRoutes = [
     component: Layout,
     redirect: '/collaboration/capabilities',
     name: 'CollaborationCenter',
+    hidden: true,
     alwaysShow: true,
     meta: { title: '协同计算', icon: 'lock', itemHeight: 48 },
     children: [
@@ -550,29 +551,28 @@ export const constantRoutes = [
     ]
   },
   {
+    path: '/security',
+    component: Layout,
+    redirect: '/security/access',
+    name: 'SecurityCenter',
+    alwaysShow: true,
+    meta: { title: '安全中心', icon: 'lock', itemHeight: 48 },
+    children: [
+      { path: 'access', name: 'AccessControl', component: () => import('@/views/SecurityCenter/AccessControl/index'), meta: { title: '访问控制', icon: 'password', itemHeight: 40 }},
+      { path: 'admin', name: 'SystemAdministration', component: () => import('@/views/AdminCenter/index'), meta: { title: '系统管理', icon: 'people', itemHeight: 40, roles: ['ADMIN'] }}
+    ]
+  },
+  {
     path: '/logs',
     component: Layout,
-    redirect: '/logs/abnormal-access',
+    redirect: '/logs/scheduling',
     name: 'SystemLogs',
     alwaysShow: true,
     meta: { title: '系统日志', icon: 'documentation', itemHeight: 48 },
     children: [
-      { path: 'abnormal-access', name: 'SecurityValidation', component: () => import('@/views/ManagementCenter/SecurityValidation/index'), meta: { title: '异常访问日志', icon: 'form', itemHeight: 40 }},
       { path: 'scheduling', name: 'SchedulingLogs', component: () => import('@/views/ManagementCenter/SchedulingLogs/index'), meta: { title: '调度执行日志', icon: 'documentation', itemHeight: 40 }},
-      { path: 'privacy', name: 'PrivacyLogs', component: () => import('@/views/ManagementCenter/PrivacyComputing/index'), meta: { title: '隐私计算日志', icon: 'lock', itemHeight: 40, privacyTab: 'jobs', evidenceMode: true }}
-    ]
-  },
-  {
-    path: '/admin',
-    component: Layout,
-    redirect: '/admin/domains',
-    name: 'SystemAdministration',
-    alwaysShow: true,
-    meta: { title: '系统管理', icon: 'people', itemHeight: 48, roles: ['ADMIN'] },
-    children: [
-      { path: 'domains', name: 'DomainAdministration', component: () => import('@/views/AdminCenter/index'), meta: { title: '域管理', icon: 'cluster', itemHeight: 40, adminTab: 'domains', roles: ['ADMIN'] }},
-      { path: 'users', name: 'UserAdministration', component: () => import('@/views/AdminCenter/index'), meta: { title: '用户管理', icon: 'people', itemHeight: 40, adminTab: 'users', roles: ['ADMIN'] }},
-      { path: 'dataset-owners', name: 'DatasetOwnerAdministration', component: () => import('@/views/AdminCenter/index'), meta: { title: '数据归属', icon: 'clipboard', itemHeight: 40, adminTab: 'datasets', roles: ['ADMIN'] }}
+      { path: 'abnormal-access', name: 'SecurityValidation', component: () => import('@/views/ManagementCenter/SecurityValidation/index'), meta: { title: '异常访问日志', icon: 'form', itemHeight: 40 }},
+      { path: 'privacy', name: 'PrivacyLogs', hidden: true, component: () => import('@/views/ManagementCenter/PrivacyComputing/index'), meta: { title: '隐私计算日志', icon: 'lock', itemHeight: 40, privacyTab: 'jobs', evidenceMode: true }}
     ]
   },
   {
@@ -601,6 +601,10 @@ export const constantRoutes = [
   { path: '/ManagementCenter/Settings', redirect: to => ({ path: '/resources/network', query: to.query, hash: to.hash }), hidden: true },
   { path: '/ManagementCenter/FrameNet', redirect: to => ({ path: '/resources/topology', query: to.query, hash: to.hash }), hidden: true },
   { path: '/ManagementCenter/DataManagement', redirect: to => ({ path: '/resources/datasets/manage', query: to.query, hash: to.hash }), hidden: true },
+  { path: '/admin', redirect: '/security/admin', hidden: true },
+  { path: '/admin/domains', redirect: to => ({ path: '/security/admin', query: { ...to.query, tab: 'domains' }, hash: to.hash }), hidden: true },
+  { path: '/admin/users', redirect: to => ({ path: '/security/admin', query: { ...to.query, tab: 'users' }, hash: to.hash }), hidden: true },
+  { path: '/admin/dataset-owners', redirect: to => ({ path: '/security/admin', query: { ...to.query, tab: 'datasets' }, hash: to.hash }), hidden: true },
   { path: '/DataCenter/SchedulingLogs', redirect: to => ({ path: '/logs/scheduling', query: to.query, hash: to.hash }), hidden: true },
   { path: '/ManagementCenter/PrivacyComputing', redirect: to => ({ path: '/collaboration/capabilities', query: to.query, hash: to.hash }), hidden: true },
   { path: '/ManagementCenter/SecurityValidation', redirect: to => ({ path: '/logs/abnormal-access', query: to.query, hash: to.hash }), hidden: true },

@@ -4,15 +4,15 @@
       <div>
         <span class="eyebrow">TOPIC4 · 原位调度与隐私协同计算</span>
         <h1>业务工作台</h1>
-        <p>从资源与数据准备开始，进入协同计算和任务运行，最后查看系统日志与原始证据。</p>
+        <p>{{ heroText }}</p>
       </div>
       <div class="hero-actions">
-        <router-link v-if="isDataOwner" to="/collaboration/jobs/new"><el-button type="primary">发起隐私计算</el-button></router-link>
+        <router-link v-if="showCollaboration && isDataOwner" to="/collaboration/jobs/new"><el-button type="primary">发起隐私计算</el-button></router-link>
         <router-link to="/resources/datasets/register"><el-button>注册数据集</el-button></router-link>
       </div>
     </section>
 
-    <section class="metric-grid" aria-label="系统概览">
+    <section class="metric-grid" :class="{ 'four-up': metrics.length === 4 }" aria-label="系统概览">
       <article v-for="item in metrics" :key="item.key" class="metric-card">
         <div class="metric-icon" :class="item.tone"><i :class="item.icon" /></div>
         <div>
@@ -38,14 +38,18 @@
 
       <article class="panel privacy-panel">
         <header>
-          <div><h2>隐私协同状态</h2><p>{{ name }} · {{ roleNames }}<span v-if="domainName"> · {{ domainName }}</span></p></div>
+          <div><h2>{{ showCollaboration ? '隐私协同状态' : '当前账号' }}</h2><p>{{ name }} · {{ roleNames }}<span v-if="domainName"> · {{ domainName }}</span></p></div>
           <el-tag type="success">已登录</el-tag>
         </header>
-        <template>
+        <template v-if="showCollaboration">
           <div class="privacy-stat"><span>等待审批</span><strong>{{ privacySummary.awaiting }}</strong></div>
           <div class="privacy-stat"><span>执行中</span><strong>{{ privacySummary.running }}</strong></div>
           <div class="privacy-stat"><span>已完成</span><strong>{{ privacySummary.succeeded }}</strong></div>
           <router-link to="/collaboration/jobs" class="panel-link">查看全部协同任务 <i class="el-icon-right" /></router-link>
+        </template>
+        <template v-else>
+          <p class="panel-note">本域数据可直接用于任务；其他域的数据集需在安全中心申请临时访问令牌，令牌到期后自动失效。</p>
+          <router-link to="/security/access" class="panel-link">查看数据集访问权限 <i class="el-icon-right" /></router-link>
         </template>
       </article>
     </section>
@@ -67,23 +71,36 @@ import { fetchPrivacyCapabilities, fetchPrivacyJobs, fetchPrivacyTemplates } fro
 
 const count = result => Number(result && result.total) || (Array.isArray(result) ? result.length : 0)
 
+// 协同计算菜单暂时隐藏：工作台上的隐私计算入口、协同任务面板和协议模板统计随之隐藏，
+// 且不再请求隐私计算接口。恢复协同计算菜单时把它改回 true 即可。
+const SHOW_COLLABORATION = false
+
 export default {
   name: 'Workspace',
   data() {
     return {
+      showCollaboration: SHOW_COLLABORATION,
       loading: true,
       overview: { nodes: '—', datasets: '—', images: '—', templates: '—', tasks: '—' },
       privacySummary: { awaiting: 0, running: 0, succeeded: 0 },
-      errors: [],
-      flow: [
-        { title: '资源与数据', description: '准备节点、网络、数据集和运行镜像', path: '/resources/nodes' },
-        { title: '协同计算', description: '选择固定协议模板并创建隐私任务', path: '/collaboration/capabilities' },
-        { title: '任务运行', description: '查看任务、调度结果和性能分析', path: '/operations/tasks' },
-        { title: '系统日志', description: '检查异常访问、调度执行和隐私计算日志', path: '/logs/abnormal-access' }
-      ]
+      errors: []
     }
   },
   computed: {
+    heroText() {
+      return this.showCollaboration
+        ? '从资源与数据准备开始，进入协同计算和任务运行，最后查看系统日志与原始证据。'
+        : '从资源与数据准备开始，进入任务运行，在安全中心管理数据访问权限，最后查看系统日志与原始证据。'
+    },
+    flow() {
+      return [
+        { title: '资源与数据', description: '准备节点、网络、数据集和运行镜像', path: '/resources/nodes' },
+        this.showCollaboration && { title: '协同计算', description: '选择固定协议模板并创建隐私任务', path: '/collaboration/capabilities' },
+        { title: '任务运行', description: '查看任务、调度结果和性能分析', path: '/operations/tasks' },
+        { title: '安全中心', description: '查看数据集访问权限并申请临时令牌', path: '/security/access' },
+        { title: '系统日志', description: this.showCollaboration ? '检查异常访问、调度执行和隐私计算日志' : '检查调度执行和异常访问日志', path: '/logs/abnormal-access' }
+      ].filter(Boolean)
+    },
     name() { return this.$store.getters.name || this.$store.getters.username },
     roles() { return this.$store.getters.roles || [] },
     isDataOwner() { return this.roles.includes('DATA_OWNER') },
@@ -96,7 +113,7 @@ export default {
         { key: 'images', label: '运行镜像', value: this.overview.images, note: '已登记镜像', icon: 'el-icon-box', tone: 'violet', loading: this.loading },
         { key: 'templates', label: '协议模板', value: this.overview.templates, note: '当前可用模板', icon: 'el-icon-lock', tone: 'orange', loading: this.loading },
         { key: 'tasks', label: '普通任务', value: this.overview.tasks, note: '任务目录记录', icon: 'el-icon-s-operation', tone: 'cyan', loading: this.loading }
-      ]
+      ].filter(item => item.key !== 'templates' || this.showCollaboration)
     }
   },
   created() { this.loadOverview() },
@@ -110,19 +127,23 @@ export default {
         ['images', '运行镜像', fetchRuntimeImages({ page: 1, pageSize: 1 })],
         ['tasks', '普通任务', fetchTaskList(1, 1, '', { silent: true })]
       ]
-      const catalog = Promise.all([fetchPrivacyCapabilities({ silent: true }), fetchPrivacyTemplates({ silent: true })])
-      const results = await Promise.allSettled([...requests.map(item => item[2]), catalog])
+      const catalog = this.showCollaboration
+        ? [Promise.all([fetchPrivacyCapabilities({ silent: true }), fetchPrivacyTemplates({ silent: true })])]
+        : []
+      const results = await Promise.allSettled([...requests.map(item => item[2]), ...catalog])
       requests.forEach((item, index) => {
         if (results[index].status === 'fulfilled') this.overview[item[0]] = count(results[index].value)
         else this.errors.push(item[1])
       })
-      const catalogResult = results[results.length - 1]
-      if (catalogResult.status === 'fulfilled') {
-        const templates = catalogResult.value[1] || []
-        this.overview.templates = templates.filter(item => item.available).length
-      } else this.errors.push('协议模板')
+      if (catalog.length) {
+        const catalogResult = results[requests.length]
+        if (catalogResult.status === 'fulfilled') {
+          const templates = catalogResult.value[1] || []
+          this.overview.templates = templates.filter(item => item.available).length
+        } else this.errors.push('协议模板')
+      }
       this.loading = false
-      await this.loadPrivacySummary()
+      if (this.showCollaboration) await this.loadPrivacySummary()
     },
     async loadPrivacySummary() {
       this.privacySummary = { awaiting: 0, running: 0, succeeded: 0 }
@@ -148,6 +169,7 @@ export default {
 .hero-card p { max-width: 700px; margin: 0; color: #d9e5e3; line-height: 1.7; }
 .hero-actions { display: flex; flex-shrink: 0; gap: 10px; }
 .metric-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin: 18px 0; }
+.metric-grid.four-up { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .metric-card { display: flex; align-items: center; gap: 13px; min-height: 116px; padding: 18px; border: 1px solid #e6ebef; border-radius: 10px; background: #fff; box-shadow: 0 3px 12px rgba(35, 58, 73, .04); }
 .metric-card > div:last-child { display: flex; min-width: 0; flex-direction: column; }
 .metric-card span, .metric-card small { color: #7b8994; }
@@ -163,10 +185,12 @@ export default {
 .flow-item { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid #e6ebef; border-radius: 8px; transition: .2s ease; }
 .flow-item:hover { border-color: #7cbda4; transform: translateY(-1px); box-shadow: 0 5px 14px rgba(12, 131, 87, .08); }
 .flow-item > div { display: flex; min-width: 0; flex: 1; flex-direction: column; }.flow-item small { margin-top: 4px; color: #84919b; }
+.flow-item:last-child:nth-child(odd) { grid-column: 1 / -1; }
 .step-index { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; color: #fff; background: #0c8357; font-weight: 700; }
 .privacy-stat { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #edf0f2; color: #62717c; }.privacy-stat strong { color: #263b4d; font-size: 20px; }
 .panel-link { display: inline-block; margin-top: 16px; color: #0c8357; font-weight: 600; }
+.panel-note { margin: 0; color: #62717c; font-size: 13px; line-height: 1.7; }
 .credential-empty { padding: 28px 10px; text-align: center; color: #7b8993; }.credential-empty i { display: block; margin-bottom: 12px; color: #9aa7af; font-size: 32px; }.credential-empty strong { color: #3d5262; }.credential-empty p { margin: 8px 0 0; font-size: 13px; line-height: 1.6; }
-@media (max-width: 1100px) { .metric-grid { grid-template-columns: repeat(3, 1fr); }.workspace-grid { grid-template-columns: 1fr; } }
+@media (max-width: 1100px) { .metric-grid { grid-template-columns: repeat(3, 1fr); }.metric-grid.four-up { grid-template-columns: repeat(2, 1fr); }.workspace-grid { grid-template-columns: 1fr; } }
 @media (max-width: 768px) { .workspace-page { padding: 14px; }.hero-card { align-items: flex-start; flex-direction: column; }.metric-grid { grid-template-columns: 1fr 1fr; }.flow-list { grid-template-columns: 1fr; } }
 </style>

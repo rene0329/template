@@ -1,3 +1,5 @@
+import fs from 'fs'
+import path from 'path'
 import DataManagement from '@/views/ManagementCenter/DataManagement/index.vue'
 import { fetchRegisteredDatasets, fetchRegisteredNodes } from '@/api/registrationApi'
 import { fetchStoragePolicy, refreshDatasetHeat } from '@/api/datasetStorageApi'
@@ -9,8 +11,12 @@ jest.mock('@/api/registrationApi', () => ({
 jest.mock('@/api/datasetAccessApi', () => ({
   runDatasetAccessTest: jest.fn(), fetchDatasetAccessEvents: jest.fn()
 }))
-jest.mock('@/api/schedulingApi', () => ({ fetchSchedulableDatasets: jest.fn(), submitDatasetSchedule: jest.fn() }))
+jest.mock('@/api/schedulingApi', () => ({
+  fetchSchedulableDatasets: jest.fn(), fetchSchedulingPlan: jest.fn(), submitDatasetSchedule: jest.fn(), submitComputeSchedule: jest.fn()
+}))
 jest.mock('@/api/datasetStorageApi', () => ({ fetchStoragePolicy: jest.fn(), refreshDatasetHeat: jest.fn() }))
+
+const readPageSource = file => fs.readFileSync(path.resolve(__dirname, '../../../src/views/ManagementCenter/DataManagement', file), 'utf8')
 
 function context() {
   const vm = { ...DataManagement.data(), $message: { success: jest.fn(), error: jest.fn() }}
@@ -27,7 +33,7 @@ const dataset = {
 
 beforeEach(() => {
   jest.resetAllMocks()
-  fetchStoragePolicy.mockResolvedValue({ heatEnabled: true, aggregationEnabled: false })
+  fetchStoragePolicy.mockResolvedValue({ heatEnabled: true })
   fetchRegisteredNodes.mockResolvedValue({ list: [
     { nodeId: 6, displayName: 'ali-bj' }, { nodeId: 5, displayName: 'ali-sh' }, { nodeId: 3, displayName: 'master-88' }
   ], total: 3 })
@@ -65,14 +71,29 @@ it('keeps the dataset list usable when the storage policy cannot be loaded', asy
   expect(vm.policyError).toContain('旧后端')
 })
 
-it('restores storage entry points while respecting server-side task conditions', () => {
+it('opens heat-sensitive storage only when the server policy allows it and no heat update is running', () => {
   const vm = context()
   vm.$refs = { storagePlan: { open: jest.fn() }}
-  vm.storagePolicy = { heatEnabled: false, aggregationEnabled: true }
-  vm.openStoragePlan('heat')
-  vm.openStoragePlan('aggregation')
-  expect(vm.$refs.storagePlan.open).toHaveBeenCalledTimes(1)
-  expect(vm.$refs.storagePlan.open).toHaveBeenCalledWith('aggregation')
+  vm.storagePolicy = { heatEnabled: false }
+  vm.openStoragePlan()
+  vm.storagePolicy = { heatEnabled: true, unfinishedTaskCount: 3 }
+  vm.heatLoading = true
+  vm.openStoragePlan()
+  expect(vm.$refs.storagePlan.open).not.toHaveBeenCalled()
+  vm.heatLoading = false
+  vm.openStoragePlan()
+  expect(vm.$refs.storagePlan.open.mock.calls).toEqual([[]])
+})
+
+it('no longer offers in-place aggregation and links registration to the canonical route', () => {
+  const page = readPageSource('index.vue')
+  expect(page).toContain("$router.push('/resources/datasets/register')")
+  expect(page).not.toContain('/RegistrationCenter/DatasetRegistry')
+  expect(page).toContain('热敏存储')
+  for (const source of [page, readPageSource('StoragePlanDialog.vue')]) {
+    expect(source).not.toContain('原位汇聚')
+    expect(source).not.toContain('aggregation')
+  }
 })
 
 it('uses the registration catalog including inactive datasets and counts logical datasets once', async() => {
@@ -106,7 +127,7 @@ it('reflects registry status changes in the list and open detail and removes del
   expect(vm.dialogVisibleDetail).toBe(false)
 })
 
-it('hides missing storage locations and detail rows without changing the source records', async() => {
+it('hides missing storage locations but keeps every detail row with missing replicas greyed out', async() => {
   const vm = context()
   const replicas = [
     { replicaId: 1, nodeId: 6, availability: 'MISSING' },
@@ -122,7 +143,7 @@ it('hides missing storage locations and detail rows without changing the source 
   vm.openTaskDialog(vm.TaskData[0])
   expect(vm.selectedTask.replicas).toEqual(replicas)
   expect(vm.selectedTask.replicas).toHaveLength(6)
-  expect(vm.detailReplicas.map(replica => replica.replicaId)).toEqual([2, 5, 6])
+  expect(replicas.map(row => vm.replicaRowClass({ row }))).toEqual(['replica-row-missing', '', 'replica-row-missing', 'replica-row-missing', '', ''])
 })
 
 it('shows no storage location when all replicas are missing or absent', () => {
@@ -144,10 +165,10 @@ it('updates displayed storage locations when a poll marks a replica missing', as
   await vm.fetchData()
   expect(vm.storageNodes(vm.TaskData[0])).toBe('ali-bj、ali-sh')
   await vm.openTaskDialog(vm.TaskData[0])
-  expect(vm.detailReplicas).toHaveLength(2)
+  expect(vm.selectedTask.replicas.map(row => vm.replicaRowClass({ row }))).toEqual(['', ''])
   await vm.fetchData(true)
   expect(vm.storageNodes(vm.TaskData[0])).toBe('ali-sh')
-  expect(vm.detailReplicas.map(replica => replica.nodeId)).toEqual([5])
+  expect(vm.selectedTask.replicas.map(row => vm.replicaRowClass({ row }))).toEqual(['replica-row-missing', ''])
 })
 
 it('shows registered node names in dataset details with Kubernetes names as a fallback', async() => {
@@ -163,21 +184,21 @@ it('shows registered node names in dataset details with Kubernetes names as a fa
   expect(vm.nodeNameError).toBe('')
 })
 
-it('shows no detail rows when all replicas are missing', async() => {
+it('greys out every detail row when all replicas are missing', async() => {
   const vm = context()
   await vm.openTaskDialog({ ...dataset, replicas: [
     { nodeId: 6, availability: 'MISSING' }, { nodeId: 5, effectiveAvailability: 'MISSING' }
   ] })
-  expect(vm.detailReplicas).toEqual([])
+  expect(vm.selectedTask.replicas.map(row => vm.replicaRowClass({ row }))).toEqual(['replica-row-missing', 'replica-row-missing'])
   await vm.openTaskDialog({ datasetId: 99 })
-  expect(vm.detailReplicas).toEqual([])
+  expect(vm.selectedTask.replicas).toBeUndefined()
 })
 
-it('retains non-missing details and falls back to IDs if the node lookup fails', async() => {
+it('retains replica details and falls back to IDs if the node lookup fails', async() => {
   const vm = context()
   fetchRegisteredNodes.mockRejectedValueOnce(new Error('offline'))
   await vm.openTaskDialog(dataset)
-  expect(vm.detailReplicas).toHaveLength(2)
+  expect(vm.selectedTask.replicas).toHaveLength(2)
   expect(vm.nodeName(6)).toBe('节点 #6（名称未找到）')
   expect(vm.nodeNameError).toContain('节点名称加载失败')
   expect(vm.nodeNamesLoading).toBe(false)
@@ -278,13 +299,4 @@ it('opens manual scheduling only for an active logical dataset with available re
   vm.openScheduleDialog({ ...dataset, availableReplicaCount: 0 })
   expect(vm.$refs.manualSchedule.open).toHaveBeenCalledTimes(1)
   expect(DataManagement.methods.toggleStatus).toBeUndefined()
-})
-
-it('opens either mode when both are enabled even with unfinished tasks', () => {
-  const vm = context()
-  vm.$refs = { storagePlan: { open: jest.fn() }}
-  vm.storagePolicy = { heatEnabled: true, aggregationEnabled: true, unfinishedTaskCount: 3 }
-  vm.openStoragePlan('heat')
-  vm.openStoragePlan('aggregation')
-  expect(vm.$refs.storagePlan.open.mock.calls).toEqual([['heat'], ['aggregation']])
 })

@@ -27,10 +27,11 @@ export const verifyDatasetAccessToken = (scope, token, context = {}) => request(
   }
 })
 
-export const fetchDatasetAccessAuditEvents = (params = {}) => request({
+// decision 为可选过滤条件（ALLOWED / DENIED）；未指定时不发送，返回全部决策。
+export const fetchDatasetAccessAuditEvents = ({ decision, ...params } = {}) => request({
   url: '/api/v1/security/access/events',
   method: 'get',
-  params
+  params: decision ? { ...params, decision } : params
 })
 
 export const startSecureAggregation = requestId => request({

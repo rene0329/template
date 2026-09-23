@@ -23,6 +23,17 @@ it('uses verified credentials and preserves the exact requested access scope', (
   })
 })
 
+it('filters access decisions only when a decision is requested', () => {
+  fetchDatasetAccessAuditEvents({ decision: 'DENIED', limit: 100 })
+  fetchDatasetAccessAuditEvents({ decision: '', limit: 20 })
+  fetchDatasetAccessAuditEvents()
+  expect(request.mock.calls.map(call => call[0].params)).toEqual([
+    { limit: 100, decision: 'DENIED' },
+    { limit: 20 },
+    {}
+  ])
+})
+
 it('queries raw access decisions and aggregation exchange events', () => {
   fetchDatasetAccessAuditEvents({ runId: 'run-1', limit: 50 })
   startSecureAggregation('aggregate-request-1')

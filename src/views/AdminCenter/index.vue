@@ -6,7 +6,7 @@
         <el-button icon="el-icon-refresh" :loading="loading" @click="loadAll">刷新</el-button>
       </section>
 
-      <el-tabs v-model="activeTab" class="content-card" @tab-click="onTabClick">
+      <el-tabs v-model="activeTab" class="content-card">
         <el-tab-pane label="域管理" name="domains">
           <div class="toolbar"><span>业务域数量不受 A/B/C 执行槽限制</span><el-button type="primary" icon="el-icon-plus" @click="openDomain()">新增业务域</el-button></div>
           <el-table v-loading="loading" :data="domains" border>
@@ -64,13 +64,14 @@ import { fetchRegisteredDatasets } from '@/api/registrationApi'
 import { assignDatasetOwner, createDomain, createUser, fetchDomains, fetchUsers, resetUserPassword, updateDomain, updateUser } from '@/api/adminApi'
 import { fetchAllPages } from '@/utils/dataset-catalog'
 
+const ADMIN_TABS = ['domains', 'users', 'datasets']
 const listOf = value => Array.isArray(value) ? value : (value && Array.isArray(value.list) ? value.list : [])
 
 export default {
   name: 'AdminCenter',
   data() {
     return {
-      activeTab: (this.$route && this.$route.meta && this.$route.meta.adminTab) || 'domains',
+      activeTab: this.$route && ADMIN_TABS.includes(this.$route.query.tab) ? this.$route.query.tab : 'domains',
       loading: false, saving: false, domains: [], users: [], datasets: [], datasetQuery: '',
       domainDialog: false, domainForm: { id: null, code: '', name: '', description: '' },
       userDialog: false, userForm: { id: null, username: '', displayName: '', password: '', roles: [], domainId: null },
@@ -89,7 +90,6 @@ export default {
       })).filter(group => group.users.length)
     }
   },
-  watch: { '$route.meta.adminTab'(value) { if (value) this.activeTab = value } },
   created() { this.loadAll() },
   methods: {
     isEnabled(item) { return item.enabled !== false && item.status !== 'DISABLED' && item.status !== 'INACTIVE' },
@@ -110,10 +110,6 @@ export default {
     async loadDatasets(nested = false) {
       if (!nested) this.loading = true
       try { this.datasets = await fetchAllPages(fetchRegisteredDatasets, {}, { query: this.datasetQuery }) } catch (error) { this.$message.error(`数据集加载失败：${error.message}`) } finally { if (!nested) this.loading = false }
-    },
-    onTabClick() {
-      const path = { domains: '/admin/domains', users: '/admin/users', datasets: '/admin/dataset-owners' }[this.activeTab]
-      if (path && this.$route.path !== path) this.$router.push(path)
     },
     openDomain(row = {}) { this.domainForm = { id: row.id || row.domainId || null, code: row.code || row.domainCode || '', name: row.name || '', description: row.description || '' }; this.domainDialog = true },
     async saveDomain() { this.saving = true; try { const payload = { code: this.domainForm.code, name: this.domainForm.name, description: this.domainForm.description }; if (this.domainForm.id) await updateDomain(this.domainForm.id, payload); else await createDomain(payload); this.domainDialog = false; this.$message.success('业务域已保存'); await this.loadAll() } catch (error) { this.$message.error(`保存失败：${error.message}`) } finally { this.saving = false } },

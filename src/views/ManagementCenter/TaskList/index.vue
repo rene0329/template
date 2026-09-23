@@ -33,10 +33,28 @@
                 />
                 <el-table-column
                   prop="selectedData"
-                  label="需要的数据"
-                  :min-width="140"
+                  label="参与数据集"
+                  :min-width="180"
                   align="center"
-                />
+                  show-overflow-tooltip
+                >
+                  <template slot-scope="scope">{{ datasetText(scope.row) }}</template>
+                </el-table-column>
+                <el-table-column
+                  label="任务类型"
+                  :min-width="120"
+                  align="center"
+                >
+                  <template slot-scope="scope">{{ taskScopeLabel(scope.row) }}</template>
+                </el-table-column>
+                <el-table-column
+                  prop="executionMode"
+                  label="调度模式"
+                  :min-width="130"
+                  align="center"
+                >
+                  <template slot-scope="scope">{{ executionModeLabel(scope.row.executionMode) }}</template>
+                </el-table-column>
                 <el-table-column
                   prop="createTime"
                   label="创建时间"
@@ -91,6 +109,7 @@ import { fetchTaskList, updateTask, deleteTask } from '@/api/managementCenterApi
 import LiveRefreshStatus from '@/components/LiveRefreshStatus'
 import { keepStableCollection } from '@/utils/live-refresh'
 import { clampPage, fetchAllPages, paginateRows, sortRows } from '@/utils/dataset-catalog'
+import { executionModeLabel, taskDatasetNames, taskScopeLabel } from '@/utils/schedule-text'
 
 export default {
   name: 'NodeList',
@@ -198,6 +217,12 @@ export default {
         window.clearInterval(this.pollingTimer)
         this.pollingTimer = null
       }
+    },
+    executionModeLabel,
+    taskScopeLabel,
+    datasetText(row) {
+      const names = taskDatasetNames(row)
+      return names.length ? names.join('、') : '—'
     },
     taskStatusType(status) {
       const map = {
