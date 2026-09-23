@@ -32,6 +32,12 @@ export const uploadAndRegisterDataset = (data, onUploadProgress) => request({
   onUploadProgress
 })
 export const verifyDataset = (id) => mutation(`/api/v1/datasets/${id}/verify`)
+export const fetchDatasetReplicas = (datasetId, options = {}) => request({
+  url: `/api/v1/datasets/${datasetId}/replicas`, method: 'get', ...options
+})
+export const addDatasetReplica = (datasetId, candidateId) => mutation(
+  `/api/v1/datasets/${datasetId}/replicas`, 'post', { candidateId }
+)
 export const activateDataset = (id) => mutation(`/api/v1/datasets/${id}/activate`)
 export const disableDataset = (id) => mutation(`/api/v1/datasets/${id}/disable`)
 export const unregisterDataset = (id) => mutation(`/api/v1/datasets/${id}`, 'delete')

@@ -75,19 +75,50 @@
             <el-form-item label="注册状态">{{ selectedTask.status }}</el-form-item>
           </el-form>
           <el-alert v-if="nodeNameError" :title="nodeNameError" type="warning" :closable="false" show-icon />
-          <el-table :data="detailReplicas" row-key="replicaId" empty-text="暂无未缺失的副本">
+          <div class="replica-toolbar">
+            <el-button size="mini" :loading="reverifyLoading" @click="onReverify">重新校验</el-button>
+            <el-button size="mini" @click="openAddReplica">从候选添加副本</el-button>
+          </div>
+          <el-table :data="selectedTask.replicas || []" row-key="replicaId" empty-text="暂无副本"
+                    :row-class-name="replicaRowClass">
             <el-table-column prop="replicaId" label="副本 ID" width="90" />
             <el-table-column label="节点名称" min-width="150" show-overflow-tooltip>
               <template slot-scope="scope"><span :title="`节点 ID：${scope.row.nodeId}`">{{ nodeName(scope.row.nodeId) }}</span></template>
             </el-table-column>
-            <el-table-column prop="filePath" label="文件路径" min-width="260" show-overflow-tooltip />
-            <el-table-column label="大小" width="115"><template slot-scope="scope">{{ formatBytes(scope.row.sizeBytes) }}</template></el-table-column>
-            <el-table-column prop="effectiveAvailability" label="可用性" width="140" />
+            <el-table-column prop="filePath" label="文件路径" min-width="220" show-overflow-tooltip />
+            <el-table-column label="大小" width="100"><template slot-scope="scope">{{ formatBytes(scope.row.sizeBytes) }}</template></el-table-column>
+            <el-table-column prop="effectiveAvailability" label="可用性" width="120" />
+            <el-table-column label="原因 / 校验信息" min-width="220" show-overflow-tooltip>
+              <template slot-scope="scope">{{ scope.row.statusReason || scope.row.verificationMessage || '—' }}</template>
+            </el-table-column>
+            <el-table-column label="最近校验时间" width="160">
+              <template slot-scope="scope">{{ scope.row.verifiedAt ? new Date(scope.row.verifiedAt).toLocaleString('zh-CN', { hour12: false }) : '尚未校验' }}</template>
+            </el-table-column>
           </el-table>
           <span slot="footer">
             <el-button type="primary" :disabled="!canSchedule(selectedTask)" @click="$refs.accessTest.open(selectedTask)">访问性能对照</el-button>
             <el-button @click="dialogVisibleDetail = false">关闭</el-button>
           </span>
+        </el-dialog>
+
+        <el-dialog title="从候选文件添加副本" :visible.sync="addReplicaDialog" width="520px">
+          <el-input v-model="candidateQuery" placeholder="按文件名 / 路径搜索候选文件" clearable
+                    @input="loadCandidates" style="margin-bottom: 12px;" />
+          <el-table v-loading="candidatesLoading" :data="unregisteredCandidates" max-height="320"
+                    empty-text="没有未注册的候选文件">
+            <el-table-column prop="candidateId" label="ID" width="70" />
+            <el-table-column label="节点" min-width="120">
+              <template slot-scope="scope">{{ nodeName(scope.row.nodeId) }}</template>
+            </el-table-column>
+            <el-table-column prop="filePath" label="路径" min-width="220" show-overflow-tooltip />
+            <el-table-column label="操作" width="90">
+              <template slot-scope="scope">
+                <el-button type="text" :loading="addReplicaLoading === scope.row.candidateId"
+                           @click="onAddReplica(scope.row)">添加</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <span slot="footer"><el-button @click="addReplicaDialog = false">关闭</el-button></span>
         </el-dialog>
 
         <manual-schedule-dialog ref="manualSchedule" @submitted="fetchData()" />
@@ -118,7 +149,7 @@ import StoragePlanDialog from './StoragePlanDialog'
 import AccessTestDialog from './AccessTestDialog'
 import { keepStableCollection } from '@/utils/live-refresh'
 import { clampPage, datasetRow, fetchAllPages, formatBytes, formatHeat, paginateRows, sortRows } from '@/utils/dataset-catalog'
-import { fetchRegisteredDatasets, fetchRegisteredNodes } from '@/api/registrationApi'
+import { addDatasetReplica, fetchDatasetCandidates, fetchRegisteredDatasets, fetchRegisteredNodes, verifyDataset } from '@/api/registrationApi'
 import { fetchStoragePolicy, refreshDatasetHeat } from '@/api/datasetStorageApi'
 
 export default {
@@ -146,15 +177,21 @@ export default {
       nodeNames: {},
       nodeNameError: '',
       nodeNamesLoading: false,
-      nodeNameRequest: 0
+      nodeNameRequest: 0,
+      reverifyLoading: false,
+      addReplicaDialog: false,
+      candidateQuery: '',
+      candidatesLoading: false,
+      candidates: [],
+      addReplicaLoading: null
     }
   },
   computed: {
     currentPageData() {
       return paginateRows(sortRows(this.TaskData, this.sort), this.currentPage, this.pageSize)
     },
-    detailReplicas() {
-      return this.nonMissingReplicas(this.selectedTask)
+    unregisteredCandidates() {
+      return this.candidates.filter(candidate => !candidate.registeredDatasetId)
     }
   },
   created() {
@@ -283,6 +320,51 @@ export default {
     },
     openScheduleDialog(dataset) {
       if (this.canSchedule(dataset)) this.$refs.manualSchedule.open(dataset)
+    },
+    replicaRowClass({ row }) {
+      return row.availability === 'MISSING' || row.effectiveAvailability === 'MISSING' ? 'replica-row-missing' : ''
+    },
+    async onReverify() {
+      if (this.reverifyLoading) return
+      this.reverifyLoading = true
+      try {
+        await verifyDataset(this.selectedTask.datasetId)
+        this.$message.success('已重新发起校验')
+        await this.fetchData()
+      } catch (error) {
+        this.$message.error(`重新校验失败：${error.message}`)
+      } finally {
+        this.reverifyLoading = false
+      }
+    },
+    openAddReplica() {
+      this.candidateQuery = ''
+      this.addReplicaDialog = true
+      this.loadCandidates()
+    },
+    async loadCandidates() {
+      this.candidatesLoading = true
+      try {
+        const result = await fetchDatasetCandidates({ page: 1, pageSize: 100, query: this.candidateQuery })
+        this.candidates = result.list || []
+      } catch (error) {
+        this.$message.error(`候选文件加载失败：${error.message}`)
+      } finally {
+        this.candidatesLoading = false
+      }
+    },
+    async onAddReplica(candidate) {
+      this.addReplicaLoading = candidate.candidateId
+      try {
+        await addDatasetReplica(this.selectedTask.datasetId, candidate.candidateId)
+        this.$message.success('已添加副本')
+        this.addReplicaDialog = false
+        await this.fetchData()
+      } catch (error) {
+        this.$message.error(`添加副本失败：${error.message}`)
+      } finally {
+        this.addReplicaLoading = null
+      }
     }
   }
 }
@@ -567,5 +649,16 @@ export default {
 }
 .node-detail-dialog .el-dialog__body {
   padding-bottom: 24px;
+}
+.replica-toolbar {
+  margin-bottom: 12px;
+  display: flex;
+  gap: 8px;
+}
+</style>
+<style>
+.replica-row-missing {
+  color: #c0c4cc;
+  background: #fafafa;
 }
 </style>
