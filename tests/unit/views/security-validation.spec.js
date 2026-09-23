@@ -1,4 +1,7 @@
+import fs from 'fs'
+import path from 'path'
 import SecurityValidation from '@/views/ManagementCenter/SecurityValidation/index.vue'
+import { fetchRegisteredDatasets, fetchRegisteredNodes } from '@/api/registrationApi'
 import { fetchDatasetAccessAuditEvents } from '@/api/securityValidationApi'
 import { parseTime } from '@/utils'
 
@@ -42,6 +45,29 @@ it('derives the scoped access path and Kubernetes node from a usable replica', (
 
   expect(vm.access.path).toBe('/dataset/good.bin')
   expect(vm.access.targetNode).toBe('master-89')
+})
+
+it('hides the integrity, token-test and MP-SPDZ tabs and loads only what the abnormal log needs', async() => {
+  const source = fs.readFileSync(path.resolve(__dirname, '../../../src/views/ManagementCenter/SecurityValidation/index.vue'), 'utf8')
+  expect(source).toContain('const SHOW_ACCEPTANCE_TOOLS = false')
+  for (const name of ['integrity', 'access', 'aggregation']) {
+    expect(source).toMatch(new RegExp(`<el-tab-pane v-if="showAcceptanceTools" label="[^"]+" name="${name}">`))
+  }
+  expect(source).toContain('<el-tab-pane label="异常访问记录" name="abnormal">')
+
+  const vm = context()
+  expect(vm.showAcceptanceTools).toBe(false)
+  vm.loadAccessEvents = jest.fn()
+  fetchDatasetAccessAuditEvents.mockResolvedValue([])
+  fetchRegisteredDatasets.mockResolvedValue({ list: [{ datasetId: 9, name: 'covertype' }], total: 1 })
+
+  await SecurityValidation.created.call(vm)
+
+  expect(fetchDatasetAccessAuditEvents).toHaveBeenCalledWith({ decision: 'DENIED', limit: 100 })
+  expect(vm.datasets.map(item => item.datasetId)).toEqual([9])
+  expect(fetchRegisteredNodes).not.toHaveBeenCalled()
+  expect(vm.loadAccessEvents).not.toHaveBeenCalled()
+  expect(vm.access.datasetId).toBeNull()
 })
 
 it('opens on the abnormal access tab and lists only denied access events', async() => {

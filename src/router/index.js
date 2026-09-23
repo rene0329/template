@@ -572,6 +572,7 @@ export const constantRoutes = [
     children: [
       { path: 'scheduling', name: 'SchedulingLogs', component: () => import('@/views/ManagementCenter/SchedulingLogs/index'), meta: { title: '调度执行日志', icon: 'documentation', itemHeight: 40 }},
       { path: 'abnormal-access', name: 'SecurityValidation', component: () => import('@/views/ManagementCenter/SecurityValidation/index'), meta: { title: '异常访问日志', icon: 'form', itemHeight: 40 }},
+      { path: 'access-grants', name: 'AccessGrantLogs', component: () => import('@/views/ManagementCenter/AccessGrantLogs/index'), meta: { title: '访问申请日志', icon: 'lock', itemHeight: 40, roles: ['ADMIN'] }},
       { path: 'privacy', name: 'PrivacyLogs', hidden: true, component: () => import('@/views/ManagementCenter/PrivacyComputing/index'), meta: { title: '隐私计算日志', icon: 'lock', itemHeight: 40, privacyTab: 'jobs', evidenceMode: true }}
     ]
   },

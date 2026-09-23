@@ -5,7 +5,7 @@
         <h2>异常访问日志</h2>
         <el-alert v-if="activeTab !== 'abnormal'" title="这里只执行功能并保留原始证据；是否满足验收标准由人工 judge。" type="info" :closable="false" show-icon />
 
-        <el-tabs v-model="activeTab">
+        <el-tabs v-model="activeTab" :class="{ 'single-pane': !showAcceptanceTools }">
           <el-tab-pane label="异常访问记录" name="abnormal">
             <div class="toolbar">
               <span>被拒绝的数据集访问请求，主要是域用户跨域访问权限外的数据集；显示最近 {{ abnormal.limit }} 条。</span>
@@ -22,7 +22,7 @@
             </el-table>
           </el-tab-pane>
 
-          <el-tab-pane label="文件强校验" name="integrity">
+          <el-tab-pane v-if="showAcceptanceTools" label="文件强校验" name="integrity">
             <el-form label-width="120px" class="validation-form">
               <el-form-item label="数据集">
                 <el-select v-model="integrity.datasetId" filterable style="width:100%" placeholder="选择已注册数据集">
@@ -43,7 +43,7 @@
             </el-table>
           </el-tab-pane>
 
-          <el-tab-pane label="访问控制" name="access">
+          <el-tab-pane v-if="showAcceptanceTools" label="访问控制" name="access">
             <el-form label-width="120px" class="validation-form">
               <el-form-item label="数据集">
                 <el-select v-model="access.datasetId" filterable style="width:100%" @change="syncAccessDefaults">
@@ -80,7 +80,7 @@
             </el-table>
           </el-tab-pane>
 
-          <el-tab-pane label="MP-SPDZ 安全求和（兼容）" name="aggregation">
+          <el-tab-pane v-if="showAcceptanceTools" label="MP-SPDZ 安全求和（兼容）" name="aggregation">
             <p class="hint">该旧入口由后端兼容映射到 <code>secure-sum-3p-v1</code>，使用固定 A/B/C 的诚实多数三方恶意安全协议。MP-SPDZ 用于协议功能验收和比较，不代表生产安全认证；是否满足验收仍由人工 judge。</p>
             <el-form label-width="120px" class="validation-form">
               <el-form-item>
@@ -125,6 +125,10 @@ import {
   fetchSecureAggregationEvents
 } from '@/api/securityValidationApi'
 
+// 文件强校验、令牌测试（访问控制）、MP-SPDZ 安全求和暂时不用，先隐藏；数据集访问控制已在
+// 安全中心 > 访问控制 单独提供。改为 true 即可恢复这三个标签页。
+const SHOW_ACCEPTANCE_TOOLS = false
+
 const ACTION_LABELS = { TASK_CREATE: '创建任务' }
 const REASON_LABELS = { CROSS_DOMAIN_ACCESS_DENIED: '跨域访问权限外数据集' }
 
@@ -145,6 +149,7 @@ export default {
   data() {
     return {
       activeTab: 'abnormal',
+      showAcceptanceTools: SHOW_ACCEPTANCE_TOOLS,
       datasets: [],
       nodes: [],
       actions: ['READ', 'VERIFY'],
@@ -161,12 +166,14 @@ export default {
   async created() {
     this.loadAbnormalEvents()
     try {
+      // 数据集列表用于在异常访问记录中显示数据集名称；节点和令牌事件只有验收工具需要。
       const [datasets, nodes] = await Promise.all([
         fetchAllPages(fetchRegisteredDatasets),
-        fetchAllPages(fetchRegisteredNodes)
+        this.showAcceptanceTools ? fetchAllPages(fetchRegisteredNodes) : []
       ])
       this.datasets = datasets
       this.nodes = nodes
+      if (!this.showAcceptanceTools) return
       const first = this.datasets[0]
       if (first) {
         this.integrity.datasetId = first.datasetId
@@ -292,6 +299,7 @@ export default {
 .content-card { background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0, 0, 0, .04); }
 h2 { margin: 0 0 18px; color: #253747; }
 .el-tabs { margin-top: 18px; }
+.single-pane >>> .el-tabs__header { display: none; }
 .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .toolbar span { color: #697986; font-size: 13px; }
 .toolbar-alert { margin-bottom: 14px; }

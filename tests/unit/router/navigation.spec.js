@@ -28,8 +28,18 @@ describe('business navigation', () => {
     expect(logs.children.map(route => [route.path, route.name, route.meta.title])).toEqual([
       ['scheduling', 'SchedulingLogs', '调度执行日志'],
       ['abnormal-access', 'SecurityValidation', '异常访问日志'],
+      ['access-grants', 'AccessGrantLogs', '访问申请日志'],
       ['privacy', 'PrivacyLogs', '隐私计算日志']
     ])
+  })
+
+  it('shows the access grant log to administrators only', () => {
+    const logs = groups.find(route => route.name === 'SystemLogs')
+    expect(logs.meta.roles).toBeUndefined()
+    const grantLog = logs.children.find(route => route.name === 'AccessGrantLogs')
+    expect(grantLog.meta.roles).toEqual(['ADMIN'])
+    expect(logs.children.filter(route => route.name !== 'AccessGrantLogs' && route.meta.roles)).toEqual([])
+    expect(router.match('/logs/access-grants').matched.map(record => record.meta.title)).toEqual(['系统日志', '访问申请日志'])
   })
 
   it('hides the collaboration group and privacy logs from the menu without removing their routes', () => {
