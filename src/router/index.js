@@ -605,7 +605,7 @@ export const constantRoutes = [
   { path: '/admin', redirect: '/security/admin', hidden: true },
   { path: '/admin/domains', redirect: to => ({ path: '/security/admin', query: { ...to.query, tab: 'domains' }, hash: to.hash }), hidden: true },
   { path: '/admin/users', redirect: to => ({ path: '/security/admin', query: { ...to.query, tab: 'users' }, hash: to.hash }), hidden: true },
-  { path: '/admin/dataset-owners', redirect: to => ({ path: '/security/admin', query: { ...to.query, tab: 'datasets' }, hash: to.hash }), hidden: true },
+  { path: '/admin/dataset-owners', redirect: to => ({ path: '/security/admin', query: to.query, hash: to.hash }), hidden: true },
   { path: '/DataCenter/SchedulingLogs', redirect: to => ({ path: '/logs/scheduling', query: to.query, hash: to.hash }), hidden: true },
   { path: '/ManagementCenter/PrivacyComputing', redirect: to => ({ path: '/collaboration/capabilities', query: to.query, hash: to.hash }), hidden: true },
   { path: '/ManagementCenter/SecurityValidation', redirect: to => ({ path: '/logs/abnormal-access', query: to.query, hash: to.hash }), hidden: true },

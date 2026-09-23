@@ -12,9 +12,3 @@ export const updateUser = (id, data) => request({ url: `${ROOT}/users/${encodeUR
 export const resetUserPassword = (id, password) => request({
   url: `${ROOT}/users/${encodeURIComponent(id)}/reset-password`, method: 'post', data: { password }
 })
-
-export const assignDatasetOwner = (datasetId, userId) => request({
-  url: `${ROOT}/datasets/${encodeURIComponent(datasetId)}/owner`,
-  method: 'put',
-  data: { userId }
-})

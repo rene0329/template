@@ -1,13 +1,13 @@
 import { mount, createLocalVue } from '@vue/test-utils'
 import AdminCenter from '@/views/AdminCenter/index.vue'
-import { fetchRegisteredDatasets, fetchRegisteredNodes } from '@/api/registrationApi'
-import { fetchDatasetAccess } from '@/api/accessControlApi'
+import fs from 'fs'
+import path from 'path'
+import { fetchRegisteredNodes } from '@/api/registrationApi'
 import { createDomain, fetchDomains, fetchUsers, updateDomain } from '@/api/adminApi'
 
-jest.mock('@/api/registrationApi', () => ({ fetchRegisteredDatasets: jest.fn(), fetchRegisteredNodes: jest.fn() }))
-jest.mock('@/api/accessControlApi', () => ({ fetchDatasetAccess: jest.fn() }))
+jest.mock('@/api/registrationApi', () => ({ fetchRegisteredNodes: jest.fn() }))
 jest.mock('@/api/adminApi', () => ({
-  assignDatasetOwner: jest.fn(), createDomain: jest.fn(), createUser: jest.fn(), fetchDomains: jest.fn(),
+  createDomain: jest.fn(), createUser: jest.fn(), fetchDomains: jest.fn(),
   fetchUsers: jest.fn(), resetUserPassword: jest.fn(), updateDomain: jest.fn(), updateUser: jest.fn()
 }))
 
@@ -24,20 +24,7 @@ const DOMAINS = [
   { id: 6, code: 'domain-e', name: '新建域', siteCode: null, enabled: true },
   { id: 7, code: 'domain-x', name: '旧站点域', siteCode: 'gz', enabled: false }
 ]
-const USERS = [{ id: 8, username: 'owner-a', displayName: '上海持有者', roles: ['DATA_OWNER'], domainId: 1, domainName: '上海域（A）', enabled: true }]
-const DATASETS = [
-  { datasetId: 1, name: 'CIFAR', datasetCode: 'real-cifar-10', version: '1.0', ownerUserId: 8, ownerDisplayName: '上海持有者' },
-  { datasetId: 2, name: 'Ciao', datasetCode: 'ciao', version: '1.0', ownerUserId: null, ownerDomainId: 2, ownerDomainName: '深圳域（B）' },
-  { datasetId: 3, name: 'Yelp', datasetCode: 'yelp', version: '1.0', ownerUserId: null }
-]
-const ACCESS = {
-  serverTime: '2026-09-24T02:00:00Z',
-  ttlMinutes: 30,
-  items: [
-    { datasetId: 1, name: 'CIFAR', accessible: true, basis: 'ADMIN', domainIds: [1, 5], domainNames: ['上海域（A）', '中心域'] },
-    { datasetId: 2, name: 'Ciao', accessible: true, basis: 'ADMIN', domainIds: [], domainNames: [] }
-  ]
-}
+const USERS = [{ id: 8, username: 'owner-a', displayName: '上海用户', roles: ['DATA_OWNER'], domainId: 1, domainName: '上海域（A）', enabled: true }]
 const page = list => ({ list, total: list.length })
 const flush = () => new Promise(resolve => setTimeout(resolve))
 
@@ -45,8 +32,6 @@ function mockBackend() {
   fetchDomains.mockResolvedValue(DOMAINS)
   fetchUsers.mockResolvedValue(USERS)
   fetchRegisteredNodes.mockResolvedValue(page(NODES))
-  fetchRegisteredDatasets.mockResolvedValue(page(DATASETS))
-  fetchDatasetAccess.mockResolvedValue(ACCESS)
 }
 
 function context() {
@@ -173,37 +158,20 @@ it('explains that a site already belongs to another domain and keeps the dialog 
   expect(vm.domainDialog).toBe(true)
 })
 
-it('shows where each dataset is stored as its business domain in 数据归属', async() => {
-  const vm = context()
-  mockBackend()
-  vm.datasetQuery = 'c'
+it('has no dataset holder section: only domain and user management remain', () => {
+  const source = fs.readFileSync(path.resolve(__dirname, '../../../src/views/AdminCenter/index.vue'), 'utf8')
+  expect(source).not.toMatch(/数据归属|调整归属|assignDatasetOwner|ownerUserId|ownerDialog/)
+  expect(source).toContain('<el-tab-pane label="域管理" name="domains">')
+  expect(source).toContain('<el-tab-pane label="用户管理" name="users">')
+  expect(source.match(/<el-tab-pane /g)).toHaveLength(2)
 
-  await vm.loadDatasets()
-
-  expect(fetchRegisteredDatasets).toHaveBeenCalledWith({ query: 'c', page: 1, pageSize: 100 }, {})
-  expect(fetchDatasetAccess).toHaveBeenCalledTimes(1)
-  expect(vm.loading).toBe(false)
-  expect(vm.datasets.map(dataset => [dataset.datasetId, vm.datasetDomainName(dataset)])).toEqual([
-    [1, '上海域（A）、中心域'],
-    [2, '—'],
-    [3, '—']
-  ])
+  // 旧书签 ?tab=datasets 落到默认的域管理标签页。
+  const vm = { ...AdminCenter.data.call({ $route: { query: { tab: 'datasets' }}}) }
+  expect(vm.activeTab).toBe('domains')
+  expect(AdminCenter.data.call({ $route: { query: { tab: 'users' }}}).activeTab).toBe('users')
 })
 
-it('keeps the previous datasets when their location domains cannot be loaded', async() => {
-  const vm = context()
-  vm.datasets = [DATASETS[0]]
-  mockBackend()
-  fetchDatasetAccess.mockRejectedValue(new Error('服务不可用'))
-
-  await vm.loadDatasets()
-
-  expect(vm.$message.error).toHaveBeenCalledWith('数据集加载失败：服务不可用')
-  expect(vm.datasets).toEqual([DATASETS[0]])
-  expect(vm.loading).toBe(false)
-})
-
-it('renders domain sites, member nodes and dataset location domains', async() => {
+it('renders domain sites and member nodes', async() => {
   mockBackend()
   const localVue = createLocalVue()
   localVue.directive('loading', {})
@@ -244,8 +212,7 @@ it('renders domain sites, member nodes and dataset location domains', async() =>
     'cluster-sh-1、上海-2、cluster-sh-3', 'cluster-sz-1', 'master-40、master-141、master-215', '—', '—'
   ])
   expect(cells('users', '业务域')).toEqual(['上海域（A）'])
-  expect(cells('datasets', '业务域')).toEqual(['上海域（A）、中心域', '—', '—'])
-  expect(cells('datasets', '持有者')).toEqual(['上海持有者', '未分配持有者', '未分配持有者'])
+  expect(wrapper.find('[data-tab="datasets"]').exists()).toBe(false)
 
   wrapper.findAll('[data-tab="domains"] [data-label="操作"] .cell').at(4).find('button').trigger('click')
   await flush()

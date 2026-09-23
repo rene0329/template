@@ -112,7 +112,7 @@ describe('business navigation', () => {
     ['/DataCenter/SchedulingLogs', '/logs/scheduling'],
     ['/admin', '/security/admin'],
     ['/admin/users?x=1', '/security/admin?x=1&tab=users'],
-    ['/admin/dataset-owners', '/security/admin?tab=datasets'],
+    ['/admin/dataset-owners', '/security/admin'],
     ['/HelpCenter/ExternalApi', '/support/external-api']
   ])('redirects legacy URL %s to %s', (path, target) => {
     expect(router.match(path).fullPath).toBe(target)

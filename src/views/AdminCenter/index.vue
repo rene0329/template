@@ -2,7 +2,7 @@
   <el-container class="admin-page">
     <el-main>
       <section class="page-heading">
-        <div><h2>系统管理</h2><p>管理协同业务域、账号角色和数据持有者。已被任务引用的记录只能停用。</p></div>
+        <div><h2>系统管理</h2><p>管理协同业务域和账号角色。已被任务引用的记录只能停用。</p></div>
         <el-button icon="el-icon-refresh" :loading="loading" @click="loadAll">刷新</el-button>
       </section>
 
@@ -31,17 +31,6 @@
             <el-table-column label="操作" width="230"><template slot-scope="s"><el-button type="text" @click="openUser(s.row)">编辑</el-button><el-button type="text" @click="toggleUser(s.row)">{{ isEnabled(s.row) ? '停用' : '启用' }}</el-button><el-button type="text" @click="openPassword(s.row)">重置密码</el-button></template></el-table-column>
           </el-table>
         </el-tab-pane>
-
-        <el-tab-pane label="数据归属" name="datasets">
-          <div class="toolbar"><span>业务域由数据集当前存放的节点决定，随数据迁移变化；持有者用于隐私计算，未分配持有者的数据不能用于隐私计算</span><el-input v-model="datasetQuery" clearable placeholder="搜索数据集" class="search" @keyup.enter.native="loadDatasets()" /><el-button @click="loadDatasets()">查询</el-button></div>
-          <el-table v-loading="loading" :data="datasets" border>
-            <el-table-column prop="datasetId" label="ID" width="80" />
-            <el-table-column label="数据集" min-width="210"><template slot-scope="s"><strong>{{ s.row.name || s.row.datasetCode }}</strong><div class="muted">{{ s.row.datasetCode }} · {{ s.row.version }}</div></template></el-table-column>
-            <el-table-column label="业务域" min-width="160"><template slot-scope="s">{{ datasetDomainName(s.row) }}</template></el-table-column>
-            <el-table-column label="持有者" min-width="160"><template slot-scope="s"><el-tag :type="s.row.ownerUserId ? 'success' : 'warning'">{{ s.row.ownerDisplayName || s.row.ownerUsername || '未分配持有者' }}</el-tag></template></el-table-column>
-            <el-table-column label="操作" width="120"><template slot-scope="s"><el-button type="text" @click="openOwner(s.row)">调整归属</el-button></template></el-table-column>
-          </el-table>
-        </el-tab-pane>
       </el-tabs>
 
       <el-dialog :title="domainForm.id ? '编辑业务域' : '新增业务域'" :visible.sync="domainDialog" width="520px">
@@ -64,38 +53,31 @@
 
       <el-dialog title="重置密码" :visible.sync="passwordDialog" width="460px"><el-alert title="保存后该用户现有登录令牌会立即失效。" type="warning" :closable="false" show-icon /><el-input v-model="newPassword" type="password" show-password placeholder="输入不少于 10 位的新密码" class="dialog-input" /><span slot="footer"><el-button @click="passwordDialog=false">取消</el-button><el-button type="primary" :loading="saving" :disabled="newPassword.length < 10" @click="savePassword">确认重置</el-button></span></el-dialog>
 
-      <el-dialog title="调整数据归属" :visible.sync="ownerDialog" width="520px"><p class="dataset-title">{{ ownerDataset.name || ownerDataset.datasetCode }}</p><el-form label-width="90px"><el-form-item label="持有者" required><el-select v-model="ownerUserId" filterable style="width:100%"><el-option-group v-for="group in ownerGroups" :key="group.id" :label="group.name"><el-option v-for="user in group.users" :key="user.id || user.userId" :value="user.id || user.userId" :label="`${user.displayName || user.name || user.username}（${user.username}）`" /></el-option-group></el-select></el-form-item></el-form><span slot="footer"><el-button @click="ownerDialog=false">取消</el-button><el-button type="primary" :loading="saving" :disabled="!ownerUserId" @click="saveOwner">保存</el-button></span></el-dialog>
     </el-main>
   </el-container>
 </template>
 
 <script>
-import { fetchRegisteredDatasets, fetchRegisteredNodes } from '@/api/registrationApi'
-import { fetchDatasetAccess } from '@/api/accessControlApi'
-import { assignDatasetOwner, createDomain, createUser, fetchDomains, fetchUsers, resetUserPassword, updateDomain, updateUser } from '@/api/adminApi'
+import { fetchRegisteredNodes } from '@/api/registrationApi'
+import { createDomain, createUser, fetchDomains, fetchUsers, resetUserPassword, updateDomain, updateUser } from '@/api/adminApi'
 import { fetchAllPages } from '@/utils/dataset-catalog'
 
-const ADMIN_TABS = ['domains', 'users', 'datasets']
+const ADMIN_TABS = ['domains', 'users']
 const DOMAIN_ERRORS = { DOMAIN_SITE_TAKEN: '该站点已对应其他业务域' }
 const listOf = value => Array.isArray(value) ? value : (value && Array.isArray(value.list) ? value.list : [])
 const siteOf = value => value == null ? '' : String(value).trim()
-const namesOf = values => (Array.isArray(values) ? values : []).filter(name => name != null && String(name).trim() !== '')
 const joinNames = names => names.length ? names.join('、') : '—'
 const nodeName = node => node.displayName || node.k8sNodeName || node.nodeName || `节点 #${node.nodeId}`
-// 业务域由数据集当前副本所在节点的站点决定，按数据集访问接口返回的 domainNames 展示。
-const locationDomains = access => (access && Array.isArray(access.items) ? access.items : [])
-  .reduce((domains, item) => { domains[item.datasetId] = namesOf(item.domainNames); return domains }, {})
 
 export default {
   name: 'AdminCenter',
   data() {
     return {
       activeTab: this.$route && ADMIN_TABS.includes(this.$route.query.tab) ? this.$route.query.tab : 'domains',
-      loading: false, saving: false, domains: [], users: [], nodes: [], datasets: [], datasetDomains: {}, datasetQuery: '',
+      loading: false, saving: false, domains: [], users: [], nodes: [],
       domainDialog: false, domainForm: { id: null, code: '', name: '', description: '', siteCode: null },
       userDialog: false, userForm: { id: null, username: '', displayName: '', password: '', roles: [], domainId: null },
-      passwordDialog: false, passwordUser: {}, newPassword: '',
-      ownerDialog: false, ownerDataset: {}, ownerUserId: null
+      passwordDialog: false, passwordUser: {}, newPassword: ''
     }
   },
   computed: {
@@ -114,14 +96,7 @@ export default {
       if (current && !sites.includes(current)) sites.push(current)
       return sites.map(site => ({ value: site, label: `${site}（${(this.siteNodeNames[site] || []).join('、') || '暂无节点'}）` }))
     },
-    canSaveUser() { return Boolean(this.userForm.username && this.userForm.displayName && this.userForm.roles.length && (this.userForm.id || this.userForm.password.length >= 10) && (!this.userForm.roles.includes('DATA_OWNER') || this.userForm.domainId)) },
-    ownerGroups() {
-      return this.enabledDomains.map(domain => ({
-        id: domain.id || domain.domainId,
-        name: domain.name,
-        users: this.users.filter(user => this.isEnabled(user) && this.roleValues(user).includes('DATA_OWNER') && String(this.userDomainId(user)) === String(domain.id || domain.domainId))
-      })).filter(group => group.users.length)
-    }
+    canSaveUser() { return Boolean(this.userForm.username && this.userForm.displayName && this.userForm.roles.length && (this.userForm.id || this.userForm.password.length >= 10) && (!this.userForm.roles.includes('DATA_OWNER') || this.userForm.domainId)) }
   },
   created() { this.loadAll() },
   methods: {
@@ -132,7 +107,6 @@ export default {
     userDomainName(user) { return user.domainName || (user.domain && user.domain.name) || '—' },
     domainSite(domain) { return siteOf(domain.siteCode) || '—' },
     domainNodeNames(domain) { const site = siteOf(domain.siteCode); return joinNames(site ? this.siteNodeNames[site] || [] : []) },
-    datasetDomainName(dataset) { return joinNames(this.datasetDomains[dataset.datasetId] || []) },
     async loadAll() {
       this.loading = true
       try {
@@ -140,16 +114,7 @@ export default {
         this.domains = listOf(domains)
         this.users = listOf(users)
         this.nodes = nodes
-        await this.loadDatasets(true)
       } catch (error) { this.$message.error(`管理数据加载失败：${error.message}`) } finally { this.loading = false }
-    },
-    async loadDatasets(nested = false) {
-      if (!nested) this.loading = true
-      try {
-        const [datasets, access] = await Promise.all([fetchAllPages(fetchRegisteredDatasets, {}, { query: this.datasetQuery }), fetchDatasetAccess()])
-        this.datasetDomains = locationDomains(access)
-        this.datasets = datasets
-      } catch (error) { this.$message.error(`数据集加载失败：${error.message}`) } finally { if (!nested) this.loading = false }
     },
     openDomain(row = {}) { this.domainForm = { id: row.id || row.domainId || null, code: row.code || row.domainCode || '', name: row.name || '', description: row.description || '', siteCode: siteOf(row.siteCode) || null }; this.domainDialog = true },
     // 清空站点时 el-select 回填空字符串，统一以 null 提交表示解除对应。
@@ -160,9 +125,7 @@ export default {
     async saveUser() { this.saving = true; try { const payload = { username: this.userForm.username, displayName: this.userForm.displayName, roles: this.userForm.roles, domainId: this.userForm.roles.includes('DATA_OWNER') ? this.userForm.domainId : null }; if (this.userForm.id) await updateUser(this.userForm.id, payload); else await createUser({ ...payload, password: this.userForm.password }); this.userDialog = false; this.$message.success('用户已保存'); await this.loadAll() } catch (error) { this.$message.error(`保存失败：${error.message}`) } finally { this.saving = false } },
     async toggleUser(row) { try { await updateUser(row.id || row.userId, { enabled: !this.isEnabled(row) }); this.$message.success('用户状态已更新'); await this.loadAll() } catch (error) { this.$message.error(`状态更新失败：${error.message}`) } },
     openPassword(row) { this.passwordUser = row; this.newPassword = ''; this.passwordDialog = true },
-    async savePassword() { this.saving = true; try { await resetUserPassword(this.passwordUser.id || this.passwordUser.userId, this.newPassword); this.passwordDialog = false; this.$message.success('密码已重置，旧令牌已失效') } catch (error) { this.$message.error(`密码重置失败：${error.message}`) } finally { this.saving = false } },
-    openOwner(row) { this.ownerDataset = row; this.ownerUserId = row.ownerUserId || null; this.ownerDialog = true },
-    async saveOwner() { this.saving = true; try { await assignDatasetOwner(this.ownerDataset.datasetId, this.ownerUserId); this.ownerDialog = false; this.$message.success('数据归属已更新'); await this.loadDatasets() } catch (error) { this.$message.error(`归属更新失败：${error.message}`) } finally { this.saving = false } }
+    async savePassword() { this.saving = true; try { await resetUserPassword(this.passwordUser.id || this.passwordUser.userId, this.newPassword); this.passwordDialog = false; this.$message.success('密码已重置，旧令牌已失效') } catch (error) { this.$message.error(`密码重置失败：${error.message}`) } finally { this.saving = false } }
   }
 }
 </script>
@@ -172,6 +135,6 @@ export default {
 .page-heading, .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .page-heading { margin-bottom: 16px; }.page-heading h2 { margin: 0 0 7px; color: #1f3447; }.page-heading p, .toolbar span, .muted { margin: 0; color: #7b8995; font-size: 13px; }
 .content-card { padding: 8px 22px 24px; border-radius: 8px; background: #fff; box-shadow: 0 2px 9px rgba(32,55,76,.06); }
-.toolbar { margin: 8px 0 16px; }.toolbar .search { width: 280px; margin-left: auto; }.tag { margin-right: 4px; }.dialog-input { margin-top: 18px; }.dataset-title { font-weight: 600; color: #334a5d; }.site-hint { margin-top: 4px; line-height: 20px; }
-@media(max-width:768px){.page-heading,.toolbar{align-items:stretch;flex-direction:column}.toolbar .search{width:100%;margin-left:0}}
+.toolbar { margin: 8px 0 16px; }.tag { margin-right: 4px; }.dialog-input { margin-top: 18px; }.site-hint { margin-top: 4px; line-height: 20px; }
+@media(max-width:768px){.page-heading,.toolbar{align-items:stretch;flex-direction:column}}
 </style>
