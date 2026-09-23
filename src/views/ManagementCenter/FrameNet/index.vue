@@ -28,6 +28,22 @@
             >
               <svg ref="svg" :width="svgWidth" :height="svgHeight" aria-label="网络节点连接图">
                 <g :transform="`translate(${pan.x}, ${pan.y}) scale(${scale})`">
+                  <!-- 域分组框 -->
+                  <g class="topology-domains">
+                    <g v-for="box in domainBoxes" :key="`domain-${box.site}`" class="domain-box">
+                      <rect
+                        :x="box.x"
+                        :y="box.y"
+                        :width="box.width"
+                        :height="box.height"
+                        rx="14"
+                        class="domain-rect"
+                        :style="{ stroke: box.color, fill: box.color }"
+                      />
+                      <text :x="box.x + 16" :y="box.y + 24" class="domain-label" :style="{ fill: box.color }">{{ box.label }}</text>
+                    </g>
+                  </g>
+
                   <!-- 链路 -->
                   <g v-for="e in edges" :key="e.id" class="topology-edge" @mouseenter="showTip('edge', e, $event)" @mouseleave="hideTip">
                     <path
@@ -59,6 +75,37 @@
                   >
                     <circle class="node-halo" :r="nodeRadius + 8" />
                     <circle class="node-disc" :r="nodeRadius" />
+
+                    <!-- 计算节点：CPU 芯片图标 -->
+                    <g v-if="n.iconType === 'compute'" class="type-icon icon-compute">
+                      <rect x="-9" y="-9" width="18" height="18" rx="3" />
+                      <rect x="-4" y="-4" width="8" height="8" rx="1" />
+                      <line x1="-13" y1="-5" x2="-9" y2="-5" /><line x1="-13" y1="0" x2="-9" y2="0" /><line x1="-13" y1="5" x2="-9" y2="5" />
+                      <line x1="9" y1="-5" x2="13" y2="-5" /><line x1="9" y1="0" x2="13" y2="0" /><line x1="9" y1="5" x2="13" y2="5" />
+                      <line x1="-5" y1="-13" x2="-5" y2="-9" /><line x1="0" y1="-13" x2="0" y2="-9" /><line x1="5" y1="-13" x2="5" y2="-9" />
+                      <line x1="-5" y1="9" x2="-5" y2="13" /><line x1="0" y1="9" x2="0" y2="13" /><line x1="5" y1="9" x2="5" y2="13" />
+                    </g>
+
+                    <!-- 存储节点：数据库柱状图标 -->
+                    <g v-else-if="n.iconType === 'storage'" class="type-icon icon-storage">
+                      <ellipse cx="0" cy="-8" rx="11" ry="4" />
+                      <path d="M-11,-8 L-11,8 A11,4 0 0 0 11,8 L11,-8" />
+                      <path d="M-11,0 A11,4 0 0 0 11,0" />
+                    </g>
+
+                    <!-- 计算+存储节点：芯片与数据库组合图标 -->
+                    <g v-else-if="n.iconType === 'compute-storage'" class="type-icon icon-hybrid">
+                      <g transform="translate(-6,-6) scale(0.55)">
+                        <rect x="-9" y="-9" width="18" height="18" rx="3" />
+                        <rect x="-4" y="-4" width="8" height="8" rx="1" />
+                      </g>
+                      <g transform="translate(6,6) scale(0.55)">
+                        <ellipse cx="0" cy="-8" rx="11" ry="4" />
+                        <path d="M-11,-8 L-11,8 A11,4 0 0 0 11,8 L11,-8" />
+                        <path d="M-11,0 A11,4 0 0 0 11,0" />
+                      </g>
+                    </g>
+
                     <circle r="5" :fill="getNodeColor(n)" class="node-status" />
                     <text y="46" class="node-name" text-anchor="middle">{{ n.label }}</text>
                     <text y="64" class="node-datasets" text-anchor="middle">{{ n.datasetSummary }}</text>
@@ -76,6 +123,16 @@
               <span><i class="dot inactive" />未启用</span>
               <span><i class="dot offline" />异常/离线</span>
               <span><i class="legend-line" />链路未就绪</span>
+              <span class="legend-icon">
+                <svg width="16" height="16" viewBox="-9 -9 18 18" class="legend-svg icon-compute">
+                  <rect x="-9" y="-9" width="18" height="18" rx="3" /><rect x="-4" y="-4" width="8" height="8" rx="1" />
+                </svg>计算节点
+              </span>
+              <span class="legend-icon">
+                <svg width="16" height="16" viewBox="-11 -12 22 24" class="legend-svg icon-storage">
+                  <ellipse cx="0" cy="-8" rx="11" ry="4" /><path d="M-11,-8 L-11,8 A11,4 0 0 0 11,8 L11,-8" /><path d="M-11,0 A11,4 0 0 0 11,0" />
+                </svg>存储节点
+              </span>
             </span>
           </div>
 
@@ -131,7 +188,7 @@ import { fetchRegisteredDatasets, fetchRegisteredNodes } from '@/api/registratio
 import { fetchAllPages, datasetsForNode, formatBytes } from '@/utils/dataset-catalog'
 import { keepStableCollection } from '@/utils/live-refresh'
 import { layoutTopology, topologyEdgePath, NODE_RADIUS } from '@/utils/topology-layout'
-import { nodeLocation, summarizeNodeDatasets } from '@/utils/topology-node-details'
+import { nodeLocation, summarizeNodeDatasets, domainLabel, domainColor, normalizeNodeType, nodeTypeLabel } from '@/utils/topology-node-details'
 
 export default {
   name: 'FrameNet',
@@ -182,7 +239,8 @@ export default {
           externalIp,
           location: nodeLocation({ ...node, externalIp }),
           datasets,
-          datasetSummary: summarizeNodeDatasets(datasets)
+          datasetSummary: summarizeNodeDatasets(datasets),
+          iconType: normalizeNodeType(node.type || details.type)
         }
       })
     },
@@ -191,6 +249,37 @@ export default {
     },
     selectedNodeDatasets() {
       return this.selectedNode ? this.selectedNode.datasets : []
+    },
+    // Bounding box per site (域), drawn behind the nodes so members of one domain read as grouped.
+    domainBoxes() {
+      const groups = new Map()
+      this.nodes.forEach(node => {
+        const key = String(node.site || '').trim()
+        if (!groups.has(key)) groups.set(key, [])
+        groups.get(key).push(node)
+      })
+      const pad = 34
+      const boxes = []
+      groups.forEach((members, site) => {
+        if (!members.length) return
+        const xs = members.flatMap(n => {
+          const halfWidth = Math.max(140, n.label.length * 4.5)
+          return [n.x - halfWidth, n.x + halfWidth]
+        })
+        const ys = members.flatMap(n => [n.y - this.nodeRadius - 8, n.y + 72])
+        const x = Math.min(...xs) - pad
+        const y = Math.min(...ys) - pad
+        boxes.push({
+          site,
+          label: domainLabel(site),
+          x,
+          y,
+          width: Math.max(...xs) - Math.min(...xs) + pad * 2,
+          height: Math.max(...ys) - Math.min(...ys) + pad * 2,
+          color: domainColor(site)
+        })
+      })
+      return boxes
     }
   },
   mounted() {
@@ -349,7 +438,7 @@ export default {
     fit() {
       if (!this.nodes.length || !this.svgWidth || !this.svgHeight) return
 
-      const pad = 20
+      const pad = this.domainBoxes.length ? 40 : 20
       const nodeXs = this.nodes.flatMap(n => {
         const halfWidth = Math.max(140, n.label.length * 4.5)
         return [n.x - halfWidth, n.x + halfWidth]
@@ -444,6 +533,8 @@ export default {
         html = `
           <div style="min-width:220px;line-height:1.6;">
             <div><b>节点名称：</b>${esc(data.label)}</div>
+            <div><b>节点类型：</b>${esc(nodeTypeLabel(data.type))}</div>
+            <div><b>所属域：</b>${esc(domainLabel(data.site))}</div>
             <div><b>内网 IP：</b>${esc(data.internalIp || (this.nodeDetailsLoading ? '加载中…' : '未登记'))}</div>
             <div title="节点探测到的公网出口 IP；共用 NAT 的节点可能相同"><b>公网 IP：</b>${esc(data.externalIp || (this.nodeDetailsLoading ? '加载中…' : '未获取'))}</div>
             <div title="按当前公网 IP 查询离线地址库；表示出口 IP 归属地，不一定是节点实际机房位置"><b>IP 归属地：</b>${esc(data.location || '未查到归属地')}</div>
@@ -624,6 +715,8 @@ export default {
 .inactive { background: #a4acb9; }
 .offline { background: #df7373; }
 .legend-line { width: 18px; border-top: 1px dashed #9aa6b5; }
+.legend-icon { display: inline-flex; align-items: center; gap: 5px; }
+.legend-svg { flex-shrink: 0; fill: none; stroke: #697788; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .topology-empty {
   position: absolute;
   inset: 0;
@@ -644,6 +737,13 @@ export default {
 }
 .svg-container svg { display: block; }
 .svg-container:active { cursor: grabbing; }
+.domain-box { pointer-events: none; }
+.domain-rect { fill-opacity: 0.06; stroke-opacity: 0.5; stroke-width: 1.6; stroke-dasharray: 4 5; vector-effect: non-scaling-stroke; }
+.domain-label { font-size: 15px; font-weight: 600; opacity: 0.75; }
+.type-icon { fill: none; stroke: #697788; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; transition: stroke 150ms; }
+.topology-node.is-selected .type-icon,
+.topology-node:hover .type-icon,
+.topology-node:focus-visible .type-icon { stroke: #279b76; }
 .edge-line {
   fill: none;
   stroke: #9aa6b5;
