@@ -4,9 +4,16 @@ export const NODE_RADIUS = 24
 const LABEL_WIDTH = 250
 const LABEL_HEIGHT = 110
 // Landscape ellipses: gateways on the outer ring, site members fanned beyond them.
-const ARM_RADIUS = { x: 680, y: 170 }
-const MEMBER_RADIUS = { x: 320, y: 115 }
-const CENTER_OFFSET = { x: 230, y: 120 }
+// Members stay close to their own gateway (tight domain) while gateways sit far
+// out on the ring (domains spread apart); DOMAIN_GAP is topped up afterwards by
+// separateDomains() so domain boxes never touch even where two arms swing close.
+const ARM_RADIUS = { x: 760, y: 190 }
+const MEMBER_RADIUS = { x: 250, y: 90 }
+const CENTER_OFFSET = { x: 190, y: 105 }
+const DOMAIN_GAP = 60
+// Same padding fit()/domainBoxes use in the Vue view, so the boxes drawn there
+// match the space actually cleared here.
+const DOMAIN_PAD = 34
 
 // Lay out the actual graph the way the design sketch draws it: the best-connected
 // node and its site sit in the middle, every other site branches out on its own
@@ -144,6 +151,10 @@ export function layoutTopology(nodes, edges) {
   })
 
   separate(ids, positions)
+  // Every site partitions the node set the same way regardless of which branch
+  // built center/arms above, so this covers both the site-tagged and the
+  // connectivity-derived case.
+  separateDomains([[hub, ...center], ...arms], positions, nodes)
   return nodes.map(node => ({ ...node, ...positions.get(node.id) }))
 }
 
@@ -168,6 +179,52 @@ function separate(ids, positions) {
         const shift = (overlapY / 2 + 1) * (dy < 0 ? -1 : 1)
         p.y -= shift
         q.y += shift
+      }
+    }))
+    if (!moved) return
+  }
+}
+
+// Push whole domains (site groups) apart as rigid blocks so their boxes never
+// overlap, leaving a clear DOMAIN_GAP between any two of them. Individual node
+// spacing inside a domain is untouched — only the group as a whole is shifted.
+function separateDomains(groups, positions, nodes) {
+  if (groups.length < 2) return
+  const labelOf = new Map(nodes.map(node => [node.id, node.label || '']))
+  const boxOf = group => {
+    const xs = group.flatMap(id => {
+      const p = positions.get(id)
+      const halfWidth = Math.max(140, labelOf.get(id).length * 4.5)
+      return [p.x - halfWidth, p.x + halfWidth]
+    })
+    const ys = group.flatMap(id => {
+      const p = positions.get(id)
+      return [p.y - NODE_RADIUS - 8, p.y + 72]
+    })
+    return {
+      minX: Math.min(...xs) - DOMAIN_PAD, maxX: Math.max(...xs) + DOMAIN_PAD,
+      minY: Math.min(...ys) - DOMAIN_PAD, maxY: Math.max(...ys) + DOMAIN_PAD
+    }
+  }
+  for (let pass = 0; pass < 60; pass++) {
+    let moved = false
+    groups.forEach((a, index) => groups.slice(index + 1).forEach(b => {
+      const boxA = boxOf(a)
+      const boxB = boxOf(b)
+      const overlapX = Math.min(boxA.maxX, boxB.maxX) - Math.max(boxA.minX, boxB.minX) + DOMAIN_GAP
+      const overlapY = Math.min(boxA.maxY, boxB.maxY) - Math.max(boxA.minY, boxB.minY) + DOMAIN_GAP
+      if (overlapX <= 0 || overlapY <= 0) return
+      moved = true
+      const dx = (boxB.minX + boxB.maxX) / 2 - (boxA.minX + boxA.maxX) / 2
+      const dy = (boxB.minY + boxB.maxY) / 2 - (boxA.minY + boxA.maxY) / 2
+      if (overlapX < overlapY) {
+        const shift = (overlapX / 2) * (dx < 0 ? -1 : 1)
+        a.forEach(id => { positions.get(id).x -= shift })
+        b.forEach(id => { positions.get(id).x += shift })
+      } else {
+        const shift = (overlapY / 2) * (dy < 0 ? -1 : 1)
+        a.forEach(id => { positions.get(id).y -= shift })
+        b.forEach(id => { positions.get(id).y += shift })
       }
     }))
     if (!moved) return
