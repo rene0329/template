@@ -12,15 +12,27 @@
             <el-button @click="onCancel">重置</el-button>
           </el-form>
           <div class="action-buttons">
-            <el-button type="primary" :loading="submitting" :disabled="selectedRows.length === 0 || submitting" @click="handleSubmit">新建任务</el-button>
+            <el-button
+              type="primary"
+              :loading="submitting"
+              :disabled="selectedRows.length === 0 || submitting || !demoImageReady"
+              :title="demoImageReady ? '' : '需要先注册并激活名为 hash-demo 的运行镜像'"
+              @click="handleSubmit"
+            >创建对比任务（集中式 / 原位）</el-button>
           </div>
           <live-refresh-status class="live-refresh-anchor" :updated-at="lastUpdatedAt" />
         </div>
         <div class="content-row">
           <div class="table-card">
             <el-alert v-if="loadError" :title="loadError" type="warning" :closable="false" />
-            <el-alert v-if="lastTaskId" :title="`任务 ${lastTaskId} 已提交，可在任务列表查看`" type="success" :closable="false" />
-            <el-button v-if="lastTaskId" type="text" @click="$router.push({ path: '/ManagementCenter/TaskList', query: { taskId: String(lastTaskId) } })">查看任务 {{ lastTaskId }}</el-button>
+            <el-alert v-if="!demoImageReady" title="未找到已激活的 hash-demo 运行镜像，请先在“资源与数据 - 运行镜像”页注册并激活一个名为 hash-demo 的镜像（用于计算数据哈希，不代表真实计算任务）。" type="warning" :closable="false" />
+            <el-alert
+              v-if="comparisonResult"
+              :title="`集中式任务 #${comparisonResult.centralizedTaskId} 与 原位任务 #${comparisonResult.inPlaceTaskId} 已提交，运行 ID: ${comparisonResult.runId}（轮次 ${comparisonResult.round}）`"
+              type="success"
+              :closable="false"
+            />
+            <el-button v-if="comparisonResult" type="text" @click="goToComparison">查看数据移动效率对比</el-button>
             <div class="table-wrapper">
               <el-table
                 ref="datasetTable"
@@ -136,7 +148,7 @@
 </template>
 
 <script>
-import { fetchRegisteredDatasets, preflightRegisteredTask, createRegisteredTask, requestId } from '@/api/registrationApi'
+import { fetchRegisteredDatasets, fetchRuntimeImages, preflightRegisteredTask, createRegisteredTask, requestId } from '@/api/registrationApi'
 import { clampPage, datasetRow, fetchAllPages, formatBytes, paginateRows, sortRows } from '@/utils/dataset-catalog'
 import LiveRefreshStatus from '@/components/LiveRefreshStatus'
 import { keepStableCollection } from '@/utils/live-refresh'
@@ -161,8 +173,8 @@ export default {
       refreshing: false,
       requestVersion: 0,
       submitting: false,
-      pendingSubmission: null,
-      lastTaskId: null,
+      demoImage: null,
+      comparisonResult: null,
       loadError: '',
       refreshTimer: null,
       lastUpdatedAt: '',
@@ -186,10 +198,14 @@ export default {
   computed: {
     currentPageData() {
       return paginateRows(sortRows(this.TaskData, this.sort), this.currentPage, this.pageSize)
+    },
+    demoImageReady() {
+      return !!(this.demoImage && this.demoImage.imageId)
     }
   },
   created() {
     this.fetchData()
+    this.loadDemoImage()
   },
 
   mounted() {
@@ -285,39 +301,66 @@ export default {
     resourceLabel(resources = {}) {
       return `CPU ${resources.cpu == null ? '-' : resources.cpu} 核 / 内存 ${resources.memoryGi == null ? '-' : resources.memoryGi} GiB / GPU ${resources.gpu == null ? '-' : resources.gpu}`
     },
+    async loadDemoImage() {
+      try {
+        const r = await fetchRuntimeImages({ query: 'hash-demo', status: 'READY' })
+        this.demoImage = (r.list || []).find(image => image.enabled) || null
+      } catch (e) {
+        console.error('加载 hash-demo 运行镜像失败:', e)
+        this.demoImage = null
+      }
+    },
+    goToComparison() {
+      if (!this.comparisonResult) return
+      this.$router.push({ path: '/operations/analysis', query: { runId: this.comparisonResult.runId, round: String(this.comparisonResult.round) } })
+    },
+    // 数据移动效率对比只关心数据搬运耗时，计算步骤故意用 hash-demo 镜像（只对已落地的数据算一次哈希）代替真实训练/推理，
+    // 避免计算时长掩盖我们真正要比较的“集中式 vs 原位”数据迁移耗时差异。
     async handleSubmit() {
       if (this.submitting) return
       if (this.selectedRows.length === 0) {
         this.$message.warning('数据不能为空，请选择数据。')
         return
       }
+      if (!this.demoImageReady) {
+        this.$message.warning('未找到已激活的 hash-demo 运行镜像，请先注册并激活。')
+        return
+      }
 
       this.submitting = true
       const datasetIds = this.selectedRows.map(r => r.datasetId).sort((a, b) => a - b)
-      const signature = JSON.stringify(datasetIds)
-      if (!this.pendingSubmission || this.pendingSubmission.signature !== signature) {
-        this.pendingSubmission = { signature, key: requestId(), body: { datasetIds, taskName: `数据任务-${new Date().toISOString()}` }}
+      const runId = `cmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      const base = {
+        taskName: `对比任务-${runId}`,
+        datasetIds,
+        runtimeImageId: this.demoImage.imageId,
+        acceptanceRunId: runId,
+        runRound: 1
       }
       try {
-        const { body, key } = this.pendingSubmission
-        if (!this.pendingSubmission.attempted) {
-          const preflight = await preflightRegisteredTask(body)
-          if (!preflight.valid) {
-            const reasons = preflight.checks.filter(check => !check.available).map(check => `${check.name || check.resourceId}: ${check.message || check.status}`)
-            await this.$alert(reasons.join('\n'), '任务预检查未通过', { customClass: 'preflight-message' })
-            return
-          }
+        const modes = ['CENTRALIZED', 'IN_PLACE']
+        const preflights = await Promise.all(modes.map(executionMode => preflightRegisteredTask({ ...base, executionMode })))
+        const failed = preflights
+          .map((preflight, idx) => ({ preflight, mode: modes[idx] }))
+          .filter(({ preflight }) => !preflight.valid)
+        if (failed.length) {
+          const reasons = failed.map(({ preflight, mode }) => {
+            const detail = preflight.checks.filter(check => !check.available).map(check => `${check.name || check.resourceId}: ${check.message || check.status}`).join('；')
+            return `[${mode === 'CENTRALIZED' ? '集中式' : '原位'}] ${detail}`
+          })
+          await this.$alert(reasons.join('\n'), '任务预检查未通过', { customClass: 'preflight-message' })
+          return
         }
-        this.pendingSubmission.attempted = true
-        const task = await createRegisteredTask(body, key)
-        this.lastTaskId = task.taskId
-        this.pendingSubmission = null
-        this.$message.success(`任务 ${task.taskId} 已提交，正在后台执行`)
+        const [centralizedTask, inPlaceTask] = await Promise.all(
+          modes.map(executionMode => createRegisteredTask({ ...base, executionMode }, requestId()))
+        )
+        this.comparisonResult = { runId, round: base.runRound, centralizedTaskId: centralizedTask.taskId, inPlaceTaskId: inPlaceTask.taskId }
+        this.$message.success(`已提交集中式任务 #${centralizedTask.taskId} 与原位任务 #${inPlaceTask.taskId}，正在后台执行`)
         this.$refs.datasetTable.clearSelection()
         this.selectedRows = []
       } catch (e) {
         console.error('提交失败:', e)
-        if (e !== 'cancel' && e !== 'close') this.$message.error(e.message || '提交失败；再次提交将复用本次请求编号')
+        if (e !== 'cancel' && e !== 'close') this.$message.error(e.message || '提交失败')
       } finally {
         this.submitting = false
       }

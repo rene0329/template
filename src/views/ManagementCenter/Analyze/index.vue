@@ -139,6 +139,11 @@ export default {
   },
   created() {
     this.fetchData()
+    const { runId, round } = this.$route.query
+    if (runId) {
+      this.runLookup = { id: String(runId), round: round ? Number(round) : 1 }
+      this.loadComparison()
+    }
   },
   mounted() {
     this.chart = echarts.init(this.$refs.speedupChart)
