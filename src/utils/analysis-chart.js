@@ -25,18 +25,22 @@ export function milliseconds(value) {
   return number == null ? '暂无数据' : `${(number * 1000).toFixed(2)} ms`
 }
 
-// Speedups cluster around 1.2–1.5×, so a zero-based line axis flattens them into a straight
-// line: lines start at 0.8× (lower only when a measurement is), with 0.2× headroom above the
-// highest point. Bars keep a zero baseline because their length encodes the value.
+// The P4 acceptance threshold the speedup line is compared against.
+export const SPEEDUP_THRESHOLD = 1.2
+
+// Speedups cluster just above the threshold, so a zero-based line axis flattens them into a
+// straight line: lines start at 0.9× (lower only when a measurement is), with 0.2× headroom
+// above the highest point or the threshold, on 0.1× ticks so the threshold sits on a gridline.
+// Bars keep a zero baseline because their length encodes the value.
 function speedupAxisRange(values, chartType) {
   const measured = values.filter(value => value != null)
-  const top = Math.max(1, ...measured)
+  const top = Math.max(SPEEDUP_THRESHOLD, ...measured)
   if (chartType === 'bar') return { min: 0, max: Math.ceil(top * 1.15 * 10) / 10 }
-  const bottom = Math.max(0, Math.min(0.8, ...measured.map(value => value - 0.1)))
-  return {
-    min: Math.floor(bottom * 5 + 1e-9) / 5,
-    max: Math.ceil((top + 0.2) * 5 - 1e-9) / 5
-  }
+  const bottom = Math.max(0, Math.min(0.9, ...measured.map(value => value - 0.1)))
+  const min = Math.floor(bottom * 10 + 1e-9) / 10
+  const max = Math.ceil((top + 0.2) * 10 - 1e-9) / 10
+  // Past a 1× span, 0.1× ticks crowd the axis; let ECharts pick the step instead.
+  return max - min <= 1 + 1e-9 ? { min, max, interval: 0.1 } : { min, max }
 }
 
 export function buildSpeedupOption(rows, chartType = 'line') {
@@ -68,8 +72,7 @@ export function buildSpeedupOption(rows, chartType = 'line') {
     yAxis: {
       type: 'value',
       name: '加速比（倍）',
-      min: axisRange.min,
-      max: axisRange.max,
+      ...axisRange,
       axisLine: { show: false },
       axisTick: { show: false },
       axisLabel: { color: '#576574', formatter: '{value}×' },
@@ -94,8 +97,8 @@ export function buildSpeedupOption(rows, chartType = 'line') {
         silent: true,
         symbol: 'none',
         lineStyle: { color: '#d39538', type: 'dashed', width: 2 },
-        label: { formatter: '1× 基准', position: 'end', color: '#9b702d' },
-        data: [{ yAxis: 1 }]
+        label: { formatter: `${SPEEDUP_THRESHOLD}× 阈值`, position: 'end', color: '#9b702d' },
+        data: [{ yAxis: SPEEDUP_THRESHOLD }]
       }
     }]
   }
