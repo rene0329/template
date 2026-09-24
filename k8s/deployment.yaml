@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: topic4-1-frontend
-          image: 10.15.16.40:30455/topic4-frontend:v-73d2c9f2868878471caf591880ada0c803171870
+          image: 10.15.16.40:30455/topic4-frontend:v-a6e93aeab55b16204b1bd0db4cb0435aed50eb67
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
