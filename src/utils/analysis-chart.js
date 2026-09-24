@@ -25,8 +25,23 @@ export function milliseconds(value) {
   return number == null ? '暂无数据' : `${(number * 1000).toFixed(2)} ms`
 }
 
+// Speedups cluster around 1.2–1.5×, so a zero-based line axis flattens them into a straight
+// line: lines start at 0.8× (lower only when a measurement is), with 0.2× headroom above the
+// highest point. Bars keep a zero baseline because their length encodes the value.
+function speedupAxisRange(values, chartType) {
+  const measured = values.filter(value => value != null)
+  const top = Math.max(1, ...measured)
+  if (chartType === 'bar') return { min: 0, max: Math.ceil(top * 1.15 * 10) / 10 }
+  const bottom = Math.max(0, Math.min(0.8, ...measured.map(value => value - 0.1)))
+  return {
+    min: Math.floor(bottom * 5 + 1e-9) / 5,
+    max: Math.ceil((top + 0.2) * 5 - 1e-9) / 5
+  }
+}
+
 export function buildSpeedupOption(rows, chartType = 'line') {
   const values = rows.map(speedupValue)
+  const axisRange = speedupAxisRange(values, chartType)
   return {
     color: ['#158568'],
     grid: { left: 24, right: 72, top: 48, bottom: rows.length > 10 ? 92 : 48, containLabel: true },
@@ -53,8 +68,8 @@ export function buildSpeedupOption(rows, chartType = 'line') {
     yAxis: {
       type: 'value',
       name: '加速比（倍）',
-      min: 0,
-      max: Math.ceil(Math.max(1, ...values.filter(value => value != null)) * 1.15 * 10) / 10,
+      min: axisRange.min,
+      max: axisRange.max,
       axisLine: { show: false },
       axisTick: { show: false },
       axisLabel: { color: '#576574', formatter: '{value}×' },

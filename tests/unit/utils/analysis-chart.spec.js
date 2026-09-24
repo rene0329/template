@@ -12,6 +12,23 @@ it('plots speedup on its own scale and preserves the 1x comparison baseline', ()
   expect(buildSpeedupOption([{ rating: 0.2 }]).yAxis.max).toBeGreaterThan(1)
 })
 
+it('starts the line axis at 0.8x so clustered speedups are not flattened', () => {
+  const rows = [{ taskId: 65, rating: 1.337, t1: 1 }, { taskId: 66, rating: 1.353, t1: 1 }]
+  expect(buildSpeedupOption(rows).yAxis).toMatchObject({ min: 0.8, max: 1.6 })
+  expect(buildSpeedupOption([{ rating: 1.507, t1: 1 }]).yAxis).toMatchObject({ min: 0.8, max: 1.8 })
+})
+
+it('lowers the line axis instead of clipping measurements below 0.8x', () => {
+  expect(buildSpeedupOption([{ rating: 0.546, t1: 1 }, { rating: 1.35, t1: 1 }]).yAxis)
+    .toMatchObject({ min: 0.4, max: 1.6 })
+  expect(buildSpeedupOption([{ rating: 0, t1: 1 }, { rating: 1.3, t1: 1 }]).yAxis.min).toBe(0)
+})
+
+it('keeps a zero baseline for bars', () => {
+  const rows = [{ taskId: 65, rating: 1.337, t1: 1 }, { taskId: 66, rating: 1.353, t1: 1 }]
+  expect(buildSpeedupOption(rows, 'bar').yAxis).toMatchObject({ min: 0, max: 1.6 })
+})
+
 it('keeps absent and non-finite measurements as gaps without discarding real zero', () => {
   const values = [null, undefined, '', ' ', Infinity, 'invalid', -1, false, 0]
   expect(values.map(measurement)).toEqual([null, null, null, null, null, null, null, null, 0])
