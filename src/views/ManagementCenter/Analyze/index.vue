@@ -50,7 +50,7 @@
 
         <div class="chart-heading">
           <h2>数据移动加速比</h2>
-          <p>集中式耗时 ÷ 分布式耗时；高于 1× 表示加速，低于 1× 表示减速。多数据集任务中，每种模式的数据移动时间为该模式下各数据集数据移动时间之和，加速比按两者之和计算。</p>
+          <p>集中式数据移动时间 T1 ÷ 分布式数据移动时间 T2；高于 1× 表示加速，低于 1× 表示减速。多数据集任务中，每种模式的数据移动时间为该模式下各数据集数据移动时间之和，加速比按两者之和计算。</p>
           <p>页面只展示实测值，不自动判定是否通过 1.2 门槛。</p>
         </div>
         <el-table
@@ -63,13 +63,13 @@
           empty-text="暂无可展示的性能数据"
         >
           <el-table-column prop="taskId" label="任务ID" min-width="100" align="center" />
-          <el-table-column prop="t2" label="集中式数据移动时间" min-width="200" align="center">
+          <el-table-column prop="t2" label="集中式数据移动时间 T1" min-width="200" align="center">
             <template v-slot:default="scope">{{ milliseconds(scope.row.t2) }}</template>
           </el-table-column>
-          <el-table-column prop="t1" label="分布式数据移动时间" min-width="200" align="center">
+          <el-table-column prop="t1" label="分布式数据移动时间 T2" min-width="200" align="center">
             <template v-slot:default="scope">{{ milliseconds(scope.row.t1) }}</template>
           </el-table-column>
-          <el-table-column prop="rating" label="数据移动加速比" min-width="160" align="center">
+          <el-table-column prop="rating" label="数据移动加速比 T1/T2" min-width="180" align="center">
             <template v-slot:default="scope">{{ speedupText(speedupValue(scope.row)) }}</template>
           </el-table-column>
         </el-table>

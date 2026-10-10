@@ -56,8 +56,8 @@ it('explains why each dataset is available and shows grant time left in server t
   expect(vm.rows.map(row => [row.access.label, row.access.type, row.access.detail])).toEqual([
     ['可用', 'success', '管理员'],
     ['可用', 'success', '本域数据'],
-    ['可用', 'success', '临时授权，剩余 23 分钟'],
-    ['不可用', 'info', '需申请临时令牌']
+    ['可用', 'success', '短期授权，剩余 23 分钟'],
+    ['不可用', 'info', '需申请短期访问令牌']
   ])
   expect(vm.rows[2].access.expiresAt).toBe(parseTime(new Date(grantExpiresAt)))
   expect(vm.rows.map(row => vm.canApply(row))).toEqual([false, false, false, true])
@@ -118,9 +118,9 @@ it('requires an application reason of at most 500 characters before requesting a
   expect(requestDatasetAccessGrant).toHaveBeenCalledWith(4, '联合建模需要读取 B 域样本')
   expect(vm.apply.visible).toBe(false)
   expect(vm.apply.submitting).toBe(false)
-  expect(vm.$message.success).toHaveBeenCalledWith('已获得「数据集 4」的临时访问令牌，有效期 30 分钟')
+  expect(vm.$message.success).toHaveBeenCalledWith('已获得「数据集 4」的短期访问令牌，有效期 30 分钟')
   expect(fetchDatasetAccess).toHaveBeenCalledTimes(1)
-  expect(vm.rows[0].access).toMatchObject({ label: '可用', detail: '临时授权，剩余 30 分钟' })
+  expect(vm.rows[0].access).toMatchObject({ label: '可用', detail: '短期授权，剩余 30 分钟' })
 })
 
 it('refreshes on a grant conflict but keeps the dialog open on validation errors', async() => {
@@ -130,7 +130,7 @@ it('refreshes on a grant conflict but keeps the dialog open on validation errors
   vm.openApply(dataset(4))
   vm.apply.reason = '复核'
   await vm.submitApply()
-  expect(vm.$message.warning).toHaveBeenCalledWith('该数据集已有生效中的临时授权')
+  expect(vm.$message.warning).toHaveBeenCalledWith('该数据集已有生效中的短期授权')
   expect(vm.apply.visible).toBe(false)
   expect(fetchDatasetAccess).toHaveBeenCalledTimes(1)
 
@@ -162,13 +162,13 @@ it('counts a grant down, flips it to unavailable at expiry and refetches without
   AccessControl.created.call(vm)
   await flush()
 
-  expect(vm.rows[0].access.detail).toBe('临时授权，剩余 40 秒')
+  expect(vm.rows[0].access.detail).toBe('短期授权，剩余 40 秒')
   await advance(39)
-  expect(vm.rows[0].access.detail).toBe('临时授权，剩余 1 秒')
+  expect(vm.rows[0].access.detail).toBe('短期授权，剩余 1 秒')
   expect(fetchDatasetAccess).toHaveBeenCalledTimes(1)
 
   await advance(1)
-  expect(vm.rows[0].access).toMatchObject({ label: '不可用', detail: '临时授权已到期' })
+  expect(vm.rows[0].access).toMatchObject({ label: '不可用', detail: '短期授权已到期' })
   expect(vm.canApply(vm.rows[0])).toBe(true)
 
   await advance(1)
@@ -227,7 +227,7 @@ it('renders location domains and the apply button only on unavailable rows', asy
   const status = wrapper.findAll('[data-label="状态"] .cell')
   expect(status.wrappers.map(cell => cell.find('.tag').text())).toEqual(['可用', '可用', '不可用'])
   expect(status.at(0).text()).toContain('本域数据')
-  expect(status.at(1).text()).toContain('临时授权，剩余 10 分钟')
+  expect(status.at(1).text()).toContain('短期授权，剩余 10 分钟')
   const actions = wrapper.findAll('[data-label="操作"] .cell')
   expect(actions.wrappers.map(cell => cell.findAll('button').length)).toEqual([0, 0, 1])
 

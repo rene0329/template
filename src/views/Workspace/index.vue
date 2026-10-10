@@ -48,7 +48,7 @@
           <router-link to="/collaboration/jobs" class="panel-link">查看全部协同任务 <i class="el-icon-right" /></router-link>
         </template>
         <template v-else>
-          <p class="panel-note">本域数据可直接用于任务；其他域的数据集需在安全中心申请临时访问令牌，令牌到期后自动失效。</p>
+          <p class="panel-note">本域数据可直接用于任务；其他域的数据集需在安全中心申请短期访问令牌，令牌到期后自动失效。</p>
           <router-link to="/security/access" class="panel-link">查看数据集访问权限 <i class="el-icon-right" /></router-link>
         </template>
       </article>
@@ -97,7 +97,7 @@ export default {
         { title: '资源与数据', description: '准备节点、网络、数据集和运行镜像', path: '/resources/nodes' },
         this.showCollaboration && { title: '协同计算', description: '选择固定协议模板并创建隐私任务', path: '/collaboration/capabilities' },
         { title: '任务运行', description: '查看任务、调度结果和性能分析', path: '/operations/tasks' },
-        { title: '安全中心', description: '查看数据集访问权限并申请临时令牌', path: '/security/access' },
+        { title: '安全中心', description: '查看数据集访问权限并申请短期访问令牌', path: '/security/access' },
         { title: '系统日志', description: this.showCollaboration ? '检查异常访问、调度执行和隐私计算日志' : '检查调度执行和异常访问日志', path: '/logs/abnormal-access' }
       ].filter(Boolean)
     },

@@ -8,7 +8,7 @@
 
       <el-tabs v-model="activeTab" class="content-card">
         <el-tab-pane label="域管理" name="domains">
-          <div class="toolbar"><span>受限域账号只能直接使用存放在本域节点上的数据集，其他数据集需申请临时访问令牌；业务域数量不受 A/B/C 执行槽限制</span><el-button type="primary" icon="el-icon-plus" @click="openDomain()">新增业务域</el-button></div>
+          <div class="toolbar"><span>受限域账号只能直接使用存放在本域节点上的数据集，其他数据集需申请短期访问令牌；业务域数量不受 A/B/C 执行槽限制</span><el-button type="primary" icon="el-icon-plus" @click="openDomain()">新增业务域</el-button></div>
           <el-table v-loading="loading" :data="domains" border>
             <el-table-column prop="code" label="域编码" min-width="140" />
             <el-table-column prop="name" label="域名称" min-width="160" />

@@ -4,7 +4,7 @@
       <section class="page-heading">
         <div>
           <h2>访问控制</h2>
-          <p>数据集的所属域由其当前存放的节点决定。存放在本域节点上的数据集可直接使用；其他数据集需填写申请说明，申请临时访问令牌<span v-if="ttlMinutes">（有效期 {{ ttlMinutes }} 分钟）</span>，到期后自动失效。</p>
+          <p>数据集的所属域由其当前存放的节点决定。存放在本域节点上的数据集可直接使用；其他数据集需填写申请说明，申请短期访问令牌<span v-if="ttlMinutes">（有效期 {{ ttlMinutes }} 分钟）</span>，到期后自动失效。</p>
         </div>
         <el-button icon="el-icon-refresh" :loading="loading" @click="load()">刷新</el-button>
       </section>
@@ -34,7 +34,7 @@
         </el-table>
       </section>
 
-      <el-dialog title="申请临时访问令牌" :visible.sync="apply.visible" width="540px" :close-on-click-modal="false">
+      <el-dialog title="申请短期访问令牌" :visible.sync="apply.visible" width="540px" :close-on-click-modal="false">
         <el-descriptions v-if="apply.dataset" :column="1" size="small" border>
           <el-descriptions-item label="数据集">{{ datasetName(apply.dataset) }}</el-descriptions-item>
           <el-descriptions-item label="编码 / 版本">{{ apply.dataset.datasetCode || '—' }} · {{ apply.dataset.version || '—' }}</el-descriptions-item>
@@ -63,10 +63,10 @@ const REFRESH_INTERVAL_MS = 60000
 const EXPIRY_GRACE_MS = 1000
 const MAX_TIMEOUT_MS = 2147483647
 
-const BASIS_TEXT = { ADMIN: '管理员', OWN_DOMAIN: '本域数据', GRANT: '临时授权' }
+const BASIS_TEXT = { ADMIN: '管理员', OWN_DOMAIN: '本域数据', GRANT: '短期授权' }
 const GRANT_CONFLICTS = {
   DATASET_ALREADY_ACCESSIBLE: '该数据集当前已可用，无需申请',
-  GRANT_ALREADY_ACTIVE: '该数据集已有生效中的临时授权'
+  GRANT_ALREADY_ACTIVE: '该数据集已有生效中的短期授权'
 }
 
 // 服务端时间按 ISO instant 返回；缺少时区后缀时按 UTC 处理（后端统一以 UTC 运行）。
@@ -137,7 +137,7 @@ export default {
     serverNow() { return this.now + this.clockOffset },
     grantRemainingMs(row) { return parseInstant(row.grantExpiresAt) - this.serverNow() },
     grantExpired(row) { return row.basis === 'GRANT' && this.grantRemainingMs(row) <= 0 },
-    // 临时授权到期的瞬间就按不可用展示，不必等待重新拉取完成。
+    // 短期授权到期的瞬间就按不可用展示，不必等待重新拉取完成。
     isAccessible(row) { return Boolean(row.accessible) && !this.grantExpired(row) },
     canApply(row) { return !this.isAccessible(row) },
     remainingText(row) {
@@ -154,11 +154,11 @@ export default {
           available: true,
           label: '可用',
           type: 'success',
-          detail: `临时授权，${this.remainingText(row)}`,
+          detail: `短期授权，${this.remainingText(row)}`,
           expiresAt: Number.isFinite(expiresAt) ? parseTime(new Date(expiresAt)) : ''
         }
       }
-      return { available: false, label: '不可用', type: 'info', detail: this.grantExpired(row) ? '临时授权已到期' : '需申请临时令牌', expiresAt: '' }
+      return { available: false, label: '不可用', type: 'info', detail: this.grantExpired(row) ? '短期授权已到期' : '需申请短期访问令牌', expiresAt: '' }
     },
     async load({ silent = false } = {}) {
       const seq = ++this.loadSeq
@@ -193,7 +193,7 @@ export default {
       this.refreshTimer = null
       this.expiryTimer = null
     },
-    // 在最早到期的临时授权到期时重新拉取列表，使该行自动恢复为不可用。
+    // 在最早到期的短期授权到期时重新拉取列表，使该行自动恢复为不可用。
     scheduleExpiryRefresh() {
       clearTimeout(this.expiryTimer)
       this.expiryTimer = null
@@ -219,7 +219,7 @@ export default {
       try {
         const grant = await requestDatasetAccessGrant(dataset.datasetId, this.apply.reason.trim()) || {}
         this.apply.visible = false
-        this.$message.success(`已获得「${this.datasetName(dataset)}」的临时访问令牌，有效期 ${grant.ttlMinutes || this.ttlMinutes} 分钟`)
+        this.$message.success(`已获得「${this.datasetName(dataset)}」的短期访问令牌，有效期 ${grant.ttlMinutes || this.ttlMinutes} 分钟`)
         await this.load()
       } catch (error) {
         if (error.status === 409 || error.status === 404) {
