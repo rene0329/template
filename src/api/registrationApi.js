@@ -1,11 +1,12 @@
 import request from './axiosConfig'
 
 export const requestId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`
-const mutation = (url, method = 'post', data, idempotencyKey = requestId()) => request({
+const mutation = (url, method = 'post', data, idempotencyKey = requestId(), options = {}) => request({
   url,
   method,
   data,
-  headers: { 'Idempotency-Key': idempotencyKey }
+  headers: { 'Idempotency-Key': idempotencyKey },
+  ...options
 })
 
 export const discoverNodes = (clusterIds = []) => mutation('/api/v1/node-discovery-runs', 'post', { clusterIds })
@@ -22,7 +23,7 @@ export const discoverDatasets = (nodeIds = []) => mutation('/api/v1/dataset-disc
 export const fetchDatasetCandidates = (params) => request({ url: '/api/v1/dataset-candidates', method: 'get', params })
 export const fetchRegisteredDatasets = (params, options = {}) => request({ url: '/api/v1/datasets', method: 'get', params, ...options })
 export const fetchRegisteredDataset = (id, options = {}) => request({ url: `/api/v1/datasets/${id}`, method: 'get', ...options })
-export const registerDataset = (data) => mutation('/api/v1/datasets', 'post', data)
+export const registerDataset = (data) => mutation('/api/v1/datasets', 'post', data, requestId(), { timeout: 600000 })
 export const uploadAndRegisterDataset = (data, onUploadProgress) => request({
   url: '/api/v1/datasets/upload',
   method: 'post',
@@ -31,7 +32,10 @@ export const uploadAndRegisterDataset = (data, onUploadProgress) => request({
   headers: { 'Idempotency-Key': requestId() },
   onUploadProgress
 })
-export const verifyDataset = (id) => mutation(`/api/v1/datasets/${id}/verify`)
+// A SHA-256 pass is intentionally a full streaming read.  Large datasets can
+// take tens of minutes, so this operation must not inherit the 120 second UI
+// default.
+export const verifyDataset = (id) => mutation(`/api/v1/datasets/${id}/verify`, 'post', undefined, requestId(), { timeout: 60 * 60 * 1000 })
 export const fetchDatasetReplicas = (datasetId, options = {}) => request({
   url: `/api/v1/datasets/${datasetId}/replicas`, method: 'get', ...options
 })

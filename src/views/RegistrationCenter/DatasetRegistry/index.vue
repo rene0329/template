@@ -6,20 +6,20 @@
         <el-tab-pane label="待注册候选" name="candidates">
           <el-table v-loading="loading" :data="rows">
             <el-table-column prop="candidateId" label="ID" width="70" /><el-table-column prop="fileName" label="文件名" min-width="180" /><el-table-column prop="filePath" label="路径" min-width="280" show-overflow-tooltip /><el-table-column prop="nodeId" label="节点" width="90" /><el-table-column prop="availability" label="可用性" width="110" />
-            <el-table-column label="操作" width="90"><template slot-scope="s"><el-button type="text" @click="openRegister(s.row)">注册</el-button></template></el-table-column>
+            <el-table-column label="操作" width="90"><template slot-scope="s"><el-button type="text" :loading="registerSaving && form.candidateId === s.row.candidateId" :disabled="registerSaving" @click="openRegister(s.row)">注册</el-button></template></el-table-column>
           </el-table>
         </el-tab-pane>
         <el-tab-pane label="已注册数据集" name="registered">
           <el-table v-loading="loading" :data="rows" @selection-change="selected=$event">
             <el-table-column type="selection" width="45" :selectable="row => row.status === 'ACTIVE' && row.availableReplicaCount > 0" /><el-table-column prop="datasetCode" label="编码" min-width="130" /><el-table-column prop="name" label="名称" min-width="150" /><el-table-column prop="version" label="版本" width="90" /><el-table-column prop="dataType" label="类型" width="100" /><el-table-column prop="status" label="注册状态" width="110" /><el-table-column label="副本健康" width="120"><template slot-scope="s"><el-tag size="mini" :type="healthTag(s.row.healthStatus)">{{ s.row.healthStatus }}</el-tag></template></el-table-column><el-table-column label="可用副本" width="100"><template slot-scope="s">{{ s.row.availableReplicaCount }}/{{ s.row.totalReplicaCount }}</template></el-table-column><el-table-column prop="statusReason" label="状态原因" min-width="180" show-overflow-tooltip /><el-table-column prop="defaultRuntimeImageId" label="镜像 ID" width="100" />
-            <el-table-column label="操作" width="250" fixed="right"><template slot-scope="s"><el-button type="text" @click="act(verifyDataset,s.row.datasetId)">校验</el-button><el-button type="text" @click="act(activateDataset,s.row.datasetId)">激活</el-button><el-button type="text" @click="act(disableDataset,s.row.datasetId)">停用</el-button><el-button type="text" class="danger-action" :loading="deletingDatasetId === s.row.datasetId" :disabled="deletingDatasetId !== null" @click="removeDataset(s.row)">删除</el-button></template></el-table-column>
+            <el-table-column label="操作" width="250" fixed="right"><template slot-scope="s"><el-button type="text" :loading="verifyingDatasetId === s.row.datasetId" :disabled="verifyingDatasetId !== null" @click="verifyRegisteredDataset(s.row.datasetId)">校验</el-button><el-button type="text" @click="act(activateDataset,s.row.datasetId)">激活</el-button><el-button type="text" @click="act(disableDataset,s.row.datasetId)">停用</el-button><el-button type="text" class="danger-action" :loading="deletingDatasetId === s.row.datasetId" :disabled="deletingDatasetId !== null" @click="removeDataset(s.row)">删除</el-button></template></el-table-column>
           </el-table>
           <div class="task-action"><el-button type="primary" :disabled="!selected.length" @click="openTaskDialog">使用所选数据集创建任务</el-button></div>
         </el-tab-pane>
       </el-tabs>
       <el-pagination :current-page="page" :page-size="20" :total="total" layout="total, prev, pager, next" @current-change="changePage" />
     </el-card>
-    <el-dialog title="注册数据集" :visible.sync="dialog" width="520px"><el-form label-width="100px"><el-form-item label="数据集编码"><el-input v-model="form.datasetCode" /></el-form-item><el-form-item label="名称"><el-input v-model="form.name" /></el-form-item><el-form-item label="版本"><el-input v-model="form.version" /></el-form-item><el-form-item label="数据类型"><el-input v-model="form.dataType" /></el-form-item><el-form-item label="描述"><el-input v-model="form.description" type="textarea" /></el-form-item></el-form><span slot="footer"><el-button @click="dialog=false">取消</el-button><el-button type="primary" @click="submit">注册</el-button></span></el-dialog>
+    <el-dialog title="注册数据集" :visible.sync="dialog" width="520px" :close-on-click-modal="!registerSaving" :close-on-press-escape="!registerSaving" :show-close="!registerSaving"><el-form label-width="100px"><el-form-item label="数据集编码"><el-input v-model="form.datasetCode" /></el-form-item><el-form-item label="名称"><el-input v-model="form.name" /></el-form-item><el-form-item label="版本"><el-input v-model="form.version" /></el-form-item><el-form-item label="数据类型"><el-input v-model="form.dataType" /></el-form-item><el-form-item label="描述"><el-input v-model="form.description" type="textarea" /></el-form-item></el-form><span slot="footer"><el-button :disabled="registerSaving" @click="dialog=false">取消</el-button><el-button type="primary" :loading="registerSaving" @click="submit">注册</el-button></span></el-dialog>
     <el-dialog title="上传并注册数据集" :visible.sync="uploadDialog" width="580px" :close-on-click-modal="false" :close-on-press-escape="!uploadSaving" :show-close="!uploadSaving">
       <el-alert title="文件将流式写入选定的可用存储节点，并自动创建首个数据副本。当前支持 NPZ 文件。" type="info" :closable="false" show-icon class="upload-tip" />
       <el-form label-width="110px">
@@ -72,7 +72,7 @@ export default {
   name: 'DatasetRegistry',
   data: () => ({
     tab: 'candidates', query: '', page: 1, total: 0, rows: [], selected: [], loading: false,
-    dialog: false, form: {}, deletingDatasetId: null,
+    dialog: false, form: {}, registerSaving: false, verifyingDatasetId: null, deletingDatasetId: null,
     uploadDialog: false, uploadSaving: false, uploadProgress: 0, uploadNodes: [], uploadFile: null, uploadFileList: [],
     uploadForm: { nodeId: null, datasetCode: '', name: '', version: '1.0', dataType: 'NPZ', description: '' },
     taskDialog: false, preflight: null, preflightLoading: false,
@@ -84,7 +84,8 @@ export default {
     async load() { this.loading = true; try { const api = this.tab === 'candidates' ? fetchDatasetCandidates : fetchRegisteredDatasets; const r = await api({ page: this.page, pageSize: 20, query: this.query }); this.rows = r.list || []; this.total = r.total || 0 } catch (e) { this.$message.error(e.message || '加载失败') } finally { this.loading = false } },
     async discover() { try { await discoverDatasets(); this.$message.success('扫描已触发'); await this.load() } catch (e) { this.$message.error(e.message || '扫描失败') } },
     openRegister(row) { const stem = fileStem(row.fileName) || 'dataset'; this.form = { candidateId: row.candidateId, datasetCode: datasetCodeOf(stem), name: stem, version: '1.0', dataType: row.fileType || 'unknown', description: '' }; this.dialog = true },
-    async submit() { try { await registerDataset(this.form); this.dialog = false; this.$message.success('数据集已注册'); await this.load() } catch (e) { this.$message.error(e.message || '注册失败') } },
+    async submit() { if (this.registerSaving) return; this.registerSaving = true; try { await registerDataset(this.form); this.dialog = false; this.$message.success('数据集已注册，请在已注册数据集中执行一次校验'); await this.load() } catch (e) { this.$message.error(e.message || '注册失败') } finally { this.registerSaving = false } },
+    async verifyRegisteredDataset(id) { if (this.verifyingDatasetId !== null) return; this.verifyingDatasetId = id; try { await verifyDataset(id); this.$message.success('数据集校验完成'); await this.load() } catch (e) { this.$message.error(e.message || '数据集校验失败') } finally { this.verifyingDatasetId = null } },
     async openUpload() {
       try {
         const nodes = await fetchAllPages(params => fetchRegisteredNodes({ ...params, status: 'ACTIVE', enabled: true }))
