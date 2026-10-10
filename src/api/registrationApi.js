@@ -35,7 +35,7 @@ export const uploadAndRegisterDataset = (data, onUploadProgress) => request({
 // A SHA-256 pass is intentionally a full streaming read.  Large datasets can
 // take tens of minutes, so this operation must not inherit the 120 second UI
 // default.
-export const verifyDataset = (id) => mutation(`/api/v1/datasets/${id}/verify`, 'post', undefined, requestId(), { timeout: 60 * 60 * 1000 })
+export const verifyDataset = (id) => mutation(`/api/v1/datasets/${id}/verify`, 'post', undefined, requestId(), { timeout: 3 * 60 * 60 * 1000 })
 export const fetchDatasetReplicas = (datasetId, options = {}) => request({
   url: `/api/v1/datasets/${datasetId}/replicas`, method: 'get', ...options
 })
