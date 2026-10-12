@@ -108,7 +108,6 @@
         <span slot="footer"><el-button @click="evidenceVisible=false">关闭</el-button></span>
       </el-dialog>
     </el-main>
-    <div class="copyright-bar">Copyright©2025 之江实验室 版权所有</div>
   </el-container>
 </template>
 
@@ -332,7 +331,6 @@ export default {
 .empty-state h3 { font-size: 16px; font-weight: 500; }
 .empty-state p { font-size: 13px; line-height: 1.8; }
 .page-footer { margin-top: 24px; overflow-x: auto; text-align: center; }
-.copyright-bar { padding: 10px; color: #666; font-size: 12px; text-align: center; }
 @media (max-width: 640px) {
   .page-main { padding: 0 8px 12px; }
   .content-card { padding: 16px 12px; }

@@ -150,7 +150,6 @@
         </div>
       </div>
     </el-main>
-    <div class="copyright-bar">Copyright©2025 之江实验室 版权所有</div>
   </el-container>
 </template>
 
@@ -580,16 +579,6 @@ export default {
 }
 .pagination-sizes-select :deep(.el-input__suffix) {
   right: 5px;
-}
-.copyright-bar {
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #666666;
-  font-size: 12px;
-  background: transparent;
-  flex-shrink: 0;
 }
 :deep(.my-table .el-table__header-wrapper th.el-table__cell) {
   height: 54px;

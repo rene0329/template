@@ -92,7 +92,6 @@
         </section>
       </main>
     </div>
-    <div class="copyright-bar">Copyright©2025 之江实验室 版权所有</div>
   </div>
 </template>
 
@@ -204,7 +203,6 @@ h3 { margin: 24px 0 12px; color: #344258; font-size: 15px; }
 .flow { display: flex; align-items: center; justify-content: center; gap: 17px; margin: 22px 0; padding: 17px; border: 1px dashed #cbd8e4; border-radius: 7px; }.flow div { display: flex; align-items: center; gap: 8px; }.flow b { color: #1591a1; font: 700 12px monospace; }.flow i { color: #9aabba; }.unit-note { margin: 13px 0 0; color: #718096; font-size: 13px; }
 .table-wrap { overflow-x: auto; border: 1px solid #e2e8ef; border-radius: 6px; }table { width: 100%; border-collapse: collapse; font-size: 13px; }th { color: #64748b; font-weight: 600; background: #f6f8fa; }th, td { padding: 11px 13px; text-align: left; border-bottom: 1px solid #e8edf2; }tbody tr:last-child td { border-bottom: 0; }td code { color: #146f80; font-weight: 600; }.required-mark { color: #8290a3; }.required-mark.required { color: #c44949; }
 .examples-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }.error-row { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin-top: 18px; padding: 13px 15px; color: #66758a; border-left: 3px solid #d79b3b; background: #fff9ed; font-size: 13px; }.error-row strong { color: #8c5d16; }.error-row code { margin-right: 4px; color: #b66028; }
-.copyright-bar { padding: 18px 0; color: #9ba6b4; text-align: center; font-size: 12px; }
 ::v-deep .code-block { overflow: hidden; border-radius: 6px; background: #162337; }.code-toolbar { display: flex; justify-content: space-between; padding: 9px 13px; color: #8ea2b9; background: #1e2e44; font: 11px monospace; }.code-toolbar button { color: #c3d2e1; border: 0; background: none; cursor: pointer; }.code-toolbar button:hover { color: #61d2dc; }pre { overflow: auto; max-height: 390px; margin: 0; padding: 17px; color: #d8e4ef; font: 12px/1.65 Consolas, Monaco, monospace; white-space: pre; }
 @media (max-width: 1050px) { .examples-grid { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .external-api-page { padding: 14px 14px 0; }.hero-card { align-items: stretch; flex-direction: column; padding: 22px 20px; }.base-url { min-width: 0; }.document-layout { grid-template-columns: 1fr; }.api-nav { position: static; }.doc-section { padding: 23px 18px; }.info-grid { grid-template-columns: 1fr; }.flow { align-items: flex-start; flex-direction: column; }.flow i { transform: rotate(90deg); }.api-heading { flex-wrap: wrap; } }

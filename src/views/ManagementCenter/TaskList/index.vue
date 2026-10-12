@@ -85,7 +85,6 @@
         </div>
       </div>
     </el-main>
-    <div class="copyright-bar">Copyright©2025 之江实验室 版权所有</div>
   </el-container>
 </template>
 
@@ -392,16 +391,6 @@ export default {
 .page-footer {
   padding: 16px 0;
   box-sizing: border-box;
-}
-.copyright-bar {
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #666666;
-  font-size: 12px;
-  background: transparent;
-  flex-shrink: 0;
 }
 .pagination-container {
   display: flex;

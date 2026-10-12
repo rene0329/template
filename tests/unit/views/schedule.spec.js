@@ -33,7 +33,7 @@ const rows = [
     taskId: 5,
     taskName: '对比任务-cmp-1',
     createTime: '2026-09-24 10:00:00',
-    schedule: '分布式调度方案:\nds-a: n1 -> n1\nds-b: n2 -> n2\n中心化调度方案:\nds-a: n1 -> central\nds-b: 执行失败'
+    schedule: '分布式调度方案:\nds-a: n1 -> n1\nds-b: n2 -> n2 [IN_PLACE]（cluster-sz-1 资源不足（需要 4 CPU / 1 GiB，空闲 3.88 CPU / 7.19 GiB），改用次优计算节点）\n中心化调度方案:\nds-a: n1 -> central\nds-b: 执行失败'
   },
   { taskId: 6, taskName: '计算调度', createTime: '2026-09-24 11:00:00', schedule: '调度目标节点 node-7:\nds-c: n3 -> node-7 [复制]' },
   {
@@ -66,7 +66,9 @@ it('renders one row per task with structured schedule blocks in the schedule cel
   // Rows are sorted by task id: 5 (comparison), 6 (target node), 7 (unrecognised), 8 (legacy compute schedule).
   expect(texts(cells[0], '.schedule-title')).toEqual(['分布式调度方案', '集中式调度方案'])
   const [distributed, centralized] = cells[0].querySelectorAll('.schedule-section')
-  expect(texts(distributed, '.schedule-line')).toEqual(['ds-a: n1 -> n1', 'ds-b: n2 -> n2'])
+  expect(texts(distributed, '.schedule-line')).toEqual(['ds-a: n1 -> n1', 'ds-b: n2 -> n2 [IN_PLACE]'])
+  expect(distributed.textContent).not.toContain('资源不足')
+  expect(distributed.textContent).not.toContain('改用次优计算节点')
   expect(texts(centralized, '.schedule-line')).toEqual(['ds-a: n1 -> central', 'ds-b: 执行失败'])
   expect(texts(cells[0], '.schedule-line.is-failed')).toEqual(['ds-b: 执行失败'])
   expect(cells[0].textContent).not.toContain('中心化')

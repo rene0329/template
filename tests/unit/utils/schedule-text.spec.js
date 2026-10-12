@@ -1,4 +1,4 @@
-import { parseSchedule, scheduleLineFailed, taskDatasetNames } from '@/utils/schedule-text'
+import { parseSchedule, scheduleLineFailed, scheduleTextForDisplay, taskDatasetNames } from '@/utils/schedule-text'
 
 describe('parseSchedule', () => {
   it('splits a comparison task into distributed and centralized blocks with one line per dataset', () => {
@@ -90,6 +90,12 @@ it('detects failed dataset lines only by the failure marker at the end', () => {
   expect(scheduleLineFailed('ds-b：执行失败 ')).toBe(true)
   expect(scheduleLineFailed('ds-a: node-1 -> node-2')).toBe(false)
   expect(scheduleLineFailed(null)).toBe(false)
+})
+
+it('hides resource fallback reasons while preserving the selected schedule', () => {
+  const text = 'ds-a: node-1 -> node-2 [IN_PLACE]（cluster-sz-1 资源不足（需要 4 CPU / 1 GiB，空闲 3.88 CPU / 7.19 GiB），改用次优计算节点）'
+  expect(scheduleTextForDisplay(text)).toBe('ds-a: node-1 -> node-2 [IN_PLACE]')
+  expect(scheduleTextForDisplay('ds-a: node-1 -> node-1 [IN_PLACE]')).toBe('ds-a: node-1 -> node-1 [IN_PLACE]')
 })
 
 describe('parseSchedule for 数据集管理 compute schedules (manual)', () => {

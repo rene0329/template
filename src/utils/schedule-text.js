@@ -81,6 +81,14 @@ export function scheduleLineFailed(line) {
   return /[:：]\s*执行失败\s*$/.test(String(line || ''))
 }
 
+// 资源回退原因是调度器的运行细节，调度方案页只展示最终的源节点、目标节点和执行模式。
+// 例如：“（cluster-sz-1 资源不足（需要 ...），改用次优计算节点）”。
+const RESOURCE_FALLBACK_REASON = /（[^（）\r\n]*资源不足（[^（）\r\n]*）[^（）\r\n]*改用次优计算节点[^（）\r\n]*）\s*$/gm
+
+export function scheduleTextForDisplay(value) {
+  return String(value == null ? '' : value).replace(RESOURCE_FALLBACK_REASON, '').trim()
+}
+
 // datasetIdsJson 是 JSON 数组；selectedData 是后端 List.toString() 的结果，例如 “[iris, mnist]”。
 function listValues(value) {
   if (Array.isArray(value)) return value

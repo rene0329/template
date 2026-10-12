@@ -121,7 +121,6 @@
         <el-button @click="detailVisible = false">关闭</el-button>
       </span>
     </el-dialog>
-    <div class="copyright-bar">Copyright©2025 之江实验室 版权所有</div>
   </div>
 </template>
 
@@ -273,7 +272,6 @@ h3 { font-size: 15px; margin: 24px 0 16px; }
 .failure-reason { white-space: pre-wrap; overflow-wrap: anywhere; }
 .entity-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .entity-id { color: #909399; font-size: 12px; }
-.copyright-bar { padding: 20px 0 12px; text-align: center; color: #909399; font-size: 12px; }
 @media (max-width: 900px) {
   .scheduling-logs-page { padding: 12px; }
   .content-card { padding: 16px; }

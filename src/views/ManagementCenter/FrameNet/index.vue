@@ -178,7 +178,6 @@
         </section>
       </div>
     </el-main>
-    <div class="copyright-bar">Copyright©2025 之江实验室 版权所有</div>
   </el-container>
 </template>
 
@@ -642,17 +641,6 @@ export default {
   flex-direction: column;
   gap: 16px;
   overflow: hidden;
-  background: #f5f7fa;
-}
-.copyright-bar {
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #666666;
-  font-size: 12px;
-  background: transparent;
-  flex-shrink: 0;
   background: #f5f7fa;
 }
 .content-card {

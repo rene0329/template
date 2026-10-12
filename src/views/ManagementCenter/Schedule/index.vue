@@ -46,11 +46,11 @@
                       <template v-if="scope.row.parsedSchedule.kind !== 'raw'">
                         <div v-for="(section, index) in scope.row.parsedSchedule.sections" :key="index" class="schedule-section">
                           <div class="schedule-title">{{ section.title }}</div>
-                          <div v-for="(line, lineIndex) in section.lines" :key="lineIndex" class="schedule-line" :class="{ 'is-failed': scheduleLineFailed(line) }">{{ line }}</div>
+                          <div v-for="(line, lineIndex) in section.lines" :key="lineIndex" class="schedule-line" :class="{ 'is-failed': scheduleLineFailed(line) }">{{ scheduleTextForDisplay(line) }}</div>
                           <div v-if="!section.lines.length" class="schedule-line is-empty">暂无</div>
                         </div>
                       </template>
-                      <div v-else class="schedule-raw">{{ scope.row.parsedSchedule.text || '—' }}</div>
+                      <div v-else class="schedule-raw">{{ scheduleTextForDisplay(scope.row.parsedSchedule.text) || '—' }}</div>
                     </div>
                   </template>
                 </el-table-column>
@@ -94,14 +94,13 @@
         </div>
       </div>
     </el-main>
-    <div class="copyright-bar">Copyright©2025 之江实验室 版权所有</div>
   </el-container>
 </template>
 
 <script>
 import { fetchScheduleList } from '@/api/managementCenterApi'
 import { clampPage, fetchAllPages, paginateRows, sortRows } from '@/utils/dataset-catalog'
-import { parseSchedule, scheduleLineFailed } from '@/utils/schedule-text'
+import { parseSchedule, scheduleLineFailed, scheduleTextForDisplay } from '@/utils/schedule-text'
 
 export default {
   name: 'NodeList',
@@ -136,6 +135,7 @@ export default {
 
   methods: {
     scheduleLineFailed,
+    scheduleTextForDisplay,
     async fetchData() {
       this.loading = true
       try {
@@ -294,17 +294,6 @@ export default {
   padding: 16px 0;
   box-sizing: border-box;
 }
-.copyright-bar {
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #666666;
-  font-size: 12px;
-  background: transparent;
-  flex-shrink: 0;
-}
-
 :deep(.my-table .el-table__header-wrapper th.el-table__cell) {
   height: 54px;
   padding: 0 !important;      /* 关键：干掉默认 padding 才能保证总高=54 */
