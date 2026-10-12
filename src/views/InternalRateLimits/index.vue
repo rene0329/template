@@ -30,13 +30,17 @@
           <el-switch v-model="form.adaptiveEnabled" />
           <div class="help">启用后，新任务按近期实测带宽、目标加速比和安全系数动态计算；无需重新部署。</div>
         </el-form-item>
+        <el-form-item label="定时带宽测量">
+          <el-switch v-model="form.bandwidthProbeEnabled" />
+          <div class="help">默认关闭。开启后每 5 分钟尝试一次主动测量；检测到对应链路正在传输业务数据时，本轮直接跳过。</div>
+        </el-form-item>
         <el-form-item label="目标加速比">
           <div class="target-range">
             <el-input-number v-model="form.targetMin" :min="0.001" :max="100" :precision="3" :step="0.01" />
             <span>至</span>
             <el-input-number v-model="form.targetMax" :min="0.001" :max="100" :precision="3" :step="0.01" />
           </div>
-          <div class="help">自适应模式使用区间中值计算集中式与分布式速率；实际结果允许在该区间内波动。</div>
+          <div class="help">自适应模式在区间上部选择工作点，为任务固定开销留出余量；实际结果允许在该区间内波动。</div>
         </el-form-item>
         <el-form-item v-if="form.adaptiveEnabled" label="中心节点">
           <el-input v-model.trim="form.adaptiveCentralNode" class="rate-input" placeholder="例如 master-40" />
@@ -103,6 +107,7 @@
         <el-table-column prop="version" label="版本" width="90" />
         <el-table-column label="状态" width="90"><template slot-scope="s"><el-tag size="mini" :type="s.row.enabled ? 'success' : 'info'">{{ s.row.enabled ? '启用' : '禁用' }}</el-tag></template></el-table-column>
         <el-table-column label="模式" width="100"><template slot-scope="s">{{ s.row.adaptiveEnabled ? '自适应' : '人工' }}</template></el-table-column>
+        <el-table-column label="定时测量" width="100"><template slot-scope="s">{{ s.row.bandwidthProbeEnabled ? '开启' : '关闭' }}</template></el-table-column>
         <el-table-column label="目标区间" width="130"><template slot-scope="s">{{ s.row.targetMin }}–{{ s.row.targetMax }}</template></el-table-column>
         <el-table-column prop="pathRules" label="路径规则" min-width="300" show-overflow-tooltip />
         <el-table-column prop="updatedBy" label="操作人" width="130" />
@@ -137,7 +142,7 @@ export default {
       previewTarget: 'master-40',
       previewResult: null,
       history: [],
-      form: { version: null, enabled: true, adaptiveEnabled: true, defaultRate: '', targetMin: 1.4, targetMax: 1.5, adaptiveSafetyFactor: 0.8, measurementMaxAgeSeconds: 900, adaptiveCentralNode: 'master-40', rules: [], updatedBy: '', updatedAt: null }
+      form: { version: null, enabled: true, adaptiveEnabled: true, bandwidthProbeEnabled: false, defaultRate: '', targetMin: 1.4, targetMax: 1.5, adaptiveSafetyFactor: 0.8, measurementMaxAgeSeconds: 900, adaptiveCentralNode: 'master-40', rules: [], updatedBy: '', updatedAt: null }
     }
   },
   computed: {
@@ -150,6 +155,7 @@ export default {
         version: value.version,
         enabled: value.enabled !== false,
         adaptiveEnabled: value.adaptiveEnabled === true,
+        bandwidthProbeEnabled: value.bandwidthProbeEnabled === true,
         defaultRate: value.defaultRate || '',
         targetMin: Number(value.targetMin),
         targetMax: Number(value.targetMax),
@@ -193,7 +199,7 @@ export default {
       if (error) { this.$message.error(error); return }
       this.saving = true
       try {
-        const updated = await updateRateLimitConfiguration({ version: this.form.version, enabled: this.form.enabled, adaptiveEnabled: this.form.adaptiveEnabled, defaultRate: this.form.defaultRate, pathRules: serializeRules(this.form.rules), targetMin: this.form.targetMin, targetMax: this.form.targetMax, adaptiveSafetyFactor: this.form.adaptiveSafetyFactor, measurementMaxAgeSeconds: this.form.measurementMaxAgeSeconds, adaptiveCentralNode: this.form.adaptiveCentralNode })
+        const updated = await updateRateLimitConfiguration({ version: this.form.version, enabled: this.form.enabled, adaptiveEnabled: this.form.adaptiveEnabled, bandwidthProbeEnabled: this.form.bandwidthProbeEnabled, defaultRate: this.form.defaultRate, pathRules: serializeRules(this.form.rules), targetMin: this.form.targetMin, targetMax: this.form.targetMax, adaptiveSafetyFactor: this.form.adaptiveSafetyFactor, measurementMaxAgeSeconds: this.form.measurementMaxAgeSeconds, adaptiveCentralNode: this.form.adaptiveCentralNode })
         this.applyConfiguration(updated)
         this.history = await fetchRateLimitHistory(20)
         this.$message.success('限速配置已保存，将用于后续创建的任务')
