@@ -5,6 +5,7 @@ import nprogress from 'nprogress'
 // 引入 进度条样式
 import 'nprogress/nprogress.css'
 import { getToken, removeToken } from '@/utils/auth'
+import { resolveDefaultBackendUrl } from '@/utils/backend-url'
 
 // 1. 利用axios对象的方法create方法去创建一个axios实例
 // request就是axios,只不过稍微配置一下
@@ -12,10 +13,10 @@ const isDemoMode = process.env.VUE_APP_DEMO_MODE === 'true'
 
 const request = axios.create({
   // 基础路径：发请求的时候，路径中会带有api 这里改成我们的地址
-  // Vue 在 Docker 构建阶段注入；未设置时使用新集群的后端 NodePort。
+  // 可在 Docker 构建阶段注入固定地址；未设置时根据当前页面主机名使用后端 NodePort。
   baseURL: isDemoMode
     ? process.env.VUE_APP_BASE_API
-    : (process.env.VUE_APP_PRACTICE_API || 'http://10.212.14.88:31081'),
+    : resolveDefaultBackendUrl(),
   // 代表请求超时的时间为50s --20230803修改-何诗锟--很重要
   // 延长了请求超时的时间，因为工作流创建比较缓慢 --20230815修改-康力
   timeout: 120000

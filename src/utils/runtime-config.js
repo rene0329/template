@@ -1,8 +1,9 @@
 import axios from 'axios'
+import { resolveDefaultBackendUrl } from '@/utils/backend-url'
 
 const STORAGE_KEY = 'vdcs_runtime_config'
 const DEFAULT_CONFIG = {
-  backendUrl: process.env.VUE_APP_PRACTICE_API || 'http://10.15.16.40:30482',
+  backendUrl: resolveDefaultBackendUrl(),
   healthPath: '/actuator/health',
   timeout: 120000
 }

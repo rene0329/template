@@ -6,8 +6,8 @@ WORKDIR /app
 # 解决 Node 22 + 旧版 Vue/Webpack 的 OpenSSL 兼容性问题。
 ENV NODE_OPTIONS=--openssl-legacy-provider
 
-# 前端地址会编译进静态资源；可在 docker build 时通过 --build-arg 覆盖。
-ARG VUE_APP_PRACTICE_API=http://10.15.16.40:30482
+# 默认根据浏览器当前主机名连接 30482 端口；仍可在构建时显式固定地址。
+ARG VUE_APP_PRACTICE_API=
 ENV VUE_APP_PRACTICE_API=${VUE_APP_PRACTICE_API}
 ENV VUE_APP_DEMO_MODE=false
 
