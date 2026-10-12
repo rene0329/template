@@ -60,6 +60,18 @@ describe('business navigation', () => {
     ])
   })
 
+  it('keeps transfer rate-limit management URI-only and administrator-only', () => {
+    const internal = constantRoutes.find(route => route.path === '/internal')
+    expect(internal.hidden).toBe(true)
+    expect(internal.children).toHaveLength(1)
+    expect(internal.children[0]).toMatchObject({ path: 'rate-limits', name: 'InternalRateLimits', hidden: true })
+    expect(internal.children[0].meta.roles).toEqual(['ADMIN'])
+    expect(groups).not.toContain(internal)
+    const route = router.match('/internal/rate-limits')
+    expect(route.name).toBe('InternalRateLimits')
+    expect(route.matched.reduce((roles, record) => roles.concat(record.meta.roles || []), [])).toEqual(['ADMIN'])
+  })
+
   it('shows the security center and access control to every logged-in user', () => {
     const security = groups.find(route => route.name === 'SecurityCenter')
     expect(security.hidden).toBeFalsy()

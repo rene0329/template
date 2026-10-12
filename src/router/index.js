@@ -588,6 +588,16 @@ export const constantRoutes = [
     ]
   },
 
+  // 内部管理工具：保留可直接访问的路由，但不出现在主页、侧栏或任何导航入口中。
+  {
+    path: '/internal',
+    component: Layout,
+    hidden: true,
+    children: [
+      { path: 'rate-limits', name: 'InternalRateLimits', hidden: true, component: () => import('@/views/InternalRateLimits/index'), meta: { title: '传输限速配置', roles: ['ADMIN'], breadcrumb: false }}
+    ]
+  },
+
   // 兼容已有书签和外部链接；规范页面只使用上面的业务路由。
   { path: '/RegistrationCenter', redirect: '/resources/nodes', hidden: true },
   { path: '/RegistrationCenter/NodeRegistry', redirect: to => ({ path: '/resources/nodes', query: to.query, hash: to.hash }), hidden: true },
