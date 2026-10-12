@@ -9,7 +9,7 @@
     </section>
 
     <el-alert
-      title="这是内部管理页面，不会出现在主页或导航菜单中。禁用配置会使新任务不再限速。"
+      title="这是内部管理页面，不会出现在主页或导航菜单中。自适应模式根据最近的网络测量结果为每个新任务计算限速；测量不可用时使用人工回退规则。"
       type="warning"
       :closable="false"
       show-icon
@@ -26,13 +26,29 @@
         <el-form-item label="启用限速">
           <el-switch v-model="form.enabled" />
         </el-form-item>
+        <el-form-item label="自适应限速">
+          <el-switch v-model="form.adaptiveEnabled" />
+          <div class="help">启用后，新任务按近期实测带宽、目标加速比和安全系数动态计算；无需重新部署。</div>
+        </el-form-item>
         <el-form-item label="目标加速比">
           <div class="target-range">
             <el-input-number v-model="form.targetMin" :min="0.001" :max="100" :precision="3" :step="0.01" />
             <span>至</span>
             <el-input-number v-model="form.targetMax" :min="0.001" :max="100" :precision="3" :step="0.01" />
           </div>
-          <div class="help">该区间用于记录测试目标；实际限速由下面的路径规则决定。</div>
+          <div class="help">自适应模式使用区间中值计算集中式与分布式速率；实际结果允许在该区间内波动。</div>
+        </el-form-item>
+        <el-form-item v-if="form.adaptiveEnabled" label="中心节点">
+          <el-input v-model.trim="form.adaptiveCentralNode" class="rate-input" placeholder="例如 master-40" />
+        </el-form-item>
+        <el-form-item v-if="form.adaptiveEnabled" label="带宽安全系数">
+          <el-input-number v-model="form.adaptiveSafetyFactor" :min="0.1" :max="0.99" :precision="3" :step="0.05" />
+          <div class="help">建议 0.8。只使用实测可用带宽的一部分，给实时波动和其他流量留出余量。</div>
+        </el-form-item>
+        <el-form-item v-if="form.adaptiveEnabled" label="测量有效期">
+          <el-input-number v-model="form.measurementMaxAgeSeconds" :min="60" :max="86400" :step="60" />
+          <span class="unit">秒</span>
+          <div class="help">超过有效期的测量不会参与计算，系统会改用下面的人工回退规则。</div>
         </el-form-item>
         <el-form-item label="默认限速">
           <el-input v-model.trim="form.defaultRate" clearable placeholder="可留空，例如 960k" class="rate-input" />
@@ -41,7 +57,7 @@
       </el-form>
 
       <div class="table-heading">
-        <div><strong>路径规则</strong><span class="help inline">按顺序匹配，第一条匹配规则生效；* 表示任意节点。</span></div>
+        <div><strong>人工回退规则</strong><span class="help inline">自适应测量不可用时按顺序匹配；* 表示任意节点。</span></div>
         <el-button type="primary" plain icon="el-icon-plus" @click="addRule">新增规则</el-button>
       </div>
       <el-table :data="form.rules" border row-key="key">
@@ -64,11 +80,29 @@
       </div>
     </el-card>
 
+    <el-card shadow="never" class="preview-card">
+      <div slot="header"><strong>新任务限速预览</strong></div>
+      <div class="preview-row">
+        <el-input v-model.trim="previewSource" placeholder="源节点，例如 cluster-sz-3" />
+        <span>→</span>
+        <el-input v-model.trim="previewTarget" placeholder="目标节点，例如 master-40" />
+        <el-button type="primary" plain :loading="previewing" @click="preview">按当前网络计算</el-button>
+      </div>
+      <el-alert v-if="previewResult" :closable="false" type="info" show-icon class="preview-result">
+        <template slot="title">
+          本次限速 {{ previewResult.rate || '不限速' }}；来源 {{ sourceLabel(previewResult.source) }}；
+          带宽基准 {{ previewResult.basisBandwidthMbps == null ? '不可用' : `${previewResult.basisBandwidthMbps} Mbps` }}；
+          计算目标 {{ previewResult.targetRatio == null ? '—' : previewResult.targetRatio }}
+        </template>
+      </el-alert>
+    </el-card>
+
     <el-card shadow="never" class="history-card">
       <div slot="header"><strong>版本历史</strong></div>
       <el-table :data="history" border>
         <el-table-column prop="version" label="版本" width="90" />
         <el-table-column label="状态" width="90"><template slot-scope="s"><el-tag size="mini" :type="s.row.enabled ? 'success' : 'info'">{{ s.row.enabled ? '启用' : '禁用' }}</el-tag></template></el-table-column>
+        <el-table-column label="模式" width="100"><template slot-scope="s">{{ s.row.adaptiveEnabled ? '自适应' : '人工' }}</template></el-table-column>
         <el-table-column label="目标区间" width="130"><template slot-scope="s">{{ s.row.targetMin }}–{{ s.row.targetMax }}</template></el-table-column>
         <el-table-column prop="pathRules" label="路径规则" min-width="300" show-overflow-tooltip />
         <el-table-column prop="updatedBy" label="操作人" width="130" />
@@ -80,7 +114,7 @@
 </template>
 
 <script>
-import { fetchRateLimitConfiguration, fetchRateLimitHistory, rollbackRateLimitConfiguration, updateRateLimitConfiguration } from '@/api/adminApi'
+import { fetchRateLimitConfiguration, fetchRateLimitHistory, previewRateLimit, rollbackRateLimitConfiguration, updateRateLimitConfiguration } from '@/api/adminApi'
 
 const RATE = /^\d+(?:\.\d+)?[kKmMgG]?$/
 let nextKey = 1
@@ -98,8 +132,12 @@ export default {
     return {
       loading: false,
       saving: false,
+      previewing: false,
+      previewSource: 'cluster-sz-3',
+      previewTarget: 'master-40',
+      previewResult: null,
       history: [],
-      form: { version: null, enabled: true, defaultRate: '', targetMin: 1.4, targetMax: 1.5, rules: [], updatedBy: '', updatedAt: null }
+      form: { version: null, enabled: true, adaptiveEnabled: true, defaultRate: '', targetMin: 1.4, targetMax: 1.5, adaptiveSafetyFactor: 0.8, measurementMaxAgeSeconds: 900, adaptiveCentralNode: 'master-40', rules: [], updatedBy: '', updatedAt: null }
     }
   },
   computed: {
@@ -111,9 +149,13 @@ export default {
       this.form = {
         version: value.version,
         enabled: value.enabled !== false,
+        adaptiveEnabled: value.adaptiveEnabled === true,
         defaultRate: value.defaultRate || '',
         targetMin: Number(value.targetMin),
         targetMax: Number(value.targetMax),
+        adaptiveSafetyFactor: Number(value.adaptiveSafetyFactor == null ? 0.8 : value.adaptiveSafetyFactor),
+        measurementMaxAgeSeconds: Number(value.measurementMaxAgeSeconds || 900),
+        adaptiveCentralNode: value.adaptiveCentralNode || 'master-40',
         rules: parseRules(value.pathRules),
         updatedBy: value.updatedBy || '',
         updatedAt: value.updatedAt || null
@@ -134,13 +176,16 @@ export default {
     moveRule(index, offset) { const target = index + offset; if (target < 0 || target >= this.form.rules.length) return; const item = this.form.rules.splice(index, 1)[0]; this.form.rules.splice(target, 0, item) },
     validate() {
       if (!(this.form.targetMin > 0) || this.form.targetMax < this.form.targetMin) return '目标加速比区间无效'
+      if (!(this.form.adaptiveSafetyFactor >= 0.1 && this.form.adaptiveSafetyFactor <= 0.99)) return '带宽安全系数必须在 0.1 到 0.99 之间'
+      if (!(this.form.measurementMaxAgeSeconds >= 60 && this.form.measurementMaxAgeSeconds <= 86400)) return '测量有效期必须在 60 到 86400 秒之间'
+      if (!this.form.adaptiveCentralNode) return '中心节点不能为空'
       if (this.form.defaultRate && !RATE.test(this.form.defaultRate)) return '默认限速格式无效'
       for (let i = 0; i < this.form.rules.length; i++) {
         const rule = this.form.rules[i]
         if (!rule.source || !rule.target || !RATE.test(rule.rate)) return `第 ${i + 1} 条路径规则不完整或限速格式无效`
         if (rule.source.includes(',') || rule.source.includes('->') || rule.source.includes('=') || rule.target.includes(',') || rule.target.includes('->') || rule.target.includes('=')) return `第 ${i + 1} 条路径规则包含保留字符`
       }
-      if (this.form.enabled && !this.form.defaultRate && !this.form.rules.length) return '启用限速时至少需要一条路径规则或默认限速'
+      if (this.form.enabled && !this.form.adaptiveEnabled && !this.form.defaultRate && !this.form.rules.length) return '人工模式至少需要一条路径规则或默认限速'
       return null
     },
     async save() {
@@ -148,13 +193,25 @@ export default {
       if (error) { this.$message.error(error); return }
       this.saving = true
       try {
-        const updated = await updateRateLimitConfiguration({ version: this.form.version, enabled: this.form.enabled, defaultRate: this.form.defaultRate, pathRules: serializeRules(this.form.rules), targetMin: this.form.targetMin, targetMax: this.form.targetMax })
+        const updated = await updateRateLimitConfiguration({ version: this.form.version, enabled: this.form.enabled, adaptiveEnabled: this.form.adaptiveEnabled, defaultRate: this.form.defaultRate, pathRules: serializeRules(this.form.rules), targetMin: this.form.targetMin, targetMax: this.form.targetMax, adaptiveSafetyFactor: this.form.adaptiveSafetyFactor, measurementMaxAgeSeconds: this.form.measurementMaxAgeSeconds, adaptiveCentralNode: this.form.adaptiveCentralNode })
         this.applyConfiguration(updated)
         this.history = await fetchRateLimitHistory(20)
         this.$message.success('限速配置已保存，将用于后续创建的任务')
       } catch (saveError) {
         this.$message.error(`保存失败：${saveError.message}`)
       } finally { this.saving = false }
+    },
+    async preview() {
+      if (!this.previewSource || !this.previewTarget) { this.$message.error('请输入源节点和目标节点'); return }
+      this.previewing = true
+      try { this.previewResult = await previewRateLimit(this.previewSource, this.previewTarget) } catch (error) {
+        this.$message.error(`预览失败：${error.message}`)
+      } finally { this.previewing = false }
+    },
+    sourceLabel(value) {
+      if (value === 'database-adaptive') return '近期网络测量'
+      if (value && value.includes('static-fallback')) return '人工回退规则'
+      return value || '未知'
     },
     async rollback(item) {
       try {
@@ -176,8 +233,8 @@ export default {
 .rate-limit-page { min-height: calc(100vh - 90px); padding: 22px; background: #f4f7fa; }
 .page-heading, .card-header, .table-heading, .save-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .page-heading { margin-bottom: 16px; }.page-heading h2 { margin: 0 0 7px; color: #1f3447; }.page-heading p { margin: 0; color: #7b8995; font-size: 13px; }
-.notice { margin-bottom: 16px; }.target-range { display: flex; align-items: center; gap: 10px; }.rate-input { width: 280px; }
+.notice { margin-bottom: 16px; }.target-range { display: flex; align-items: center; gap: 10px; }.rate-input { width: 280px; }.unit { margin-left: 8px; color: #667785; }
 .help { color: #7b8995; font-size: 12px; line-height: 20px; }.help.inline { margin-left: 12px; }.table-heading { margin: 10px 0 12px; }
-.save-row { margin-top: 18px; }.history-card { margin-top: 18px; }.danger { color: #f56c6c; }
+.save-row { margin-top: 18px; }.preview-card,.history-card { margin-top: 18px; }.preview-row { display: flex; align-items: center; gap: 12px; }.preview-row .el-input { max-width: 300px; }.preview-result { margin-top: 14px; }.danger { color: #f56c6c; }
 @media(max-width:768px){.page-heading,.table-heading,.save-row{align-items:stretch;flex-direction:column}.target-range{align-items:flex-start;flex-direction:column}.rate-input{width:100%}}
 </style>

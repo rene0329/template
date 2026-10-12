@@ -14,6 +14,9 @@ export const resetUserPassword = (id, password) => request({
 })
 
 export const fetchRateLimitConfiguration = () => request({ url: `${ROOT}/rate-limits`, method: 'get' })
+export const previewRateLimit = (sourceNode, targetNode) => request({
+  url: `${ROOT}/rate-limits/preview`, method: 'get', params: { sourceNode, targetNode }
+})
 export const updateRateLimitConfiguration = data => request({ url: `${ROOT}/rate-limits`, method: 'put', data })
 export const fetchRateLimitHistory = (limit = 20) => request({ url: `${ROOT}/rate-limits/history`, method: 'get', params: { limit }})
 export const rollbackRateLimitConfiguration = data => request({ url: `${ROOT}/rate-limits/rollback`, method: 'post', data })
