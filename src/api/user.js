@@ -9,6 +9,15 @@ export function login(data) {
   })
 }
 
+export function directLogin() {
+  return request({
+    url: '/api/v1/auth/direct-login',
+    method: 'post',
+    skipAuth: true,
+    silent: true
+  })
+}
+
 export function getInfo() {
   return request({ url: '/api/v1/auth/me', method: 'get' })
 }

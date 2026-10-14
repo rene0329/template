@@ -91,7 +91,8 @@ export default {
       },
       loading: false,
       passwordType: 'password',
-      redirect: undefined
+      redirect: undefined,
+      directLoginAttempted: false
     }
   },
   watch: {
@@ -101,6 +102,9 @@ export default {
       },
       immediate: true
     }
+  },
+  mounted() {
+    this.handleDirectLogin()
   },
   methods: {
     openBackendSettings() {
@@ -114,6 +118,18 @@ export default {
       }
       this.$nextTick(() => {
         this.$refs.password.focus()
+      })
+    },
+    handleDirectLogin() {
+      if (this.directLoginAttempted) return
+      this.directLoginAttempted = true
+      this.loading = true
+      this.$store.dispatch('user/directLogin').then(() => {
+        this.$router.replace({ path: this.redirect || '/' })
+      }).catch(() => {
+        // The backend keeps direct login disabled by default. In that case, or
+        // if it is temporarily unavailable, retain the existing password form.
+        this.loading = false
       })
     },
     handleLogin() {

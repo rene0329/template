@@ -1,4 +1,4 @@
-import { login, getInfo, impersonateUser, exitImpersonation } from '@/api/user'
+import { login, directLogin, getInfo, impersonateUser, exitImpersonation } from '@/api/user'
 import { getToken, setToken, removeToken } from '@/utils/auth'
 import { resetRouter } from '@/router'
 
@@ -59,6 +59,18 @@ const actions = {
       }).catch(error => {
         reject(error)
       })
+    })
+  },
+
+  // Enter with the deployment-configured administrator. The backend remains
+  // responsible for deciding whether this feature is enabled and issuing a token.
+  directLogin({ commit }) {
+    return directLogin().then(response => {
+      const token = response && (response.token || response.accessToken)
+      if (!token) throw new Error('免登录响应中缺少访问令牌')
+      commit('SET_TOKEN', token)
+      setToken(token)
+      return response
     })
   },
 
