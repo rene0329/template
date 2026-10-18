@@ -1,7 +1,7 @@
 <template>
   <el-dialog title="热敏存储 · 分配预览" :visible.sync="visible" width="820px" :close-on-click-modal="false" :show-close="!submitting" :close-on-press-escape="!submitting">
     <div v-loading="loading">
-      <el-alert title="热度达到阈值的数据集，沿网络路径迁到离其就近计算节点最近的存储节点；不迁到计算存储节点，已足够近的数据保持不动。" type="info" :closable="false" show-icon />
+      <el-alert title="温度达到阈值的数据集，沿网络路径迁到离其就近计算节点最近的存储节点；不迁到计算存储节点，已足够近的数据保持不动。" type="info" :closable="false" show-icon />
       <p>迁移只移动数据、不增加副本：目标文件通过 SHA-256 校验后才删除源文件。请核对操作清单。</p>
       <p>只处理数据，不启动计算任务。有任务正在使用的数据集会等其结束后再迁移。</p>
       <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
@@ -9,7 +9,7 @@
         <p>检查 {{ preview.datasetCount }} 个数据集，计划执行 {{ preview.assignments.length }} 项操作。</p>
         <el-table :data="preview.placements" max-height="320">
           <el-table-column prop="datasetName" label="数据集" min-width="180" show-overflow-tooltip />
-          <el-table-column label="热度" width="90"><template slot-scope="scope">{{ formatHeat(scope.row.dataHeat) }}</template></el-table-column>
+          <el-table-column label="温度" width="90"><template slot-scope="scope">{{ formatHeat(scope.row.dataHeat) }}</template></el-table-column>
           <el-table-column prop="sourceNode" label="源节点" />
           <el-table-column prop="targetNode" label="目标节点" />
           <el-table-column label="操作" width="100"><template slot-scope="scope">{{ actionLabel(scope.row.action) }}</template></el-table-column>

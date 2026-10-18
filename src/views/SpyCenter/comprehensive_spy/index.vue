@@ -87,7 +87,7 @@
       <el-col span="8">
         <div class="content"> 
         <div class="rank">
-          <h2>工作流调用热度排名</h2>
+          <h2>工作流调用温度排名</h2>
           <ul>
             <li>
               <span class="rank-icon">1</span>

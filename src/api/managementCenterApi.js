@@ -16,7 +16,7 @@ export const fetchDataManagementList = (page, pageSize, query = '', options = {}
 }
 
 /**
- * 更新单个数据热度
+ * 更新单个数据温度
  */
 export const updateDataHeatSingle = (dataName) => {
   return request({
@@ -27,7 +27,7 @@ export const updateDataHeatSingle = (dataName) => {
 }
 
 /**
- * 热度全部更新
+ * 温度全部更新
  */
 export const updateDataHeatAll = () => {
   return request({

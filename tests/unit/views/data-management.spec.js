@@ -56,7 +56,7 @@ it('updates logical heat rather than only refreshing the legacy list', async() =
   refreshDatasetHeat.mockResolvedValue({ updatedCount: 8 })
   await vm.onUpdateHeatAll()
   expect(refreshDatasetHeat).toHaveBeenCalledTimes(1)
-  expect(vm.$message.success).toHaveBeenCalledWith('已更新 8 个数据集的热度')
+  expect(vm.$message.success).toHaveBeenCalledWith('已更新 8 个数据集的温度')
   expect(vm.fetchData).toHaveBeenCalled()
   expect(vm.heatLoading).toBe(false)
 })

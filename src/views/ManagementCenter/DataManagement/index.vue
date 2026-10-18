@@ -12,7 +12,7 @@
             <el-button @click="onCancel">重置</el-button>
           </el-form>
           <div class="action-buttons">
-            <el-button type="primary" :loading="heatLoading" @click="onUpdateHeatAll">热度全部更新</el-button>
+            <el-button type="primary" :loading="heatLoading" @click="onUpdateHeatAll">温度全部更新</el-button>
             <el-tooltip :disabled="!!storagePolicy.heatEnabled" :content="storagePolicy.heatReason || policyError || '正在加载存储策略'" placement="top">
               <span><el-button type="primary" :disabled="heatLoading || !storagePolicy.heatEnabled" @click="openStoragePlan()">热敏存储</el-button></span>
             </el-tooltip>
@@ -31,7 +31,7 @@
               <el-table v-loading="loading" class="my-table" :data="currentPageData" row-key="datasetId" style="width: 100%;" @sort-change="handleSortChange">
                 <el-table-column prop="datasetId" label="ID" width="70" align="center" />
                 <el-table-column prop="name" label="数据名称" min-width="160" show-overflow-tooltip />
-                <el-table-column prop="dataHeat" label="热度" width="100" align="center" sortable="custom">
+                <el-table-column prop="dataHeat" label="温度" width="100" align="center" sortable="custom">
                   <template slot-scope="scope">{{ formatHeat(scope.row.dataHeat) }}</template>
                 </el-table-column>
                 <el-table-column prop="datasetCode" label="编码" min-width="160" show-overflow-tooltip />
@@ -67,8 +67,8 @@
             <el-form-item label="数据名称">{{ selectedTask.name }}</el-form-item>
             <el-form-item label="描述">{{ selectedTask.description || '暂无描述' }}</el-form-item>
             <el-form-item label="大小">{{ formatBytes(selectedTask.dataSize) }}</el-form-item>
-            <el-form-item label="热度">{{ formatHeat(selectedTask.dataHeat) }}</el-form-item>
-            <el-form-item label="热度更新时间">{{ selectedTask.heatUpdatedAt ? new Date(selectedTask.heatUpdatedAt).toLocaleString('zh-CN', { hour12: false }) : '暂无数据' }}</el-form-item>
+            <el-form-item label="温度">{{ formatHeat(selectedTask.dataHeat) }}</el-form-item>
+            <el-form-item label="温度更新时间">{{ selectedTask.heatUpdatedAt ? new Date(selectedTask.heatUpdatedAt).toLocaleString('zh-CN', { hour12: false }) : '暂无数据' }}</el-form-item>
             <el-form-item label="注册状态">{{ selectedTask.status }}</el-form-item>
           </el-form>
           <el-alert v-if="nodeNameError" :title="nodeNameError" type="warning" :closable="false" show-icon />
@@ -226,10 +226,10 @@ export default {
       this.heatLoading = true
       try {
         const result = await refreshDatasetHeat()
-        this.$message.success(`已更新 ${result.updatedCount} 个数据集的热度`)
+        this.$message.success(`已更新 ${result.updatedCount} 个数据集的温度`)
         await this.fetchData()
       } catch (error) {
-        this.$message.error(`热度更新失败：${error.message}`)
+        this.$message.error(`温度更新失败：${error.message}`)
       } finally {
         this.heatLoading = false
       }
