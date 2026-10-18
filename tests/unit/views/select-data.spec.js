@@ -40,7 +40,7 @@ it('creates one COMPARISON task for all selected datasets with a single prefligh
   expect(body.taskName).toBe(`对比任务-${body.acceptanceRunId}`)
   expect(preflightRegisteredTask.mock.calls[0][0]).toEqual(body)
   expect(key).toBe('stable-request-key')
-  expect(vm.submitResult).toEqual({ taskId: 77, datasetCount: 2 })
+  expect(vm.submitResult).toEqual({ taskId: 77, datasetCount: 2, executionMode: 'COMPARISON' })
   expect(vm.$message.success).toHaveBeenCalledWith('已创建任务 #77：2 个数据集，按分布式与集中式两种模式调度')
   expect(vm.submitSummary(vm.submitResult)).toBe('已创建任务 #77：2 个数据集，按分布式与集中式两种模式调度')
   expect(vm.$refs.datasetTable.clearSelection).toHaveBeenCalled()
@@ -151,7 +151,7 @@ it('retries a failed create with the same request body and idempotency key witho
   expect(preflightRegisteredTask).toHaveBeenCalledTimes(1)
   expect(createRegisteredTask).toHaveBeenCalledTimes(2)
   expect(createRegisteredTask.mock.calls[1]).toEqual(createRegisteredTask.mock.calls[0])
-  expect(vm.submitResult).toEqual({ taskId: 78, datasetCount: 2 })
+  expect(vm.submitResult).toEqual({ taskId: 78, datasetCount: 2, executionMode: 'COMPARISON' })
 })
 
 it('asks for a runtime image before submitting', async() => {
@@ -160,4 +160,27 @@ it('asks for a runtime image before submitting', async() => {
   await vm.handleSubmit()
   expect(vm.$message.warning).toHaveBeenCalledWith('请先选择运行镜像。')
   expect(preflightRegisteredTask).not.toHaveBeenCalled()
+})
+
+it.each(['IN_PLACE', 'CENTRALIZED'])('creates an independent %s task and links only to schedules', async mode => {
+  const vm = context()
+  preflightRegisteredTask.mockResolvedValue({ valid: true, checks: [] })
+  createRegisteredTask.mockResolvedValue({ taskId: 79 })
+  await vm.handleSubmit(mode)
+  expect(createRegisteredTask.mock.calls[0][0].executionMode).toBe(mode)
+  expect(preflightRegisteredTask.mock.calls[0][0].executionMode).toBe(mode)
+  vm.goToAnalysis()
+  expect(vm.$router.push).not.toHaveBeenCalled()
+  vm.goToSchedule()
+  expect(vm.$router.push).toHaveBeenCalledWith({ path: '/operations/schedules', query: { taskId: '79' }})
+})
+
+it('does not reuse a failed comparison request when switching mode', async() => {
+  const vm = context()
+  preflightRegisteredTask.mockResolvedValue({ valid: true, checks: [] })
+  createRegisteredTask.mockRejectedValueOnce(new Error('timeout')).mockResolvedValueOnce({ taskId: 80 })
+  await vm.handleSubmit()
+  await vm.handleSubmit('IN_PLACE')
+  expect(preflightRegisteredTask).toHaveBeenCalledTimes(2)
+  expect(createRegisteredTask.mock.calls[1][0].executionMode).toBe('IN_PLACE')
 })

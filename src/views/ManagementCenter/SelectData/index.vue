@@ -24,11 +24,20 @@
             </el-select>
             <el-button
               type="primary"
-              :loading="submitting"
+              :loading="submitting && submittingMode === 'COMPARISON'"
               :disabled="selectedRows.length === 0 || submitting || !selectedImageId"
               :title="selectedImageId ? '一个任务 ID 内，每个所选数据集都按分布式与集中式两种模式各调度一次' : '没有可用的已激活运行镜像'"
-              @click="handleSubmit"
+              @click="handleSubmit('COMPARISON')"
             >创建任务（分布式 + 集中式）</el-button>
+            <el-button
+              v-for="mode in ['IN_PLACE', 'CENTRALIZED']"
+              :key="mode"
+              type="primary"
+              :loading="submitting && submittingMode === mode"
+              :disabled="selectedRows.length === 0 || submitting || !selectedImageId"
+              title="仅执行所选模式，结果在调度方案中展示，不纳入性能分析"
+              @click="handleSubmit(mode)"
+            >{{ mode === 'IN_PLACE' ? '创建分布式任务' : '创建集中式任务' }}</el-button>
           </div>
           <live-refresh-status class="live-refresh-anchor" :updated-at="lastUpdatedAt" />
         </div>
@@ -37,7 +46,8 @@
             <el-alert v-if="loadError" :title="loadError" type="warning" :closable="false" />
             <el-alert v-if="!runtimeImages.length" title="没有已激活的运行镜像，请先在“资源与数据 - 运行镜像”页注册并激活至少一个镜像。若只想对比数据搬运耗时，推荐注册一个只计算哈希的轻量镜像（如 busybox + sha256sum），避免真实训练/推理耗时掩盖数据移动耗时。" type="warning" :closable="false" />
             <el-alert v-if="submitResult" :title="submitSummary(submitResult)" type="success" :closable="false" />
-            <el-button v-if="submitResult" type="text" @click="goToAnalysis">查看性能分析</el-button>
+            <el-button v-if="submitResult && submitResult.executionMode === 'COMPARISON'" type="text" @click="goToAnalysis">查看性能分析</el-button>
+            <el-button v-if="submitResult" type="text" @click="goToSchedule">查看调度方案</el-button>
             <div class="table-wrapper">
               <el-table
                 ref="datasetTable"
@@ -194,9 +204,10 @@ export default {
       refreshing: false,
       requestVersion: 0,
       submitting: false,
+      submittingMode: null,
       runtimeImages: [],
       selectedImageId: null,
-      // 最近一次创建成功的任务：{ taskId, datasetCount }
+      // 最近一次创建成功的任务：{ taskId, datasetCount, executionMode }
       submitResult: null,
       // 创建请求超时/失败后重试时复用同一个幂等键和请求体，避免重复建任务。
       pendingSubmission: null,
@@ -335,11 +346,16 @@ export default {
         this.selectedImageId = null
       }
     },
-    submitSummary({ taskId, datasetCount }) {
-      return `已创建任务 #${taskId}：${datasetCount} 个数据集，按分布式与集中式两种模式调度`
+    submitSummary({ taskId, datasetCount, executionMode = 'COMPARISON' }) {
+      const modes = executionMode === 'COMPARISON' ? '分布式与集中式两种模式' : `${MODE_LABELS[executionMode]}模式`
+      return `已创建任务 #${taskId}：${datasetCount} 个数据集，按${modes}调度`
+    },
+    goToSchedule() {
+      if (!this.submitResult) return
+      this.$router.push({ path: '/operations/schedules', query: { taskId: String(this.submitResult.taskId) }})
     },
     goToAnalysis() {
-      if (!this.submitResult) return
+      if (!this.submitResult || (this.submitResult.executionMode && this.submitResult.executionMode !== 'COMPARISON')) return
       this.$router.push({ path: '/operations/analysis', query: { taskId: String(this.submitResult.taskId) }})
     },
     // 按模式分组列出未通过的检查项：先列两种模式共用的检查，再列 [分布式]、[集中式]。
@@ -354,10 +370,10 @@ export default {
       }
       return lines.join('\n')
     },
-    // 一次点击只建一个任务 ID（executionMode=COMPARISON）：所选的每个数据集都按分布式与集中式各调度一次。
+    // 一次点击创建一个任务；对比任务按两种模式执行，单独任务仅执行所选模式。
     // 运行镜像默认指向 hash-demo（只对已落地的数据算一次哈希），避免计算时长掩盖数据移动耗时，
     // 但用户可以按需切换成任意已激活镜像。
-    async handleSubmit() {
+    async handleSubmit(executionMode = 'COMPARISON') {
       if (this.submitting) return
       if (this.selectedRows.length === 0) {
         this.$message.warning('数据不能为空，请选择数据。')
@@ -369,18 +385,19 @@ export default {
       }
 
       this.submitting = true
+      this.submittingMode = executionMode
       const datasetIds = this.selectedRows.map(r => r.datasetId).sort((a, b) => a - b)
-      const signature = JSON.stringify([datasetIds, this.selectedImageId])
+      const signature = JSON.stringify([datasetIds, this.selectedImageId, executionMode])
       if (!this.pendingSubmission || this.pendingSubmission.signature !== signature) {
-        const runId = `cmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+        const runId = `${executionMode === 'COMPARISON' ? 'cmp' : 'task'}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
         this.pendingSubmission = {
           signature,
           key: requestId(),
           body: {
-            taskName: `对比任务-${runId}`,
+            taskName: `${executionMode === 'COMPARISON' ? '对比' : MODE_LABELS[executionMode]}任务-${runId}`,
             datasetIds,
             runtimeImageId: this.selectedImageId,
-            executionMode: 'COMPARISON',
+            executionMode,
             acceptanceRunId: runId,
             runRound: 1
           }
@@ -404,7 +421,7 @@ export default {
         this.pendingSubmission.attempted = true
         const task = await createRegisteredTask(body, key)
         this.pendingSubmission = null
-        this.submitResult = { taskId: task.taskId, datasetCount: datasetIds.length }
+        this.submitResult = { taskId: task.taskId, datasetCount: datasetIds.length, executionMode }
         this.$message.success(this.submitSummary(this.submitResult))
         this.$refs.datasetTable.clearSelection()
         this.selectedRows = []
@@ -418,6 +435,7 @@ export default {
         if (e !== 'cancel' && e !== 'close') this.$message.error((e && e.message) || '提交失败')
       } finally {
         this.submitting = false
+        this.submittingMode = null
       }
     }
   }
