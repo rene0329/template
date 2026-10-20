@@ -50,7 +50,8 @@ it('loads fresh eligible resources by logical ID and asks for a target node firs
   expect(vm.replicas).toEqual([replica])
   expect(vm.nodes.map(node => node.nodeId)).toEqual([6, 3, 2])
   expect(fetchRuntimeImages).not.toHaveBeenCalled()
-  expect(vm.form).toEqual({ targetNodeId: null, replicaId: 19, action: 'COPY', compute: false, runtimeImageId: null })
+  expect(vm.form).toEqual({ targetNodeId: null, replicaId: 19, action: 'MOVE', compute: false, runtimeImageId: null })
+  expect(vm.actions.map(action => action.value)).toEqual(['MOVE', 'COPY'])
   expect(vm.targetNodes.map(node => node.nodeId)).toEqual([3])
   expect(vm.canSubmit).toBe(false)
   await chooseTarget(vm, 3)
@@ -61,6 +62,7 @@ it('loads fresh eligible resources by logical ID and asks for a target node firs
 it('submits a pure data copy and reports acceptance without a compute task', async() => {
   const vm = context()
   await vm.open(dataset)
+  vm.form.action = 'COPY'
   await chooseTarget(vm, 3)
   await vm.submit()
   expect(submitDatasetSchedule).toHaveBeenCalledWith({
@@ -90,7 +92,7 @@ it('retains the same plan on uncertain retries but gives changed assignments a n
   expect(vm.$emit).not.toHaveBeenCalled()
   await vm.submit()
   expect(submitDatasetSchedule.mock.calls[1][0]).toBe(submitDatasetSchedule.mock.calls[0][0])
-  vm.form.action = 'MOVE'
+  vm.form.action = 'COPY'
   await vm.submit()
   expect(submitDatasetSchedule.mock.calls[2][0].externalPlanId).toBe('manual-two')
 })
@@ -98,6 +100,7 @@ it('retains the same plan on uncertain retries but gives changed assignments a n
 it('prevents duplicate clicks while a request is pending', async() => {
   const vm = context()
   await vm.open(dataset)
+  vm.form.action = 'COPY'
   await chooseTarget(vm, 3)
   let resolve
   submitDatasetSchedule.mockImplementationOnce(() => new Promise(done => { resolve = done }))
@@ -155,7 +158,7 @@ it('offers the compute option only for compute-capable targets and clears it on 
   expect(vm.form.runtimeImageId).toBeNull()
   await vm.submit()
   expect(submitComputeSchedule).not.toHaveBeenCalled()
-  expect(submitDatasetSchedule.mock.calls[0][0].assignments[0]).toEqual({ datasetId: 9, replicaId: 19, sourceNodeId: 6, targetNodeId: 8, action: 'COPY' })
+  expect(submitDatasetSchedule.mock.calls[0][0].assignments[0]).toEqual({ datasetId: 9, replicaId: 19, sourceNodeId: 6, targetNodeId: 8, action: 'MOVE' })
 })
 
 it('keeps a storage-only node that already holds the data out of the targets', async() => {
@@ -259,7 +262,7 @@ it('never offers a node that already holds a replica, so every schedule transfer
   vm.form.replicaId = 21
   await vm.submit()
   expect(submitComputeSchedule.mock.calls[0][0].assignments).toEqual([
-    { datasetId: 9, replicaId: 21, sourceNodeId: 3, targetNodeId: 5, action: 'COPY_AND_USE' }
+    { datasetId: 9, replicaId: 21, sourceNodeId: 3, targetNodeId: 5, action: 'MOVE_AND_USE' }
   ])
 })
 

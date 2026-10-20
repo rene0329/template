@@ -14,7 +14,7 @@
         <strong>{{ dataset.name }}</strong>
         <span>{{ dataset.datasetCode }} / {{ dataset.version }} · ID {{ dataset.datasetId }}</span>
       </div>
-      <el-alert class="schedule-tip" title="先选择目标节点，再选择复制或迁移；目标节点具有计算能力时可同时发起计算调度。" type="info" :closable="false" show-icon />
+      <el-alert class="schedule-tip" title="先选择目标节点，再选择迁移或复制；目标节点具有计算能力时可同时发起计算调度。" type="info" :closable="false" show-icon />
       <el-alert v-if="loadError" class="schedule-tip" :title="loadError" type="error" :closable="false" show-icon />
       <el-alert v-else-if="unavailableReason" class="schedule-tip" :title="unavailableReason" type="warning" :closable="false" show-icon />
       <el-form label-width="100px" :disabled="loading || submitting || !!acceptedPlan" @submit.native.prevent="submit">
@@ -68,8 +68,8 @@ import { fetchSchedulableDatasets, fetchSchedulingPlan, submitDatasetSchedule, s
 import { fetchAllPages, formatBytes } from '@/utils/dataset-catalog'
 
 const actions = [
-  { value: 'COPY', label: '复制', description: '复制到目标节点，保留源节点上的副本。' },
-  { value: 'MOVE', label: '迁移', description: '复制成功后删除源文件，将副本迁移到目标节点。此操作会移除源副本，请谨慎选择。' }
+  { value: 'MOVE', label: '迁移', description: '复制成功后删除源文件，将副本迁移到目标节点。此操作会移除源副本，请谨慎选择。' },
+  { value: 'COPY', label: '复制', description: '复制到目标节点，保留源节点上的副本。' }
 ]
 
 export default {
@@ -79,7 +79,7 @@ export default {
       visible: false, loading: false, submitting: false, loadVersion: 0,
       dataset: {}, replicas: [], nodes: [],
       images: [], imagesLoading: false, imagesLoaded: false, imageError: '',
-      actions, form: { targetNodeId: null, replicaId: null, action: 'COPY', compute: false, runtimeImageId: null },
+      actions, form: { targetNodeId: null, replicaId: null, action: 'MOVE', compute: false, runtimeImageId: null },
       loadError: '', submitError: '', acceptedPlan: null, computeTask: null, pendingPlan: null
     }
   },
@@ -134,7 +134,7 @@ export default {
     replicaLabel(replica) { return `${replica.nodeName || '节点'} #${replica.nodeId} · 副本 #${replica.replicaId}` },
     open(dataset) {
       this.dataset = { ...dataset }
-      this.form = { targetNodeId: null, replicaId: null, action: 'COPY', compute: false, runtimeImageId: null }
+      this.form = { targetNodeId: null, replicaId: null, action: 'MOVE', compute: false, runtimeImageId: null }
       this.acceptedPlan = null
       this.computeTask = null
       this.pendingPlan = null
