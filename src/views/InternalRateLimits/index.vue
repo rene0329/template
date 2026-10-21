@@ -9,7 +9,7 @@
     </section>
 
     <el-alert
-      title="这是内部管理页面，不会出现在主页或导航菜单中。自适应模式根据最近的网络测量结果为每个新任务计算限速；测量不可用时使用人工回退规则。"
+      title="这是内部管理页面，不会出现在主页或导航菜单中。自适应模式根据最近的网络测量结果为每个新任务计算限速；测量过期时按最近一次完整成功测量计算路径限速，并将两种模式的限速同时减半；没有完整测量时使用人工规则。"
       type="warning"
       :closable="false"
       show-icon
@@ -216,6 +216,7 @@ export default {
     },
     sourceLabel(value) {
       if (value === 'database-adaptive') return '近期网络测量'
+      if (value === 'database-last-measurement-fallback') return '最近一次成功测量（已过期）'
       if (value && value.includes('static-fallback')) return '人工回退规则'
       return value || '未知'
     },
