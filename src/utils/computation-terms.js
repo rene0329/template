@@ -1,6 +1,7 @@
 // 只转换计算语境，保留分布式存储、协同缓存等术语及原始记录。
 export function computationTextForDisplay(value) {
   return String(value == null ? '' : value)
+    .replace(/任务类型=分布式/g, '任务类型=原位计算')
     .replace(/分布式调度方案/g, '原位调度方案')
     .replace(/分布式执行/g, '原位执行')
     .replace(/分布式任务/g, '原位计算任务')
