@@ -98,6 +98,7 @@
 </template>
 
 <script>
+import { computationTextForDisplay } from '@/utils/computation-terms'
 import { fetchScheduleList } from '@/api/managementCenterApi'
 import { clampPage, fetchAllPages, paginateRows, sortRows } from '@/utils/dataset-catalog'
 import { parseSchedule, scheduleLineFailed, scheduleTextForDisplay } from '@/utils/schedule-text'
@@ -147,6 +148,7 @@ export default {
         )
         const keyword = this.formInline.name.trim()
         this.TaskData = tasks
+          .map(task => ({ ...task, taskName: computationTextForDisplay(task.taskName) }))
           .filter(task => !keyword || String(task.taskId) === keyword || String(task.taskName || '').includes(keyword))
           .map(task => ({ ...task, parsedSchedule: parseSchedule(task.schedule, { manual: task.manualSchedule === true }) }))
         this.total = this.TaskData.length

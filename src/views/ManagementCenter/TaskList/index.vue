@@ -89,6 +89,7 @@
 </template>
 
 <script>
+import { computationTextForDisplay } from '@/utils/computation-terms'
 import { fetchTaskList, updateTask, deleteTask } from '@/api/managementCenterApi'
 import LiveRefreshStatus from '@/components/LiveRefreshStatus'
 import { keepStableCollection } from '@/utils/live-refresh'
@@ -166,7 +167,7 @@ export default {
           { query: this.formInline.name }
         )
         if (version !== this.requestVersion) return
-        this.TaskData = keepStableCollection(this.TaskData, tasks)
+        this.TaskData = keepStableCollection(this.TaskData, tasks.map(task => ({ ...task, taskName: computationTextForDisplay(task.taskName) })))
         this.total = tasks.length
         this.currentPage = clampPage(this.currentPage, this.pageSize, this.total)
         this.lastUpdatedAt = new Date().toLocaleTimeString('zh-CN', { hour12: false })
