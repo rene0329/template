@@ -64,7 +64,7 @@ it('renders one row per task with structured schedule blocks in the schedule cel
   expect(cells).toHaveLength(4)
 
   // Rows are sorted by task id: 5 (comparison), 6 (target node), 7 (unrecognised), 8 (legacy compute schedule).
-  expect(texts(cells[0], '.schedule-title')).toEqual(['分布式调度方案', '集中式调度方案'])
+  expect(texts(cells[0], '.schedule-title')).toEqual(['原位调度方案', '集中式调度方案'])
   const [distributed, centralized] = cells[0].querySelectorAll('.schedule-section')
   expect(texts(distributed, '.schedule-line')).toEqual(['ds-a: n1 -> n1', 'ds-b: n2 -> n2 [IN_PLACE]'])
   expect(distributed.textContent).not.toContain('资源不足')

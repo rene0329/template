@@ -41,8 +41,8 @@ it('creates one COMPARISON task for all selected datasets with a single prefligh
   expect(preflightRegisteredTask.mock.calls[0][0]).toEqual(body)
   expect(key).toBe('stable-request-key')
   expect(vm.submitResult).toEqual({ taskId: 77, datasetCount: 2, executionMode: 'COMPARISON' })
-  expect(vm.$message.success).toHaveBeenCalledWith('已创建任务 #77：2 个数据集，按分布式与集中式两种模式调度')
-  expect(vm.submitSummary(vm.submitResult)).toBe('已创建任务 #77：2 个数据集，按分布式与集中式两种模式调度')
+  expect(vm.$message.success).toHaveBeenCalledWith('已创建任务 #77：2 个数据集，按原位计算与集中式计算两种模式调度')
+  expect(vm.submitSummary(vm.submitResult)).toBe('已创建任务 #77：2 个数据集，按原位计算与集中式计算两种模式调度')
   expect(vm.$refs.datasetTable.clearSelection).toHaveBeenCalled()
   expect(vm.selectedRows).toEqual([])
   expect(vm.pendingSubmission).toBeNull()
@@ -71,7 +71,7 @@ it('lists preflight failures grouped by execution mode', async() => {
 
   expect(createRegisteredTask).not.toHaveBeenCalled()
   expect(vm.$alert).toHaveBeenCalledWith(
-    'COMPUTE_POOL: UNAVAILABLE\n[分布式] ds-a: no in-place replica\n[集中式] central-node: central compute node is not available',
+    'COMPUTE_POOL: UNAVAILABLE\n[原位计算] ds-a: no in-place replica\n[集中式计算] central-node: central compute node is not available',
     '任务预检查未通过',
     { customClass: 'preflight-message' }
   )

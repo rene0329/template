@@ -1,7 +1,9 @@
+import { computationTextForDisplay } from './computation-terms'
+
 // task_management.schedule 是后端拼接的纯文本。这里把它拆成带标题的分组，
 // 识别不了的历史文本原样返回（kind: 'raw'），页面据此直接展示原文。
 const MODE_HEADERS = [
-  { pattern: /^(?:分布式调度方案|IN_PLACE方案)\s*[:：]/i, title: '分布式调度方案' },
+  { pattern: /^(?:原位调度方案|分布式调度方案|IN_PLACE方案)\s*[:：]/i, title: '原位调度方案' },
   // 后端文本写作“中心化”，页面统一显示为“集中式”。
   { pattern: /^(?:中心化调度方案|集中式调度方案|CENTRALIZED方案)\s*[:：]/i, title: '集中式调度方案' }
 ]
@@ -86,7 +88,7 @@ export function scheduleLineFailed(line) {
 const RESOURCE_FALLBACK_REASON = /（[^（）\r\n]*资源不足（[^（）\r\n]*）[^（）\r\n]*改用次优计算节点[^（）\r\n]*）\s*$/gm
 
 export function scheduleTextForDisplay(value) {
-  return String(value == null ? '' : value).replace(RESOURCE_FALLBACK_REASON, '').trim()
+  return computationTextForDisplay(value).replace(RESOURCE_FALLBACK_REASON, '').trim()
 }
 
 // datasetIdsJson 是 JSON 数组；selectedData 是后端 List.toString() 的结果，例如 “[iris, mnist]”。

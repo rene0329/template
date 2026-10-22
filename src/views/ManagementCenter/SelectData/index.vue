@@ -26,9 +26,9 @@
               type="primary"
               :loading="submitting && submittingMode === 'COMPARISON'"
               :disabled="selectedRows.length === 0 || submitting || !selectedImageId"
-              :title="selectedImageId ? '一个任务 ID 内，每个所选数据集都按分布式与集中式两种模式各调度一次' : '没有可用的已激活运行镜像'"
+              :title="selectedImageId ? '一个任务 ID 内，每个所选数据集都按原位计算与集中式计算两种模式各调度一次' : '没有可用的已激活运行镜像'"
               @click="handleSubmit('COMPARISON')"
-            >创建任务（分布式 + 集中式）</el-button>
+            >创建任务（原位计算 + 集中式计算）</el-button>
             <el-button
               v-for="mode in ['IN_PLACE', 'CENTRALIZED']"
               :key="mode"
@@ -37,7 +37,7 @@
               :disabled="selectedRows.length === 0 || submitting || !selectedImageId"
               title="仅执行所选模式，结果在调度方案中展示，不纳入性能分析"
               @click="handleSubmit(mode)"
-            >{{ mode === 'IN_PLACE' ? '创建分布式任务' : '创建集中式任务' }}</el-button>
+            >{{ mode === 'IN_PLACE' ? '创建原位计算任务' : '创建集中式计算任务' }}</el-button>
           </div>
           <live-refresh-status class="live-refresh-anchor" :updated-at="lastUpdatedAt" />
         </div>
@@ -169,7 +169,7 @@ import { keepStableCollection } from '@/utils/live-refresh'
 
 const ACCESS_DENIED = 'DATASET_ACCESS_DENIED'
 const ACCESS_DENIED_MESSAGE = '任务创建失败，用户访问受限'
-const MODE_LABELS = { IN_PLACE: '分布式', CENTRALIZED: '集中式' }
+const MODE_LABELS = { IN_PLACE: '原位计算', CENTRALIZED: '集中式计算' }
 
 // axiosConfig 把 { code, msg, errorCode } 响应体归一化为 error.errorCode；
 // 同时兼容未经拦截器归一化、仍挂在 error.response.data 上的响应体。
@@ -347,7 +347,7 @@ export default {
       }
     },
     submitSummary({ taskId, datasetCount, executionMode = 'COMPARISON' }) {
-      const modes = executionMode === 'COMPARISON' ? '分布式与集中式两种模式' : `${MODE_LABELS[executionMode]}模式`
+      const modes = executionMode === 'COMPARISON' ? '原位计算与集中式计算两种模式' : `${MODE_LABELS[executionMode]}模式`
       return `已创建任务 #${taskId}：${datasetCount} 个数据集，按${modes}调度`
     },
     goToSchedule() {
@@ -358,7 +358,7 @@ export default {
       if (!this.submitResult || (this.submitResult.executionMode && this.submitResult.executionMode !== 'COMPARISON')) return
       this.$router.push({ path: '/operations/analysis', query: { taskId: String(this.submitResult.taskId) }})
     },
-    // 按模式分组列出未通过的检查项：先列两种模式共用的检查，再列 [分布式]、[集中式]。
+    // 按模式分组列出未通过的检查项：先列两种模式共用的检查，再列 [原位计算]、[集中式计算]。
     preflightFailureText(checks = []) {
       const failed = checks.filter(check => !check.available)
       const lines = []

@@ -58,7 +58,7 @@ export function buildSpeedupOption(rows, chartType = 'line') {
         const row = point && rows[point.dataIndex]
         if (!row) return ''
         // Only numeric measurements and fixed labels enter this HTML tooltip.
-        return `${taskLabel(row)}<br/>数据移动加速比：${speedupText(speedupValue(row))}<br/>集中式耗时：${milliseconds(row.t2)}<br/>分布式耗时：${milliseconds(row.t1)}`
+        return `${taskLabel(row)}<br/>数据移动加速比：${speedupText(speedupValue(row))}<br/>集中式计算耗时：${milliseconds(row.t2)}<br/>原位计算耗时：${milliseconds(row.t1)}`
       }
     },
     xAxis: {

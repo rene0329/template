@@ -12,10 +12,10 @@
         <el-table v-if="comparison" :data="[comparison]" class="comparison-table" border>
           <el-table-column prop="acceptanceRunId" label="验收运行 ID" min-width="160" />
           <el-table-column prop="runRound" label="轮次" width="70" />
-          <el-table-column prop="centralizedTaskId" label="集中式任务" width="110">
+          <el-table-column prop="centralizedTaskId" label="集中式计算任务" width="145">
             <template slot-scope="s"><el-button type="text" :disabled="!s.row.centralizedTaskId" @click="showEvidence(s.row.centralizedTaskId)">#{{ s.row.centralizedTaskId || '—' }}</el-button></template>
           </el-table-column>
-          <el-table-column label="集中式 T1" width="120"><template slot-scope="s">{{ rawMs(s.row.centralizedPreparationMs) }}</template></el-table-column>
+          <el-table-column label="集中式计算 T1" width="145"><template slot-scope="s">{{ rawMs(s.row.centralizedPreparationMs) }}</template></el-table-column>
           <el-table-column prop="inPlaceTaskId" label="方舱式任务" width="110">
             <template slot-scope="s"><el-button type="text" :disabled="!s.row.inPlaceTaskId" @click="showEvidence(s.row.inPlaceTaskId)">#{{ s.row.inPlaceTaskId || '—' }}</el-button></template>
           </el-table-column>
@@ -50,7 +50,7 @@
 
         <div class="chart-heading">
           <h2>数据移动加速比</h2>
-          <p>集中式数据移动时间 T1 ÷ 分布式数据移动时间 T2；高于 1× 表示加速，低于 1× 表示减速。多数据集任务中，每种模式的数据移动时间为该模式下各数据集数据移动时间之和，加速比按两者之和计算。</p>
+          <p>集中式计算数据移动时间 T1 ÷ 原位计算数据移动时间 T2；高于 1× 表示加速，低于 1× 表示减速。多数据集任务中，每种模式的数据移动时间为该模式下各数据集数据移动时间之和，加速比按两者之和计算。</p>
           <p>页面只展示实测值，不自动判定是否通过 1.2 门槛。</p>
         </div>
         <el-table
@@ -63,10 +63,10 @@
           empty-text="暂无可展示的性能数据"
         >
           <el-table-column prop="taskId" label="任务ID" min-width="100" align="center" />
-          <el-table-column prop="t2" label="集中式数据移动时间 T1" min-width="200" align="center">
+          <el-table-column prop="t2" label="集中式计算数据移动时间 T1" min-width="200" align="center">
             <template v-slot:default="scope">{{ milliseconds(scope.row.t2) }}</template>
           </el-table-column>
-          <el-table-column prop="t1" label="分布式数据移动时间 T2" min-width="200" align="center">
+          <el-table-column prop="t1" label="原位计算数据移动时间 T2" min-width="200" align="center">
             <template v-slot:default="scope">{{ milliseconds(scope.row.t1) }}</template>
           </el-table-column>
           <el-table-column prop="rating" label="数据移动加速比 T1/T2" min-width="180" align="center">
@@ -153,14 +153,14 @@ export default {
       return this.analysisData.filter(row => speedupValue(row) == null).length
     },
     chartDescription() {
-      return this.analysisData.map(row => `${taskLabel(row)}，加速比 ${speedupText(speedupValue(row))}，集中式耗时 ${milliseconds(row.t2)}，分布式耗时 ${milliseconds(row.t1)}`).join('；')
+      return this.analysisData.map(row => `${taskLabel(row)}，加速比 ${speedupText(speedupValue(row))}，集中式计算耗时 ${milliseconds(row.t2)}，原位计算耗时 ${milliseconds(row.t1)}`).join('；')
     },
     focusText() {
       if (!this.focusTaskId) return ''
       if (this.analysisData.length) return `仅显示任务 #${this.focusTaskId} 的性能数据。`
       if (this.loading) return `正在加载任务 #${this.focusTaskId} 的性能数据…`
       if (this.error) return `任务 #${this.focusTaskId} 的性能数据加载失败，本页每 5 秒自动重试。`
-      return `任务 #${this.focusTaskId} 暂无性能数据：分布式与集中式两种模式的数据移动都有实测结果后才会显示，本页每 5 秒自动刷新。`
+      return `任务 #${this.focusTaskId} 暂无性能数据：原位计算与集中式计算两种模式的数据移动都有实测结果后才会显示，本页每 5 秒自动刷新。`
     }
   },
   watch: {

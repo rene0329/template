@@ -107,6 +107,7 @@
 </template>
 
 <script>
+import { computationTextForDisplay } from '@/utils/computation-terms'
 import { getTaskInfo,update_task,delete_task,getTaskLogs } from '@/api/TaskManager'
 
 export default {
@@ -233,9 +234,9 @@ export default {
         // 假设 res.result 包含所需的日志
         const logs = res.result;
         if (typeof logs === 'object') {
-          this.selectedTask.task_logs = logs.log; // 格式化 JSON
+          this.selectedTask.task_logs = computationTextForDisplay(logs.log); // 格式化 JSON
         } else {
-          this.selectedTask.task_logs = logs; // 直接赋值
+          this.selectedTask.task_logs = computationTextForDisplay(logs); // 直接赋值
         }
       } catch (error) {
         console.error('获取日志失败', error);
