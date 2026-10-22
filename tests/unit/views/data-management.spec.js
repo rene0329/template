@@ -8,9 +8,6 @@ import { formatHeat } from '@/utils/dataset-catalog'
 jest.mock('@/api/registrationApi', () => ({
   fetchRegisteredDatasets: jest.fn(), fetchRegisteredNodes: jest.fn(), removeDatasetReplica: jest.fn()
 }))
-jest.mock('@/api/datasetAccessApi', () => ({
-  runDatasetAccessTest: jest.fn(), fetchDatasetAccessEvents: jest.fn()
-}))
 jest.mock('@/api/schedulingApi', () => ({
   fetchSchedulableDatasets: jest.fn(), fetchSchedulingPlan: jest.fn(), submitDatasetSchedule: jest.fn(), submitComputeSchedule: jest.fn()
 }))

@@ -65,7 +65,7 @@
             <el-form-item label="数据集 ID">{{ selectedTask.datasetId }}</el-form-item>
             <el-form-item label="编码 / 版本">{{ selectedTask.datasetCode }} / {{ selectedTask.version }}</el-form-item>
             <el-form-item label="数据名称">{{ selectedTask.name }}</el-form-item>
-            <el-form-item label="描述">{{ selectedTask.description || '暂无描述' }}</el-form-item>
+            <el-form-item label="数据集介绍"><div class="dataset-description">{{ selectedTask.description || '尚未填写数据集介绍' }}</div></el-form-item>
             <el-form-item label="大小">{{ formatBytes(selectedTask.dataSize) }}</el-form-item>
             <el-form-item label="温度">{{ formatHeat(selectedTask.dataHeat) }}</el-form-item>
             <el-form-item label="温度更新时间">{{ selectedTask.heatUpdatedAt ? new Date(selectedTask.heatUpdatedAt).toLocaleString('zh-CN', { hour12: false }) : '暂无数据' }}</el-form-item>
@@ -108,16 +108,24 @@
             </el-table-column>
           </el-table>
           <span slot="footer">
-            <el-button type="primary" :disabled="!canSchedule(selectedTask)" @click="$refs.accessTest.open(selectedTask)">访问性能对照</el-button>
             <el-button @click="dialogVisibleDetail = false">关闭</el-button>
           </span>
         </el-dialog>
 
         <el-dialog title="从候选文件添加副本" :visible.sync="addReplicaDialog" width="520px">
-          <el-input v-model="candidateQuery" placeholder="按文件名 / 路径搜索候选文件" clearable
-                    @input="loadCandidates" style="margin-bottom: 12px;" />
-          <el-table v-loading="candidatesLoading" :data="unregisteredCandidates" max-height="320"
-                    empty-text="没有未注册的候选文件">
+          <el-input
+            v-model="candidateQuery"
+            placeholder="按文件名 / 路径搜索候选文件"
+            clearable
+            style="margin-bottom: 12px;"
+            @input="loadCandidates"
+          />
+          <el-table
+            v-loading="candidatesLoading"
+            :data="unregisteredCandidates"
+            max-height="320"
+            empty-text="没有未注册的候选文件"
+          >
             <el-table-column prop="candidateId" label="ID" width="70" />
             <el-table-column label="节点" min-width="120">
               <template slot-scope="scope">{{ nodeName(scope.row.nodeId) }}</template>
@@ -125,8 +133,11 @@
             <el-table-column prop="filePath" label="路径" min-width="220" show-overflow-tooltip />
             <el-table-column label="操作" width="90">
               <template slot-scope="scope">
-                <el-button type="text" :loading="addReplicaLoading === scope.row.candidateId"
-                           @click="onAddReplica(scope.row)">添加</el-button>
+                <el-button
+                  type="text"
+                  :loading="addReplicaLoading === scope.row.candidateId"
+                  @click="onAddReplica(scope.row)"
+                >添加</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -135,7 +146,6 @@
 
         <manual-schedule-dialog ref="manualSchedule" @submitted="fetchData()" />
         <storage-plan-dialog ref="storagePlan" @submitted="fetchData()" />
-        <access-test-dialog ref="accessTest" @completed="fetchData()" />
 
         <div class="page-footer">
           <div class="pagination-container">
@@ -157,7 +167,6 @@
 import LiveRefreshStatus from '@/components/LiveRefreshStatus'
 import ManualScheduleDialog from './ManualScheduleDialog'
 import StoragePlanDialog from './StoragePlanDialog'
-import AccessTestDialog from './AccessTestDialog'
 import { keepStableCollection } from '@/utils/live-refresh'
 import { clampPage, datasetRow, fetchAllPages, formatBytes, formatHeat, paginateRows, sortRows } from '@/utils/dataset-catalog'
 import { addDatasetReplica, fetchDatasetCandidates, fetchRegisteredDatasets, fetchRegisteredNodes, removeDatasetReplica, verifyDataset } from '@/api/registrationApi'
@@ -165,7 +174,7 @@ import { fetchStoragePolicy, refreshDatasetHeat } from '@/api/datasetStorageApi'
 
 export default {
   name: 'DataManagement',
-  components: { LiveRefreshStatus, ManualScheduleDialog, StoragePlanDialog, AccessTestDialog },
+  components: { LiveRefreshStatus, ManualScheduleDialog, StoragePlanDialog },
   data() {
     return {
       currentPage: 1,
@@ -698,6 +707,12 @@ export default {
 }
 .node-detail-dialog .el-dialog__body {
   padding-bottom: 24px;
+}
+.dataset-description {
+  white-space: pre-line;
+  line-height: 1.7;
+  padding-top: 8px;
+  max-width: 900px;
 }
 .replica-toolbar {
   margin-bottom: 12px;
