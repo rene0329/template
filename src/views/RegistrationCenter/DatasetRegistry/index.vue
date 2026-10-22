@@ -48,7 +48,7 @@
         <el-form-item label="执行模式">
           <el-radio-group v-model="task.executionMode" @change="runPreflight">
             <el-radio label="IN_PLACE">方舱 / 原位</el-radio>
-            <el-radio label="CENTRALIZED">集中式</el-radio>
+            <el-radio label="CENTRALIZED">集中式计算</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="验收运行 ID"><el-input v-model.trim="task.acceptanceRunId" maxlength="128" @change="runPreflight" /></el-form-item>
