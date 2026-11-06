@@ -563,8 +563,7 @@ export default {
           <div style="min-width:220px;line-height:1.6;">
             <div><b>连接：</b>${esc(s)} — ${esc(t)}</div>
             <div><b>链路状态：</b>${esc(data.status || (data.active === false ? '未就绪' : '可用'))}</div>
-            <div><b>延迟：</b>${data.latency == null ? '未测量' : data.latency + ' ms'}</div>
-            <div><b>带宽：</b>${data.bandwidth == null ? '未测量' : data.bandwidth + ' Mbps'}</div>
+            <div><b>平均往返时延：</b>${data.latency == null ? '未测量' : data.latency + ' ms'}</div>
           </div>
         `
       }
