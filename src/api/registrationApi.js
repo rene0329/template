@@ -59,6 +59,8 @@ export const disableRuntimeImage = (id) => mutation(`/api/v1/runtime-images/${id
 export const createRegisteredTask = (data, idempotencyKey) => mutation('/api/v1/tasks', 'post', data, idempotencyKey)
 export const preflightRegisteredTask = (data) => request({ url: '/api/v1/tasks/preflight', method: 'post', data })
 export const fetchRegisteredTaskExecution = (taskId) => request({ url: `/api/v1/tasks/${taskId}`, method: 'get' })
+export const fetchRegisteredTaskJobs = (taskId, options = {}) => request({ url: `/api/v1/tasks/${taskId}/jobs`, method: 'get', ...options })
+export const cancelRegisteredTask = (taskId) => request({ url: `/api/v1/tasks/${taskId}/cancel`, method: 'post' })
 export const fetchTaskRunComparison = (acceptanceRunId, runRound = 1) => request({
   url: `/api/v1/tasks/runs/${encodeURIComponent(acceptanceRunId)}/comparison`, method: 'get', params: { round: runRound }
 })

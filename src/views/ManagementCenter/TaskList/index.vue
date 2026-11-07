@@ -59,6 +59,11 @@
                     </el-tag>
                   </template>
                 </el-table-column>
+                <el-table-column label="操作" width="110" align="center">
+                  <template slot-scope="scope">
+                    <el-button type="text" size="small" @click="openJobs(scope.row)">作业详情</el-button>
+                  </template>
+                </el-table-column>
               </el-table>
             </div>
           </div>
@@ -84,6 +89,39 @@
           </div>
         </div>
       </div>
+      <el-dialog :title="`任务 ${jobsTaskId == null ? '' : jobsTaskId} 的计算作业`" :visible.sync="jobsVisible" width="92%" @close="closeJobs">
+        <el-alert v-if="jobsError" :title="jobsError" type="error" :closable="false" show-icon />
+        <p class="job-explanation">各数据集的计算作业分别申请资源。资源不足时等待，获得资源后开始数据准备和计算。</p>
+        <el-table v-loading="jobsLoading" :data="jobs" row-key="id" empty-text="暂无资源调度作业记录，历史任务可能未记录作业详情。">
+          <el-table-column prop="datasetId" label="数据集 ID" width="105" />
+          <el-table-column label="计算模式" width="115">
+            <template slot-scope="scope">{{ jobModeLabel(scope.row.executionMode) }}</template>
+          </el-table-column>
+          <el-table-column label="状态" width="125">
+            <template slot-scope="scope"><el-tag size="mini" :type="jobStatusType(scope.row.state)">{{ jobStatusLabel(scope.row.state) }}</el-tag></template>
+          </el-table-column>
+          <el-table-column label="申请资源" min-width="175">
+            <template slot-scope="scope">{{ jobResourceText(scope.row) }}</template>
+          </el-table-column>
+          <el-table-column label="计算节点" min-width="145" show-overflow-tooltip>
+            <template slot-scope="scope">{{ jobNodeText(scope.row) }}</template>
+          </el-table-column>
+          <el-table-column label="进入队列时间" min-width="170">
+            <template slot-scope="scope">{{ jobTime(scope.row.queuedAt) }}</template>
+          </el-table-column>
+          <el-table-column label="资源分配时间" min-width="170">
+            <template slot-scope="scope">{{ jobTime(scope.row.boundAt) }}</template>
+          </el-table-column>
+          <el-table-column label="等待或失败原因" min-width="250" show-overflow-tooltip>
+            <template slot-scope="scope">{{ scope.row.waitingReason || '—' }}</template>
+          </el-table-column>
+        </el-table>
+        <span slot="footer">
+          <el-button v-if="jobsCanCancel" type="danger" plain :loading="jobsCancelling" @click="cancelJobs">取消任务</el-button>
+          <el-button :loading="jobsLoading" @click="loadJobs()">刷新</el-button>
+          <el-button @click="jobsVisible = false">关闭</el-button>
+        </span>
+      </el-dialog>
     </el-main>
   </el-container>
 </template>
@@ -95,6 +133,7 @@ import LiveRefreshStatus from '@/components/LiveRefreshStatus'
 import { keepStableCollection } from '@/utils/live-refresh'
 import { clampPage, fetchAllPages, paginateRows, sortRows } from '@/utils/dataset-catalog'
 import { taskDatasetNames } from '@/utils/schedule-text'
+import { fetchRegisteredTaskJobs, cancelRegisteredTask } from '@/api/registrationApi'
 
 export default {
   name: 'NodeList',
@@ -119,6 +158,15 @@ export default {
       refreshing: false,
       requestVersion: 0,
       lastUpdatedAt: '',
+      jobsVisible: false,
+      jobsTaskId: null,
+      jobs: [],
+      jobsLoading: false,
+      jobsCancelling: false,
+      jobsError: '',
+      jobsRequestVersion: 0,
+      jobsSessionVersion: 0,
+      jobsPollingTimer: null,
       // 用于表单搜索
       formInline: {
         name: ''
@@ -138,6 +186,10 @@ export default {
     filteredDataCount() {
       return this.total
     },
+    jobsCanCancel() {
+      const roles = this.$store && this.$store.getters && this.$store.getters.roles
+      return Array.isArray(roles) && roles.includes('ADMIN') && this.jobs.some(job => !['COMPLETED', 'FAILED', 'CANCELLED', 'CANCELLING'].includes(job.state))
+    },
     currentPageData() {
       return paginateRows(sortRows(this.TaskData, this.sort), this.currentPage, this.pageSize)
     }
@@ -151,6 +203,7 @@ export default {
   },
   beforeDestroy() {
     this.stopPolling()
+    this.closeJobs()
     this.requestVersion++
   },
   methods: {
@@ -215,9 +268,99 @@ export default {
         '部分完成': 'warning',
         '执行中': 'warning',
         '排队中': 'info',
+        '等待资源': 'info',
+        '数据准备中': 'warning',
+        '计算中': 'warning',
+        '取消中': 'warning',
+        '已取消': 'info',
         '失败': 'danger'
       }
       return map[status] || 'info'
+    },
+    jobStatusLabel(state) {
+      return ({ WAITING: '等待资源', SUBMITTING: '分配资源中', PREPARING: '数据准备中', RUNNING: '计算中', COMPLETED: '已完成', FAILED: '失败', CANCELLING: '取消中', CANCELLED: '已取消', RELEASING: '重新分配中', FAILING: '停止失败作业中' })[state] || state || '—'
+    },
+    jobStatusType(state) {
+      if (state === 'COMPLETED') return 'success'
+      if (state === 'FAILED') return 'danger'
+      return ['SUBMITTING', 'PREPARING', 'RUNNING', 'CANCELLING', 'RELEASING', 'FAILING'].includes(state) ? 'warning' : 'info'
+    },
+    jobModeLabel(mode) {
+      return ({ IN_PLACE: '原位计算', CENTRALIZED: '集中式计算', EXTERNAL: '外部方案' })[mode] || mode || '—'
+    },
+    jobResourceText(job) {
+      const parts = [`CPU ${job.cpu == null ? '—' : job.cpu} 核`, `内存 ${job.memoryGi == null ? '—' : job.memoryGi} GiB`]
+      if (Number(job.gpu) > 0) parts.push(`GPU ${job.gpu}`)
+      if (Number(job.ephemeralStorageGi) > 0) parts.push(`临时存储 ${Number(Number(job.ephemeralStorageGi).toFixed(2))} GiB`)
+      return parts.join(' / ')
+    },
+    jobNodeText(job) {
+      if (!job.targetNode) return '尚未分配'
+      return job.boundAt ? job.targetNode : `${job.targetNode}（待确认）`
+    },
+    jobTime(value) {
+      return value ? String(value).replace('T', ' ').replace(/\.\d+$/, '') : '—'
+    },
+    async openJobs(task) {
+      this.closeJobs()
+      const session = this.jobsSessionVersion
+      this.jobsTaskId = task.taskId
+      this.jobs = []
+      this.jobsError = ''
+      this.jobsCancelling = false
+      this.jobsVisible = true
+      await this.loadJobs()
+      if (this.jobsVisible && this.jobsTaskId === task.taskId && session === this.jobsSessionVersion) {
+        this.jobsPollingTimer = window.setInterval(() => {
+          if (!this.jobsLoading && !this.jobsCancelling) this.loadJobs(true)
+        }, 3000)
+      }
+    },
+    async loadJobs(silent = false) {
+      if (!this.jobsVisible || this.jobsTaskId == null) return
+      const version = ++this.jobsRequestVersion
+      const taskId = this.jobsTaskId
+      this.jobsLoading = true
+      try {
+        const jobs = await fetchRegisteredTaskJobs(taskId, { silent })
+        if (version !== this.jobsRequestVersion || !this.jobsVisible || taskId !== this.jobsTaskId) return
+        this.jobs = Array.isArray(jobs) ? jobs : []
+        this.jobsError = ''
+      } catch (error) {
+        if (version !== this.jobsRequestVersion || !this.jobsVisible) return
+        this.jobsError = `作业详情加载失败：${error.message}`
+      } finally {
+        if (version === this.jobsRequestVersion) this.jobsLoading = false
+      }
+    },
+    closeJobs() {
+      this.jobsSessionVersion++
+      this.jobsRequestVersion++
+      this.jobsVisible = false
+      this.jobsLoading = false
+      if (this.jobsPollingTimer) window.clearInterval(this.jobsPollingTimer)
+      this.jobsPollingTimer = null
+    },
+    async cancelJobs() {
+      const taskId = this.jobsTaskId
+      const roles = this.$store && this.$store.getters && this.$store.getters.roles
+      if (!Array.isArray(roles) || !roles.includes('ADMIN')) return
+      try {
+        await this.$confirm('取消后将停止该任务尚未完成的计算作业，是否继续？', '取消任务', { type: 'warning' })
+      } catch (_) { return }
+      if (!this.jobsVisible || taskId !== this.jobsTaskId) return
+      this.jobsCancelling = true
+      try {
+        await cancelRegisteredTask(taskId)
+        if (!this.jobsVisible || taskId !== this.jobsTaskId) return
+        this.$message.success('已提交取消请求，作业停止后将显示已取消')
+        await this.loadJobs(true)
+        this.fetchData(true)
+      } catch (error) {
+        if (this.jobsVisible && taskId === this.jobsTaskId) this.jobsError = `取消任务失败：${error.message}`
+      } finally {
+        this.jobsCancelling = false
+      }
     },
     handleSizeChange(val) {
       this.pageSize = val
@@ -296,6 +439,7 @@ export default {
 </script>
 
 <style scoped>
+.job-explanation { color: #606266; line-height: 1.6; margin: 12px 0; }
 .analyze-page {
   height: calc(100vh - 90px);
   background: #f5f7fa;
