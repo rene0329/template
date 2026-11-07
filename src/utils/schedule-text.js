@@ -109,7 +109,7 @@ export function taskDatasetNames(row) {
   return listValues(row && row.selectedData).map(String)
 }
 
-// 路径类别使用节点登记中的站点信息，不从节点名称推测站点。
+// 路径类别使用节点登记中的域信息，不从节点名称推测域。
 export function schedulePlacementForDisplay(value, title, nodes = []) {
   const text = scheduleTextForDisplay(value)
   if (!['原位调度方案', '集中式调度方案'].includes(title)) return text
@@ -123,8 +123,8 @@ export function schedulePlacementForDisplay(value, title, nodes = []) {
   const sourceSite = site(source)
   const targetSite = site(target)
   const placement = source === target ? '本节点计算'
-    : sourceSite && targetSite ? (sourceSite === targetSite ? '同站点计算' : '跨站点计算')
-      : '跨节点计算（站点信息不全）'
+    : sourceSite && targetSite ? (sourceSite === targetSite ? '同域计算' : '跨域计算')
+      : '跨节点计算（域信息不全）'
   const mode = title === '集中式调度方案' ? '集中式计算；' : ''
   return text.replace(/\s*\[(?:IN_PLACE|CENTRALIZED)\]$/, '') + ` [${mode}${placement}]`
 }

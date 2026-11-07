@@ -18,7 +18,7 @@
           <el-button icon="el-icon-edit el-icon--left">批量操作</el-button>
           <el-button style="width:110px">更多操作&nbsp;<i class="el-icon-bottom el-icon--left" /></el-button>
         </div>-->
-        <p class="schedule-placement-note">路径类型按当前登记的节点站点信息区分：本节点计算、同站点计算、跨站点计算；站点信息不全时显示跨节点计算。</p>
+        <p class="schedule-placement-note">路径类型按当前登记的节点域信息区分：本节点计算、同域计算、跨域计算；域信息不全时显示跨节点计算。</p>
         <div class="content-row">
           <div class="table-card">
             <div class="table-wrapper">

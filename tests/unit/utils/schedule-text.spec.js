@@ -153,9 +153,9 @@ describe('schedule placement details', () => {
   ]
   it.each([
     ['sh-storage', 'sh-storage', '本节点计算'],
-    ['sh-storage', 'sh-compute', '同站点计算'],
-    ['sh-storage', 'central', '跨站点计算'],
-    ['missing', 'central', '跨节点计算（站点信息不全）']
+    ['sh-storage', 'sh-compute', '同域计算'],
+    ['sh-storage', 'central', '跨域计算'],
+    ['missing', 'central', '跨节点计算（域信息不全）']
   ])('shows %s -> %s in both modes', (source, target, label) => {
     for (const [mode, title, prefix] of [
       ['IN_PLACE', '原位调度方案', ''],
