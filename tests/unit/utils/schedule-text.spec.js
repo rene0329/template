@@ -145,28 +145,15 @@ describe('task dataset helpers', () => {
   })
 })
 
-describe('schedule placement details', () => {
-  const nodes = [
-    { k8sNodeName: 'sh-storage', siteCode: 'sh' },
-    { k8sNodeName: 'sh-compute', siteCode: 'sh' },
-    { k8sNodeName: 'central', siteCode: 'core' }
-  ]
-  it.each([
-    ['sh-storage', 'sh-storage', '本节点计算'],
-    ['sh-storage', 'sh-compute', '同域计算'],
-    ['sh-storage', 'central', '跨域计算'],
-    ['missing', 'central', '跨节点计算（域信息不全）']
-  ])('shows %s -> %s in both modes', (source, target, label) => {
-    for (const [mode, title] of [
-      ['IN_PLACE', '原位调度方案'],
-      ['CENTRALIZED', '集中式调度方案']
-    ]) {
-      expect(schedulePlacementForDisplay(`a: ${source} -> ${target} [${mode}]`, title, nodes))
-        .toBe(`a: ${source} -> ${target} [${label}]`)
+describe('schedule path display', () => {
+  it.each(['IN_PLACE', 'CENTRALIZED', '本节点计算', '同域计算', '跨域计算', '跨节点计算（域信息不全）'])('removes redundant %s labels from both schemes', label => {
+    for (const title of ['原位调度方案', '集中式调度方案']) {
+      expect(schedulePlacementForDisplay(`a: source -> target [${label}]`, title)).toBe('a: source -> target')
     }
   })
-  it('preserves failed and manual schedules', () => {
-    expect(schedulePlacementForDisplay('a: 执行失败', '原位调度方案', nodes)).toBe('a: 执行失败')
-    expect(schedulePlacementForDisplay('a: x -> y [复制]', '调度目标节点 y', nodes)).toBe('a: x -> y [复制]')
+  it('preserves paths, failures and manual actions', () => {
+    expect(schedulePlacementForDisplay('a: x -> y', '原位调度方案')).toBe('a: x -> y')
+    expect(schedulePlacementForDisplay('a: 执行失败', '原位调度方案')).toBe('a: 执行失败')
+    expect(schedulePlacementForDisplay('a: x -> y [复制]', '调度目标节点 y')).toBe('a: x -> y [复制]')
   })
 })

@@ -1,9 +1,7 @@
-import { fetchRegisteredNodes } from '@/api/registrationApi'
 import Vue from 'vue'
 import Schedule from '@/views/ManagementCenter/Schedule/index.vue'
 import { fetchScheduleList } from '@/api/managementCenterApi'
 
-jest.mock('@/api/registrationApi', () => ({ fetchRegisteredNodes: jest.fn() }))
 
 jest.mock('@/api/managementCenterApi', () => ({ fetchScheduleList: jest.fn() }))
 
@@ -53,7 +51,6 @@ const texts = (root, selector) => Array.from(root.querySelectorAll(selector)).ma
 
 beforeEach(() => {
   jest.resetAllMocks()
-  fetchRegisteredNodes.mockResolvedValue({ list: [], total: 0 })
   fetchScheduleList.mockResolvedValue({ list: rows, total: rows.length })
 })
 
@@ -70,10 +67,10 @@ it('renders one row per task with structured schedule blocks in the schedule cel
   // Rows are sorted by task id: 5 (comparison), 6 (target node), 7 (unrecognised), 8 (legacy compute schedule).
   expect(texts(cells[0], '.schedule-title')).toEqual(['原位调度方案', '集中式调度方案'])
   const [distributed, centralized] = cells[0].querySelectorAll('.schedule-section')
-  expect(texts(distributed, '.schedule-line')).toEqual(['ds-a: n1 -> n1 [本节点计算]', 'ds-b: n2 -> n2 [本节点计算]'])
+  expect(texts(distributed, '.schedule-line')).toEqual(['ds-a: n1 -> n1', 'ds-b: n2 -> n2'])
   expect(distributed.textContent).not.toContain('资源不足')
   expect(distributed.textContent).not.toContain('改用次优计算节点')
-  expect(texts(centralized, '.schedule-line')).toEqual(['ds-a: n1 -> central [跨节点计算（域信息不全）]', 'ds-b: 执行失败'])
+  expect(texts(centralized, '.schedule-line')).toEqual(['ds-a: n1 -> central', 'ds-b: 执行失败'])
   expect(texts(cells[0], '.schedule-line.is-failed')).toEqual(['ds-b: 执行失败'])
   expect(cells[0].textContent).not.toContain('中心化')
 
