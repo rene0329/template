@@ -1,4 +1,4 @@
-import { parseSchedule, scheduleLineFailed, scheduleTextForDisplay, taskDatasetNames } from '@/utils/schedule-text'
+import { parseSchedule, schedulePlacementForDisplay, scheduleLineFailed, scheduleTextForDisplay, taskDatasetNames } from '@/utils/schedule-text'
 
 describe('parseSchedule', () => {
   it('splits a comparison task into distributed and centralized blocks with one line per dataset', () => {
@@ -142,5 +142,31 @@ describe('task dataset helpers', () => {
   it('returns no names when the datasets are unknown', () => {
     expect(taskDatasetNames({})).toEqual([])
     expect(taskDatasetNames(null)).toEqual([])
+  })
+})
+
+describe('schedule placement details', () => {
+  const nodes = [
+    { k8sNodeName: 'sh-storage', siteCode: 'sh' },
+    { k8sNodeName: 'sh-compute', siteCode: 'sh' },
+    { k8sNodeName: 'central', siteCode: 'core' }
+  ]
+  it.each([
+    ['sh-storage', 'sh-storage', '本节点计算'],
+    ['sh-storage', 'sh-compute', '同站点计算'],
+    ['sh-storage', 'central', '跨站点计算'],
+    ['missing', 'central', '跨节点计算（站点信息不全）']
+  ])('shows %s -> %s in both modes', (source, target, label) => {
+    for (const [mode, title, prefix] of [
+      ['IN_PLACE', '原位调度方案', ''],
+      ['CENTRALIZED', '集中式调度方案', '集中式计算；']
+    ]) {
+      expect(schedulePlacementForDisplay(`a: ${source} -> ${target} [${mode}]`, title, nodes))
+        .toBe(`a: ${source} -> ${target} [${prefix}${label}]`)
+    }
+  })
+  it('preserves failed and manual schedules', () => {
+    expect(schedulePlacementForDisplay('a: 执行失败', '原位调度方案', nodes)).toBe('a: 执行失败')
+    expect(schedulePlacementForDisplay('a: x -> y [复制]', '调度目标节点 y', nodes)).toBe('a: x -> y [复制]')
   })
 })

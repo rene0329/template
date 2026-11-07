@@ -18,6 +18,7 @@
           <el-button icon="el-icon-edit el-icon--left">批量操作</el-button>
           <el-button style="width:110px">更多操作&nbsp;<i class="el-icon-bottom el-icon--left" /></el-button>
         </div>-->
+        <p class="schedule-placement-note">路径类型按当前登记的节点站点信息区分：本节点计算、同站点计算、跨站点计算；站点信息不全时显示跨节点计算。</p>
         <div class="content-row">
           <div class="table-card">
             <div class="table-wrapper">
@@ -46,7 +47,7 @@
                       <template v-if="scope.row.parsedSchedule.kind !== 'raw'">
                         <div v-for="(section, index) in scope.row.parsedSchedule.sections" :key="index" class="schedule-section">
                           <div class="schedule-title">{{ section.title }}</div>
-                          <div v-for="(line, lineIndex) in section.lines" :key="lineIndex" class="schedule-line" :class="{ 'is-failed': scheduleLineFailed(line) }">{{ scheduleTextForDisplay(line) }}</div>
+                          <div v-for="(line, lineIndex) in section.lines" :key="lineIndex" class="schedule-line" :class="{ 'is-failed': scheduleLineFailed(line) }">{{ schedulePlacementForDisplay(line, section.title, nodes) }}</div>
                           <div v-if="!section.lines.length" class="schedule-line is-empty">暂无</div>
                         </div>
                       </template>
@@ -98,10 +99,11 @@
 </template>
 
 <script>
+import { fetchRegisteredNodes } from '@/api/registrationApi'
 import { computationTextForDisplay } from '@/utils/computation-terms'
 import { fetchScheduleList } from '@/api/managementCenterApi'
 import { clampPage, fetchAllPages, paginateRows, sortRows } from '@/utils/dataset-catalog'
-import { parseSchedule, scheduleLineFailed, scheduleTextForDisplay } from '@/utils/schedule-text'
+import { parseSchedule, scheduleLineFailed, scheduleTextForDisplay, schedulePlacementForDisplay } from '@/utils/schedule-text'
 
 export default {
   name: 'NodeList',
@@ -117,7 +119,8 @@ export default {
         name: ''
       },
       // 从服务器获取的数据
-      TaskData: []
+      TaskData: [],
+      nodes: []
     }
   },
   computed: {
@@ -135,17 +138,22 @@ export default {
   },
 
   methods: {
+    schedulePlacementForDisplay,
     scheduleLineFailed,
     scheduleTextForDisplay,
     async fetchData() {
       this.loading = true
       try {
         // 后端 query 只匹配任务名称；这里取全量后在前端按任务ID（精确）或任务名称（包含）过滤。
+        const nodesPromise = fetchAllPages(
+          params => fetchRegisteredNodes(params, { silent: true })
+        ).catch(() => [])
         const tasks = await fetchAllPages(
           ({ page, pageSize, query }) => fetchScheduleList(page, pageSize, query),
           {},
           { query: '' }
         )
+        this.nodes = await nodesPromise
         const keyword = this.formInline.name.trim()
         this.TaskData = tasks
           .map(task => ({ ...task, taskName: computationTextForDisplay(task.taskName) }))
