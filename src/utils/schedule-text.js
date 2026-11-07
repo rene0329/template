@@ -125,6 +125,5 @@ export function schedulePlacementForDisplay(value, title, nodes = []) {
   const placement = source === target ? '本节点计算'
     : sourceSite && targetSite ? (sourceSite === targetSite ? '同域计算' : '跨域计算')
       : '跨节点计算（域信息不全）'
-  const mode = title === '集中式调度方案' ? '集中式计算；' : ''
-  return text.replace(/\s*\[(?:IN_PLACE|CENTRALIZED)\]$/, '') + ` [${mode}${placement}]`
+  return text.replace(/\s*\[(?:IN_PLACE|CENTRALIZED)\]$/, '') + ` [${placement}]`
 }

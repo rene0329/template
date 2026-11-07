@@ -157,12 +157,12 @@ describe('schedule placement details', () => {
     ['sh-storage', 'central', '跨域计算'],
     ['missing', 'central', '跨节点计算（域信息不全）']
   ])('shows %s -> %s in both modes', (source, target, label) => {
-    for (const [mode, title, prefix] of [
-      ['IN_PLACE', '原位调度方案', ''],
-      ['CENTRALIZED', '集中式调度方案', '集中式计算；']
+    for (const [mode, title] of [
+      ['IN_PLACE', '原位调度方案'],
+      ['CENTRALIZED', '集中式调度方案']
     ]) {
       expect(schedulePlacementForDisplay(`a: ${source} -> ${target} [${mode}]`, title, nodes))
-        .toBe(`a: ${source} -> ${target} [${prefix}${label}]`)
+        .toBe(`a: ${source} -> ${target} [${label}]`)
     }
   })
   it('preserves failed and manual schedules', () => {
