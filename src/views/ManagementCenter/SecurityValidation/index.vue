@@ -8,7 +8,7 @@
         <el-tabs v-model="activeTab" :class="{ 'single-pane': !showAcceptanceTools }">
           <el-tab-pane label="异常访问记录" name="abnormal">
             <div class="toolbar">
-              <span>被拒绝的数据集访问请求，主要是域用户跨域访问权限外的数据集；显示最近 {{ abnormal.limit }} 条。</span>
+              <span>被拒绝的数据集访问请求，主要是方舱用户跨域访问权限外的数据集；显示最近 {{ abnormal.limit }} 条。</span>
               <el-button icon="el-icon-refresh" :loading="abnormal.loading" @click="loadAbnormalEvents">刷新</el-button>
             </div>
             <el-alert v-if="abnormal.error" :title="abnormal.error" type="error" :closable="false" show-icon class="toolbar-alert" />

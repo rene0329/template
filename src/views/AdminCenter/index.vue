@@ -2,16 +2,16 @@
   <el-container class="admin-page">
     <el-main>
       <section class="page-heading">
-        <div><h2>系统管理</h2><p>管理协同业务域和账号角色。已被任务引用的记录只能停用。</p></div>
+        <div><h2>系统管理</h2><p>管理方舱和账号角色。已被任务引用的记录只能停用。</p></div>
         <el-button icon="el-icon-refresh" :loading="loading" @click="loadAll">刷新</el-button>
       </section>
 
       <el-tabs v-model="activeTab" class="content-card">
-        <el-tab-pane label="域管理" name="domains">
-          <div class="toolbar"><span>受限域账号只能直接使用存放在本域节点上的数据集，其他数据集需申请短期访问令牌；业务域数量不受 A/B/C 执行槽限制</span><el-button type="primary" icon="el-icon-plus" @click="openDomain()">新增业务域</el-button></div>
+        <el-tab-pane label="方舱管理" name="domains">
+          <div class="toolbar"><span>方舱用户账号只能直接使用存放在本方舱节点上的数据集，其他数据集需申请短期访问令牌；方舱数量不受 A/B/C 执行槽限制</span><el-button type="primary" icon="el-icon-plus" @click="openDomain()">新增方舱</el-button></div>
           <el-table v-loading="loading" :data="domains" border>
-            <el-table-column prop="code" label="域编码" min-width="140" />
-            <el-table-column prop="name" label="域名称" min-width="160" />
+            <el-table-column prop="code" label="方舱编码" min-width="140" />
+            <el-table-column prop="name" label="方舱名称" min-width="160" />
             <el-table-column label="对应站点" width="110"><template slot-scope="s">{{ domainSite(s.row) }}</template></el-table-column>
             <el-table-column label="包含节点" min-width="220"><template slot-scope="s">{{ domainNodeNames(s.row) }}</template></el-table-column>
             <el-table-column prop="description" label="说明" min-width="200" show-overflow-tooltip />
@@ -21,25 +21,25 @@
         </el-tab-pane>
 
         <el-tab-pane label="用户管理" name="users">
-          <div class="toolbar"><span>域用户必须绑定一个启用的业务域</span><el-button type="primary" icon="el-icon-plus" @click="openUser()">新增用户</el-button></div>
+          <div class="toolbar"><span>方舱用户必须绑定一个启用的方舱</span><el-button type="primary" icon="el-icon-plus" @click="openUser()">新增用户</el-button></div>
           <el-table v-loading="loading" :data="users" border>
             <el-table-column prop="username" label="用户名" min-width="140" />
             <el-table-column label="姓名" min-width="140"><template slot-scope="s">{{ s.row.displayName || s.row.name || '—' }}</template></el-table-column>
             <el-table-column label="角色" min-width="190"><template slot-scope="s"><el-tag v-for="role in roleValues(s.row)" :key="role" size="mini" class="tag">{{ roleText(role) }}</el-tag></template></el-table-column>
-            <el-table-column label="业务域" min-width="160"><template slot-scope="s">{{ userDomainName(s.row) }}</template></el-table-column>
+            <el-table-column label="方舱" min-width="160"><template slot-scope="s">{{ userDomainName(s.row) }}</template></el-table-column>
             <el-table-column label="状态" width="100"><template slot-scope="s"><el-tag :type="isEnabled(s.row) ? 'success' : 'info'">{{ isEnabled(s.row) ? '启用' : '停用' }}</el-tag></template></el-table-column>
             <el-table-column label="操作" width="230"><template slot-scope="s"><el-button type="text" @click="openUser(s.row)">编辑</el-button><el-button type="text" @click="toggleUser(s.row)">{{ isEnabled(s.row) ? '停用' : '启用' }}</el-button><el-button type="text" @click="openPassword(s.row)">重置密码</el-button></template></el-table-column>
           </el-table>
         </el-tab-pane>
       </el-tabs>
 
-      <el-dialog :title="domainForm.id ? '编辑业务域' : '新增业务域'" :visible.sync="domainDialog" width="520px">
+      <el-dialog :title="domainForm.id ? '编辑方舱' : '新增方舱'" :visible.sync="domainDialog" width="520px">
         <el-form label-width="90px">
-          <el-form-item label="域编码" required><el-input v-model.trim="domainForm.code" :disabled="!!domainForm.id" /></el-form-item>
-          <el-form-item label="域名称" required><el-input v-model.trim="domainForm.name" /></el-form-item>
+          <el-form-item label="方舱编码" required><el-input v-model.trim="domainForm.code" :disabled="!!domainForm.id" /></el-form-item>
+          <el-form-item label="方舱名称" required><el-input v-model.trim="domainForm.name" /></el-form-item>
           <el-form-item label="对应站点">
             <el-select v-model="domainForm.siteCode" clearable placeholder="不对应站点" style="width:100%"><el-option v-for="item in siteOptions" :key="item.value" :label="item.label" :value="item.value" /></el-select>
-            <div class="muted site-hint">该站点的全部节点属于本域，存放在这些节点上的数据集归属本域</div>
+            <div class="muted site-hint">该站点的全部节点属于本方舱，存放在这些节点上的数据集归属本方舱</div>
           </el-form-item>
           <el-form-item label="说明"><el-input v-model="domainForm.description" type="textarea" /></el-form-item>
         </el-form>
@@ -47,7 +47,7 @@
       </el-dialog>
 
       <el-dialog :title="userForm.id ? '编辑用户' : '新增用户'" :visible.sync="userDialog" width="560px">
-        <el-form label-width="90px"><el-form-item label="用户名" required><el-input v-model.trim="userForm.username" :disabled="!!userForm.id" /></el-form-item><el-form-item label="姓名" required><el-input v-model.trim="userForm.displayName" /></el-form-item><el-form-item v-if="!userForm.id" label="初始密码" required><el-input v-model="userForm.password" type="password" show-password /></el-form-item><el-form-item label="角色" required><el-select v-model="userForm.roles" multiple style="width:100%"><el-option label="管理员" value="ADMIN" /><el-option label="域用户" value="DATA_OWNER" /><el-option label="审计员" value="AUDITOR" /></el-select></el-form-item><el-form-item v-if="userForm.roles.includes('DATA_OWNER')" label="业务域" required><el-select v-model="userForm.domainId" style="width:100%"><el-option v-for="item in enabledDomains" :key="item.id || item.domainId" :label="item.name" :value="item.id || item.domainId" /></el-select></el-form-item></el-form>
+        <el-form label-width="90px"><el-form-item label="用户名" required><el-input v-model.trim="userForm.username" :disabled="!!userForm.id" /></el-form-item><el-form-item label="姓名" required><el-input v-model.trim="userForm.displayName" /></el-form-item><el-form-item v-if="!userForm.id" label="初始密码" required><el-input v-model="userForm.password" type="password" show-password /></el-form-item><el-form-item label="角色" required><el-select v-model="userForm.roles" multiple style="width:100%"><el-option label="管理员" value="ADMIN" /><el-option label="方舱用户" value="DATA_OWNER" /><el-option label="审计员" value="AUDITOR" /></el-select></el-form-item><el-form-item v-if="userForm.roles.includes('DATA_OWNER')" label="方舱" required><el-select v-model="userForm.domainId" style="width:100%"><el-option v-for="item in enabledDomains" :key="item.id || item.domainId" :label="item.name" :value="item.id || item.domainId" /></el-select></el-form-item></el-form>
         <span slot="footer"><el-button @click="userDialog=false">取消</el-button><el-button type="primary" :loading="saving" :disabled="!canSaveUser" @click="saveUser">保存</el-button></span>
       </el-dialog>
 
@@ -63,7 +63,7 @@ import { createDomain, createUser, fetchDomains, fetchUsers, resetUserPassword, 
 import { fetchAllPages } from '@/utils/dataset-catalog'
 
 const ADMIN_TABS = ['domains', 'users']
-const DOMAIN_ERRORS = { DOMAIN_SITE_TAKEN: '该站点已对应其他业务域' }
+const DOMAIN_ERRORS = { DOMAIN_SITE_TAKEN: '该站点已对应其他方舱' }
 const listOf = value => Array.isArray(value) ? value : (value && Array.isArray(value.list) ? value.list : [])
 const siteOf = value => value == null ? '' : String(value).trim()
 const joinNames = names => names.length ? names.join('、') : '—'
@@ -102,7 +102,7 @@ export default {
   methods: {
     isEnabled(item) { return item.enabled !== false && item.status !== 'DISABLED' && item.status !== 'INACTIVE' },
     roleValues(user) { return (user.roles || []).map(role => typeof role === 'string' ? role : role.code) },
-    roleText(role) { return { ADMIN: '管理员', DATA_OWNER: '域用户', AUDITOR: '审计员' }[role] || role },
+    roleText(role) { return { ADMIN: '管理员', DATA_OWNER: '方舱用户', AUDITOR: '审计员' }[role] || role },
     userDomainId(user) { return user.domainId || (user.domain && (user.domain.id || user.domain.domainId)) },
     userDomainName(user) { return user.domainName || (user.domain && user.domain.name) || '—' },
     domainSite(domain) { return siteOf(domain.siteCode) || '—' },
@@ -118,9 +118,9 @@ export default {
     },
     openDomain(row = {}) { this.domainForm = { id: row.id || row.domainId || null, code: row.code || row.domainCode || '', name: row.name || '', description: row.description || '', siteCode: siteOf(row.siteCode) || null }; this.domainDialog = true },
     // 清空站点时 el-select 回填空字符串，统一以 null 提交表示解除对应。
-    async saveDomain() { this.saving = true; try { const payload = { code: this.domainForm.code, name: this.domainForm.name, description: this.domainForm.description, siteCode: siteOf(this.domainForm.siteCode) || null }; if (this.domainForm.id) await updateDomain(this.domainForm.id, payload); else await createDomain(payload); this.domainDialog = false; this.$message.success('业务域已保存'); await this.loadAll() } catch (error) { this.$message.error(`保存失败：${DOMAIN_ERRORS[error.errorCode] || error.message}`) } finally { this.saving = false } },
+    async saveDomain() { this.saving = true; try { const payload = { code: this.domainForm.code, name: this.domainForm.name, description: this.domainForm.description, siteCode: siteOf(this.domainForm.siteCode) || null }; if (this.domainForm.id) await updateDomain(this.domainForm.id, payload); else await createDomain(payload); this.domainDialog = false; this.$message.success('方舱已保存'); await this.loadAll() } catch (error) { this.$message.error(`保存失败：${DOMAIN_ERRORS[error.errorCode] || error.message}`) } finally { this.saving = false } },
     // 启停时带上当前站点，避免后端把缺省的 siteCode 当作解除对应。
-    async toggleDomain(row) { try { await updateDomain(row.id || row.domainId, { enabled: !this.isEnabled(row), siteCode: siteOf(row.siteCode) || null }); this.$message.success('业务域状态已更新'); await this.loadAll() } catch (error) { this.$message.error(`状态更新失败：${error.message}`) } },
+    async toggleDomain(row) { try { await updateDomain(row.id || row.domainId, { enabled: !this.isEnabled(row), siteCode: siteOf(row.siteCode) || null }); this.$message.success('方舱状态已更新'); await this.loadAll() } catch (error) { this.$message.error(`状态更新失败：${error.message}`) } },
     openUser(row = {}) { this.userForm = { id: row.id || row.userId || null, username: row.username || '', displayName: row.displayName || row.name || '', password: '', roles: this.roleValues(row), domainId: this.userDomainId(row) || null }; this.userDialog = true },
     async saveUser() { this.saving = true; try { const payload = { username: this.userForm.username, displayName: this.userForm.displayName, roles: this.userForm.roles, domainId: this.userForm.roles.includes('DATA_OWNER') ? this.userForm.domainId : null }; if (this.userForm.id) await updateUser(this.userForm.id, payload); else await createUser({ ...payload, password: this.userForm.password }); this.userDialog = false; this.$message.success('用户已保存'); await this.loadAll() } catch (error) { this.$message.error(`保存失败：${error.message}`) } finally { this.saving = false } },
     async toggleUser(row) { try { await updateUser(row.id || row.userId, { enabled: !this.isEnabled(row) }); this.$message.success('用户状态已更新'); await this.loadAll() } catch (error) { this.$message.error(`状态更新失败：${error.message}`) } },

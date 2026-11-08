@@ -11,16 +11,16 @@ export function nodeLocation(node) {
 }
 
 const DOMAIN_LABELS = {
-  center: '中心域',
-  hangzhou: '杭州',
-  shanghai: '上海',
-  beijing: '北京',
-  shenzhen: '深圳'
+  center: '中心方舱',
+  hangzhou: '杭州方舱',
+  shanghai: '上海方舱',
+  beijing: '北京方舱',
+  shenzhen: '深圳方舱'
 }
 
 export function domainLabel(site) {
   const key = String(site || '').trim().toLowerCase()
-  if (!key) return '未分域'
+  if (!key) return '未归属方舱'
   return DOMAIN_LABELS[key] || key
 }
 

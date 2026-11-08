@@ -23,5 +23,5 @@ it('submits domain-derived slot inputs and exposes pending approvals', () => {
   expect(page).toContain('inputs: this.jobForm.inputs.map')
   expect(page).toContain('domainIds')
   expect(page).not.toContain('ownerUserId')
-  expect(page).toContain('同一任务中的数据必须来自不同业务域')
+  expect(page).toContain('同一任务中的数据必须来自不同方舱')
 })

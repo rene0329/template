@@ -55,7 +55,7 @@ it('explains why each dataset is available and shows grant time left in server t
   expect(vm.ttlMinutes).toBe(30)
   expect(vm.rows.map(row => [row.access.label, row.access.type, row.access.detail])).toEqual([
     ['可用', 'success', '管理员'],
-    ['可用', 'success', '本域数据'],
+    ['可用', 'success', '本方舱数据'],
     ['可用', 'success', '短期授权，剩余 23 分钟'],
     ['不可用', 'info', '需申请短期访问令牌']
   ])
@@ -67,16 +67,16 @@ it('explains why each dataset is available and shows grant time left in server t
 it('searches all datasets by name, code, version and location domains', () => {
   const vm = context()
   vm.items = [
-    dataset(1, { domainIds: [1], domainNames: ['上海域（A）'] }),
+    dataset(1, { domainIds: [1], domainNames: ['上海方舱'] }),
     dataset(2, { datasetCode: 'census', version: 'v2' }),
-    dataset(3, { domainIds: [3, 5], domainNames: ['北京域（C）', '中心域'] }),
+    dataset(3, { domainIds: [3, 5], domainNames: ['北京方舱', '中心方舱'] }),
     dataset(4, { domainIds: [], domainNames: [] })
   ]
   vm.query = ' CENSUS '
   expect(vm.rows.map(row => row.datasetId)).toEqual([2])
-  vm.query = '上海域'
+  vm.query = '上海方舱'
   expect(vm.rows.map(row => row.datasetId)).toEqual([1])
-  vm.query = '中心域'
+  vm.query = '中心方舱'
   expect(vm.rows.map(row => row.datasetId)).toEqual([3])
   vm.query = 'b 域'
   expect(vm.rows.map(row => row.datasetId)).toEqual([2])
@@ -88,7 +88,7 @@ it('searches all datasets by name, code, version and location domains', () => {
 it('shows every location domain of a dataset and a dash when it is on no domain node', () => {
   const vm = context()
   expect(vm.domainName(dataset(1))).toBe('B 域')
-  expect(vm.domainName(dataset(2, { domainIds: [1, 5], domainNames: ['上海域（A）', '中心域'] }))).toBe('上海域（A）、中心域')
+  expect(vm.domainName(dataset(2, { domainIds: [1, 5], domainNames: ['上海方舱', '中心方舱'] }))).toBe('上海方舱、中心方舱')
   expect(vm.domainName(dataset(3, { domainIds: [], domainNames: [] }))).toBe('—')
   expect(vm.domainName(dataset(4, { domainIds: undefined, domainNames: undefined }))).toBe('—')
   expect(vm.domainName({ datasetId: 5, ownerDomainId: 2, ownerDomainName: 'B 域' })).toBe('—')
@@ -188,7 +188,7 @@ it('counts a grant down, flips it to unavailable at expiry and refetches without
 it('renders location domains and the apply button only on unavailable rows', async() => {
   jest.useFakeTimers()
   fetchDatasetAccess.mockResolvedValue(payload([
-    dataset(1, { accessible: true, basis: 'OWN_DOMAIN', domainIds: [1, 5], domainNames: ['上海域（A）', '中心域'] }),
+    dataset(1, { accessible: true, basis: 'OWN_DOMAIN', domainIds: [1, 5], domainNames: ['上海方舱', '中心方舱'] }),
     dataset(2, { accessible: true, basis: 'GRANT', grantExpiresAt: iso(START + 10 * 60000), domainIds: [], domainNames: [] }),
     dataset(3)
   ]))
@@ -222,11 +222,11 @@ it('renders location domains and the apply button only on unavailable rows', asy
   })
   await flush()
 
-  const domains = wrapper.findAll('[data-label="所属域"] .cell')
-  expect(domains.wrappers.map(cell => cell.text())).toEqual(['上海域（A）、中心域', '—', 'B 域'])
+  const domains = wrapper.findAll('[data-label="所属方舱"] .cell')
+  expect(domains.wrappers.map(cell => cell.text())).toEqual(['上海方舱、中心方舱', '—', 'B 域'])
   const status = wrapper.findAll('[data-label="状态"] .cell')
   expect(status.wrappers.map(cell => cell.find('.tag').text())).toEqual(['可用', '可用', '不可用'])
-  expect(status.at(0).text()).toContain('本域数据')
+  expect(status.at(0).text()).toContain('本方舱数据')
   expect(status.at(1).text()).toContain('短期授权，剩余 10 分钟')
   const actions = wrapper.findAll('[data-label="操作"] .cell')
   expect(actions.wrappers.map(cell => cell.findAll('button').length)).toEqual([0, 0, 1])

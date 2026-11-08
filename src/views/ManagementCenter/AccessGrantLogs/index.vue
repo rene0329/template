@@ -28,7 +28,7 @@
         <el-table-column label="申请用户" min-width="150" show-overflow-tooltip>
           <template slot-scope="scope">{{ userLabel(scope.row) }}</template>
         </el-table-column>
-        <el-table-column label="所属域" min-width="120" show-overflow-tooltip>
+        <el-table-column label="所属方舱" min-width="120" show-overflow-tooltip>
           <template slot-scope="scope">{{ scope.row.domainName || '—' }}</template>
         </el-table-column>
         <el-table-column label="数据集" min-width="190" show-overflow-tooltip>

@@ -4,7 +4,7 @@
       <section class="page-heading">
         <div>
           <h2>访问控制</h2>
-          <p>数据集的所属域由其当前存放的节点决定。存放在本域节点上的数据集可直接使用；其他数据集需填写申请说明，申请短期访问令牌<span v-if="ttlMinutes">（有效期 {{ ttlMinutes }} 分钟）</span>，到期后自动失效。</p>
+          <p>数据集的所属方舱由其当前存放的节点决定。存放在本方舱节点上的数据集可直接使用；其他数据集需填写申请说明，申请短期访问令牌<span v-if="ttlMinutes">（有效期 {{ ttlMinutes }} 分钟）</span>，到期后自动失效。</p>
         </div>
         <el-button icon="el-icon-refresh" :loading="loading" @click="load()">刷新</el-button>
       </section>
@@ -12,7 +12,7 @@
       <section class="content-card">
         <div class="toolbar">
           <span>共 {{ items.length }} 个数据集，当前可用 {{ accessibleCount }} 个</span>
-          <el-input v-model="query" clearable prefix-icon="el-icon-search" placeholder="搜索名称、编码、版本或所属域" class="search" />
+          <el-input v-model="query" clearable prefix-icon="el-icon-search" placeholder="搜索名称、编码、版本或所属方舱" class="search" />
         </div>
         <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon class="load-error" />
         <el-table v-loading="loading" :data="rows" :empty-text="emptyText" row-key="datasetId" border>
@@ -21,7 +21,7 @@
           </el-table-column>
           <el-table-column prop="datasetCode" label="编码" min-width="150" show-overflow-tooltip />
           <el-table-column prop="version" label="版本" width="90" />
-          <el-table-column label="所属域" min-width="150"><template slot-scope="s">{{ domainName(s.row) }}</template></el-table-column>
+          <el-table-column label="所属方舱" min-width="150"><template slot-scope="s">{{ domainName(s.row) }}</template></el-table-column>
           <el-table-column label="状态" min-width="250">
             <template slot-scope="s">
               <div class="status-cell"><el-tag :type="s.row.access.type" size="small">{{ s.row.access.label }}</el-tag><span>{{ s.row.access.detail }}</span></div>
@@ -38,7 +38,7 @@
         <el-descriptions v-if="apply.dataset" :column="1" size="small" border>
           <el-descriptions-item label="数据集">{{ datasetName(apply.dataset) }}</el-descriptions-item>
           <el-descriptions-item label="编码 / 版本">{{ apply.dataset.datasetCode || '—' }} · {{ apply.dataset.version || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="所属域">{{ domainName(apply.dataset) }}</el-descriptions-item>
+          <el-descriptions-item label="所属方舱">{{ domainName(apply.dataset) }}</el-descriptions-item>
         </el-descriptions>
         <el-form label-position="top" class="apply-form">
           <el-form-item label="申请说明" :error="apply.touched ? reasonError : ''" required>
@@ -63,7 +63,7 @@ const REFRESH_INTERVAL_MS = 60000
 const EXPIRY_GRACE_MS = 1000
 const MAX_TIMEOUT_MS = 2147483647
 
-const BASIS_TEXT = { ADMIN: '管理员', OWN_DOMAIN: '本域数据', GRANT: '短期授权' }
+const BASIS_TEXT = { ADMIN: '管理员', OWN_DOMAIN: '本方舱数据', GRANT: '短期授权' }
 const GRANT_CONFLICTS = {
   DATASET_ALREADY_ACCESSIBLE: '该数据集当前已可用，无需申请',
   GRANT_ALREADY_ACTIVE: '该数据集已有生效中的短期授权'
@@ -77,7 +77,7 @@ const parseInstant = value => {
   return Date.parse(/(Z|[+-]\d{2}:?\d{2})$/i.test(text) ? text : `${text}Z`)
 }
 
-// 数据集随副本所在节点归属一个或多个业务域；不在任何域节点上时为空。
+// 数据集随副本所在节点归属一个或多个方舱；不在任何域节点上时为空。
 const domainNamesOf = row => (Array.isArray(row.domainNames) ? row.domainNames : [])
   .filter(name => name != null && String(name).trim() !== '')
 

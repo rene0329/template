@@ -541,7 +541,7 @@ export default {
           <div style="min-width:220px;line-height:1.6;">
             <div><b>节点名称：</b>${esc(data.label)}</div>
             <div><b>节点类型：</b>${esc(nodeTypeLabel(data.type))}</div>
-            <div><b>所属域：</b>${esc(domainLabel(data.site))}</div>
+            <div><b>所属方舱：</b>${esc(domainLabel(data.site))}</div>
             <div><b>内网 IP：</b>${esc(data.internalIp || (this.nodeDetailsLoading ? '加载中…' : '未登记'))}</div>
             <div title="节点探测到的公网出口 IP；共用 NAT 的节点可能相同"><b>公网 IP：</b>${esc(data.externalIp || (this.nodeDetailsLoading ? '加载中…' : '未获取'))}</div>
             <div title="按当前公网 IP 查询离线地址库；表示出口 IP 归属地，不一定是节点实际机房位置"><b>IP 归属地：</b>${esc(data.location || '未查到归属地')}</div>

@@ -55,10 +55,10 @@ export default {
       this.$refs.backendSettings.open()
     },
     roleText(role) {
-      return { ADMIN: '管理员', DATA_OWNER: '域用户', AUDITOR: '审计员' }[role] || role
+      return { ADMIN: '管理员', DATA_OWNER: '方舱用户', AUDITOR: '审计员' }[role] || role
     },
     userLabel(user) {
-      const domain = user.domainName || user.domainCode || '无业务域'
+      const domain = user.domainName || user.domainCode || '无方舱'
       return `${user.displayName || user.username}（${user.username} · ${domain}）`
     },
     goToWorkspace() {

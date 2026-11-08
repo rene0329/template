@@ -18,13 +18,13 @@ const NODES = [
   node(21, 'cluster-sz-1', 'sz'), node(31, 'edge-unassigned', null)
 ]
 const DOMAINS = [
-  { id: 1, code: 'domain-a', name: '上海域（A）', description: '上海站点', siteCode: 'sh', enabled: true },
-  { id: 2, code: 'domain-b', name: '深圳域（B）', siteCode: 'sz', enabled: true },
-  { id: 5, code: 'core', name: '中心域', siteCode: 'core', enabled: true },
+  { id: 1, code: 'domain-a', name: '上海方舱', description: '上海站点', siteCode: 'sh', enabled: true },
+  { id: 2, code: 'domain-b', name: '深圳方舱', siteCode: 'sz', enabled: true },
+  { id: 5, code: 'core', name: '中心方舱', siteCode: 'core', enabled: true },
   { id: 6, code: 'domain-e', name: '新建域', siteCode: null, enabled: true },
   { id: 7, code: 'domain-x', name: '旧站点域', siteCode: 'gz', enabled: false }
 ]
-const USERS = [{ id: 8, username: 'owner-a', displayName: '上海用户', roles: ['DATA_OWNER'], domainId: 1, domainName: '上海域（A）', enabled: true }]
+const USERS = [{ id: 8, username: 'owner-a', displayName: '上海用户', roles: ['DATA_OWNER'], domainId: 1, domainName: '上海方舱', enabled: true }]
 const page = list => ({ list, total: list.length })
 const flush = () => new Promise(resolve => setTimeout(resolve))
 
@@ -56,9 +56,9 @@ it('loads registered nodes and shows the site and member nodes of each domain', 
   expect(vm.loading).toBe(false)
   expect(vm.$message.error).not.toHaveBeenCalled()
   expect(vm.domains.map(domain => [domain.name, vm.domainSite(domain), vm.domainNodeNames(domain)])).toEqual([
-    ['上海域（A）', 'sh', 'cluster-sh-1、上海-2、cluster-sh-3'],
-    ['深圳域（B）', 'sz', 'cluster-sz-1'],
-    ['中心域', 'core', 'master-40、master-141、master-215'],
+    ['上海方舱', 'sh', 'cluster-sh-1、上海-2、cluster-sh-3'],
+    ['深圳方舱', 'sz', 'cluster-sz-1'],
+    ['中心方舱', 'core', 'master-40、master-141、master-215'],
     ['新建域', '—', '—'],
     ['旧站点域', 'gz', '—']
   ])
@@ -94,11 +94,11 @@ it('sends the selected site on create and update and null when it is cleared', a
   updateDomain.mockResolvedValue({})
 
   vm.openDomain()
-  Object.assign(vm.domainForm, { code: 'domain-d', name: '杭州域（D）', siteCode: 'hz' })
+  Object.assign(vm.domainForm, { code: 'domain-d', name: '杭州方舱', siteCode: 'hz' })
   await vm.saveDomain()
-  expect(createDomain).toHaveBeenLastCalledWith({ code: 'domain-d', name: '杭州域（D）', description: '', siteCode: 'hz' })
+  expect(createDomain).toHaveBeenLastCalledWith({ code: 'domain-d', name: '杭州方舱', description: '', siteCode: 'hz' })
   expect(vm.domainDialog).toBe(false)
-  expect(vm.$message.success).toHaveBeenCalledWith('业务域已保存')
+  expect(vm.$message.success).toHaveBeenCalledWith('方舱已保存')
 
   vm.openDomain()
   Object.assign(vm.domainForm, { code: 'domain-f', name: '无站点域' })
@@ -114,7 +114,7 @@ it('sends the selected site on create and update and null when it is cleared', a
   vm.openDomain(DOMAINS[0])
   vm.domainForm.siteCode = ''
   await vm.saveDomain()
-  expect(updateDomain).toHaveBeenLastCalledWith(1, { code: 'domain-a', name: '上海域（A）', description: '上海站点', siteCode: null })
+  expect(updateDomain).toHaveBeenLastCalledWith(1, { code: 'domain-a', name: '上海方舱', description: '上海站点', siteCode: null })
   expect(vm.$message.error).not.toHaveBeenCalled()
   expect(fetchDomains).toHaveBeenCalledTimes(4)
 })
@@ -145,7 +145,7 @@ it('explains that a site already belongs to another domain and keeps the dialog 
   await vm.saveDomain()
 
   expect(updateDomain).toHaveBeenCalledWith(6, { code: 'domain-e', name: '新建域', description: '', siteCode: 'sh' })
-  expect(vm.$message.error).toHaveBeenCalledWith('保存失败：该站点已对应其他业务域')
+  expect(vm.$message.error).toHaveBeenCalledWith('保存失败：该站点已对应其他方舱')
   expect(vm.domainDialog).toBe(true)
   expect(vm.saving).toBe(false)
   expect(fetchDomains).not.toHaveBeenCalled()
@@ -161,11 +161,11 @@ it('explains that a site already belongs to another domain and keeps the dialog 
 it('has no dataset holder section: only domain and user management remain', () => {
   const source = fs.readFileSync(path.resolve(__dirname, '../../../src/views/AdminCenter/index.vue'), 'utf8')
   expect(source).not.toMatch(/数据归属|调整归属|assignDatasetOwner|ownerUserId|ownerDialog/)
-  expect(source).toContain('<el-tab-pane label="域管理" name="domains">')
+  expect(source).toContain('<el-tab-pane label="方舱管理" name="domains">')
   expect(source).toContain('<el-tab-pane label="用户管理" name="users">')
   expect(source.match(/<el-tab-pane /g)).toHaveLength(2)
 
-  // 旧书签 ?tab=datasets 落到默认的域管理标签页。
+  // 旧书签 ?tab=datasets 落到默认的方舱管理标签页。
   const vm = { ...AdminCenter.data.call({ $route: { query: { tab: 'datasets' }}}) }
   expect(vm.activeTab).toBe('domains')
   expect(AdminCenter.data.call({ $route: { query: { tab: 'users' }}}).activeTab).toBe('users')
@@ -211,7 +211,7 @@ it('renders domain sites and member nodes', async() => {
   expect(cells('domains', '包含节点')).toEqual([
     'cluster-sh-1、上海-2、cluster-sh-3', 'cluster-sz-1', 'master-40、master-141、master-215', '—', '—'
   ])
-  expect(cells('users', '业务域')).toEqual(['上海域（A）'])
+  expect(cells('users', '方舱')).toEqual(['上海方舱'])
   expect(wrapper.find('[data-tab="datasets"]').exists()).toBe(false)
 
   wrapper.findAll('[data-tab="domains"] [data-label="操作"] .cell').at(4).find('button').trigger('click')

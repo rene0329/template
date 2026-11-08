@@ -48,7 +48,7 @@
           <router-link to="/collaboration/jobs" class="panel-link">查看全部协同任务 <i class="el-icon-right" /></router-link>
         </template>
         <template v-else>
-          <p class="panel-note">本域数据可直接用于任务；其他域的数据集需在安全中心申请短期访问令牌，令牌到期后自动失效。</p>
+          <p class="panel-note">本方舱数据可直接用于任务；其他方舱的数据集需在安全中心申请短期访问令牌，令牌到期后自动失效。</p>
           <router-link to="/security/access" class="panel-link">查看数据集访问权限 <i class="el-icon-right" /></router-link>
         </template>
       </article>
@@ -104,7 +104,7 @@ export default {
     name() { return this.$store.getters.name || this.$store.getters.username },
     roles() { return this.$store.getters.roles || [] },
     isDataOwner() { return this.roles.includes('DATA_OWNER') },
-    roleNames() { return this.roles.map(role => ({ ADMIN: '管理员', DATA_OWNER: '域用户', AUDITOR: '审计员' })[role] || role).join('、') },
+    roleNames() { return this.roles.map(role => ({ ADMIN: '管理员', DATA_OWNER: '方舱用户', AUDITOR: '审计员' })[role] || role).join('、') },
     domainName() { const domain = this.$store.getters.domain; return domain && (domain.name || domain.domainName) },
     metrics() {
       return [

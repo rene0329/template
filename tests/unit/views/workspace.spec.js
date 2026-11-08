@@ -14,7 +14,7 @@ const settle = () => new Promise(resolve => setTimeout(resolve))
 function mountWorkspace() {
   return mount(Workspace, {
     stubs: { RouterLink: RouterLinkStub, 'el-button': Plain, 'el-tag': Plain, 'el-alert': Plain },
-    mocks: { $store: { getters: { name: '域用户甲', roles: ['DATA_OWNER'], domain: { name: 'A 域' }}}}
+    mocks: { $store: { getters: { name: '方舱用户甲', roles: ['DATA_OWNER'], domain: { name: 'A 域' }}}}
   })
 }
 
