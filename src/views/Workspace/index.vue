@@ -2,7 +2,6 @@
   <main class="workspace-page">
     <section class="hero-card">
       <div>
-        <span class="eyebrow">TOPIC4 · 原位调度</span>
         <h1>业务工作台</h1>
         <p>{{ heroText }}</p>
       </div>
@@ -164,7 +163,6 @@ export default {
 <style lang="scss" scoped>
 .workspace-page { min-height: calc(100vh - 90px); padding: 24px; background: #f4f7fa; color: #263b4d; }
 .hero-card { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 28px 30px; border-radius: 12px; color: #fff; background: linear-gradient(120deg, #202231 0%, #245f56 100%); box-shadow: 0 10px 28px rgba(24, 48, 57, .15); }
-.eyebrow { color: #89dcc1; font-size: 12px; font-weight: 700; letter-spacing: .08em; }
 .hero-card h1 { margin: 8px 0; font-size: 28px; }
 .hero-card p { max-width: 700px; margin: 0; color: #d9e5e3; line-height: 1.7; }
 .hero-actions { display: flex; flex-shrink: 0; gap: 10px; }
