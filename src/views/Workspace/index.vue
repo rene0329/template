@@ -2,7 +2,7 @@
   <main class="workspace-page">
     <section class="hero-card">
       <div>
-        <span class="eyebrow">TOPIC4 · 原位调度与隐私协同计算</span>
+        <span class="eyebrow">TOPIC4 · 原位调度</span>
         <h1>业务工作台</h1>
         <p>{{ heroText }}</p>
       </div>
