@@ -7,7 +7,8 @@
       <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
       <template v-if="preview">
         <p>检查 {{ preview.datasetCount }} 个数据集，计划执行 {{ preview.assignments.length }} 项操作。</p>
-        <el-table :data="preview.placements" max-height="320">
+        <el-alert v-if="showDemo" title="演示记录 · 当前实时预览无可执行迁移" description="表格中的温度和时延为模拟值，仅供展示。" type="info" :closable="false" show-icon />
+        <el-table :data="displayedPlacements" max-height="320">
           <el-table-column prop="datasetName" label="数据集" min-width="180" show-overflow-tooltip />
           <el-table-column label="温度" width="90"><template slot-scope="scope">{{ formatHeat(scope.row.dataHeat) }}</template></el-table-column>
           <el-table-column prop="sourceNode" label="源节点" />
@@ -17,7 +18,6 @@
         </el-table>
         <ul v-if="preview.notices.length"><li v-for="(notice, index) in preview.notices" :key="index">{{ notice }}</li></ul>
         <el-alert v-if="preview.assignments.some(item => ['MOVE', 'DELETE'].includes(item.action))" title="迁移会在目标文件校验通过后删除源文件；执行端会再次确认没有任务正在使用该数据集。" type="warning" :closable="false" show-icon />
-        <p v-if="!preview.assignments.length">当前没有可执行的复制或迁移，请查看上面的提示。</p>
       </template>
       <el-alert v-if="accepted" :title="`调度计划 #${accepted.planId} 已提交，执行结果请查看调度日志。`" type="success" :closable="false" show-icon />
     </div>
@@ -35,10 +35,37 @@ import { previewDatasetStorage, submitDatasetStorage } from '@/api/datasetStorag
 import { requestId } from '@/api/registrationApi'
 import { formatHeat } from '@/utils/dataset-catalog'
 
+const demoPlacements = [
+  {
+    datasetName: 'epinions',
+    dataHeat: 80,
+    sourceNode: 'cluster-sz-3',
+    targetNode: 'cluster-sz-2',
+    action: 'MOVE',
+    reason: '就近计算节点 cluster-sz-1，模拟时延从 1.87 ms 降至 0.37 ms'
+  },
+  {
+    datasetName: 'Online Retail II',
+    dataHeat: 65,
+    sourceNode: 'cluster-sz-3',
+    targetNode: 'cluster-sz-2',
+    action: 'MOVE',
+    reason: '就近计算节点 cluster-sz-1，模拟时延从 1.87 ms 降至 0.37 ms'
+  }
+]
+
 export default {
   name: 'StoragePlanDialog',
   data() {
     return { visible: false, loading: false, submitting: false, preview: null, error: '', accepted: null, pending: null, version: 0 }
+  },
+  computed: {
+    showDemo() {
+      return Boolean(this.preview && !this.preview.assignments.length && !this.preview.placements.length)
+    },
+    displayedPlacements() {
+      return this.showDemo ? demoPlacements : this.preview.placements
+    }
   },
   beforeDestroy() { this.version++ },
   methods: {

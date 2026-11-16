@@ -7,6 +7,9 @@ const assignments = [{ datasetId: 9, replicaId: 19, sourceNodeId: 6, targetNodeI
 function context() {
   const vm = { ...Dialog.data(), $confirm: jest.fn().mockResolvedValue(true), $emit: jest.fn(), $router: { push: jest.fn() }}
   Object.entries(Dialog.methods).forEach(([name, method]) => { vm[name] = method.bind(vm) })
+  Object.entries(Dialog.computed).forEach(([name, getter]) => {
+    Object.defineProperty(vm, name, { get: getter.bind(vm) })
+  })
   return vm
 }
 
@@ -67,6 +70,23 @@ it('has no in-place aggregation mode and never loads dataset or node pickers', a
   expect(vm).not.toHaveProperty('mode')
   expect(vm).not.toHaveProperty('datasetIds')
   expect(vm.pending.mode).toBe('heat')
+})
+
+it('shows multiple demo rows for an empty preview and never submits them', async() => {
+  const vm = context()
+  const empty = { assignments: [], placements: [], notices: [] }
+  const actual = [{ datasetName: 'Actual dataset', action: 'MOVE' }]
+  previewDatasetStorage.mockResolvedValueOnce(empty)
+    .mockResolvedValueOnce({ ...empty, assignments, placements: actual })
+  await vm.open()
+  expect(vm.showDemo).toBe(true)
+  expect(vm.displayedPlacements.map(row => row.datasetName)).toEqual(['epinions', 'Online Retail II'])
+  await vm.submit()
+  expect(vm.$confirm).not.toHaveBeenCalled()
+  expect(submitDatasetStorage).not.toHaveBeenCalled()
+  await vm.load()
+  expect(vm.showDemo).toBe(false)
+  expect(vm.displayedPlacements).toBe(actual)
 })
 
 it('ignores a superseded preview and reports preview failures', async() => {
